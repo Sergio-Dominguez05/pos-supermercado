@@ -10,7 +10,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 
-[Descripción](#-descripción) · [Arquitectura C4](#-arquitectura-c4) · [Estructura](#-estructura-del-repositorio) · [Organización del equipo](#-flujo-de-trabajo) · [Documentación](#-documentación)
+[Descripción](#-descripción) · [Arquitectura C4](#-arquitectura-c4) · [Roadmap](#-roadmap-de-sprints) · [Estructura](#-estructura-del-repositorio) · [Organización del equipo](#-flujo-de-trabajo) · [Documentación](#-documentación)
 
 ## 📌 Descripción
 
@@ -127,7 +127,40 @@ Los criterios de aceptación se documentan en las historias. No se debe hacer pu
 
 ## 🏃 Organización ágil
 
-El backlog original incluye 13 épicas; el plan arquitectónico propone **Sprint 0 de preparación** y **sprints 1–8** como punto de partida, sujeto a la capacidad y calendario real del equipo. Las tareas se administrarán como **GitHub Issues** y se agruparán en **GitHub Projects** cuando se defina el compromiso de cada sprint.
+El backlog original incluye **13 épicas y 167 historias de usuario**, de las cuales **115 HU** integran el alcance propuesto para la V1 (las otras 52 quedan para futuras etapas). El **Sprint 0** prepara el entorno y los **sprints 1–8** distribuyen las 115 HU. La distribución es una **meta orientativa**, no un compromiso cerrado ni un calendario de 25 semanas: se ajustará a la capacidad real del equipo de tres integrantes y a las fechas del curso.
+
+### 🗺️ Roadmap de sprints
+
+El esquema se lee **de arriba hacia abajo por etapas** y **de izquierda a derecha dentro de cada etapa**. Los colores distinguen la prioridad de las historias.
+
+```mermaid
+flowchart TB
+    subgraph BASE["Etapa 1 · Fundamentos"]
+        direction LR
+        S0["Sprint 0<br/>Preparación del entorno<br/>Base · sin HU"] --> S1["Sprint 1<br/>Acceso, usuarios y bitácora<br/>15 HU · Alta"] --> S2["Sprint 2<br/>Catálogo, IVA y apertura de caja<br/>17 HU · Alta"]
+    end
+
+    subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
+        direction LR
+        S3["Sprint 3<br/>Pantalla de venta y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+    end
+
+    subgraph MEJORAS["Etapa 3 · Reportes y operación"]
+        direction LR
+        S6["Sprint 6<br/>Reportes y exportación<br/>10 HU · Alta"] --> S7["Sprint 7<br/>Operación: suspendidas, cierres y correos<br/>14 HU · Media"] --> S8["Sprint 8<br/>Consultas, precios, bitácora y panel<br/>14 HU · Media/Baja"]
+    end
+
+    classDef base fill:#eaf5ff,stroke:#3275b3,color:#17324d;
+    classDef alta fill:#fff0e0,stroke:#c47420,color:#5a330c;
+    classDef media fill:#e7f6ef,stroke:#21795d,color:#173e32;
+    class S0 base;
+    class S1,S2,S3,S4,S5,S6 alta;
+    class S7,S8 media;
+```
+
+**Hitos previstos:** al cerrar el **Sprint 5**, contar con un flujo mínimo de venta, cobro, FEL, contingencia y cierre de caja; al completar el **Sprint 8**, cubrir las **115 HU** planificadas para la V1. Estos hitos describen objetivos, no funcionalidades ya implementadas.
+
+Las historias se administrarán como **GitHub Issues** y se agruparán en **GitHub Projects**, reajustando el compromiso de cada sprint según avance, prioridades y dependencias.
 
 - [Épicas](docs/original/epics.md)
 - [Historias de usuario por épica](docs/original/)
