@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** preparación del repositorio (Sprint 0). La documentación y las convenciones de colaboración están listas; la aplicación aún no ha sido inicializada ni desplegada.
+> **Estado:** Sprint 0 — scaffold de frontend, backend y PostgreSQL preparado para verificación local. Aún no incluye ventas ni certificación FEL real.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -10,7 +10,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 
-[Descripción](#-descripción) · [Arquitectura C4](#-arquitectura-c4) · [Estructura](#-estructura-del-repositorio) · [Organización del equipo](#-flujo-de-trabajo) · [Documentación](#-documentación)
+[Descripción](#-descripción) · [Arquitectura C4](#-arquitectura-c4) · [Roadmap](#-roadmap-de-sprints) · [Estructura](#-estructura-del-repositorio) · [Organización del equipo](#-flujo-de-trabajo) · [Documentación](#-documentación)
 
 ## 📌 Descripción
 
@@ -60,10 +60,10 @@ flowchart LR
     end
     FEL["☁️ Certificador FEL<br/>API externa"]
     Cajero -->|Utiliza| Web
-    Web -->|HTTP(S) / JSON| API
+    Web -->|"HTTP(S) / JSON"| API
     API -->|SQL| BD
-    API -->|TCP 9100, si es de red| Imp
-    API -->|HTTPS / DTE| FEL
+    API -->|"TCP 9100, si es de red"| Imp
+    API -->|"HTTPS / DTE"| FEL
     classDef app fill:#eaf5ff,stroke:#3275b3,color:#17324d;
     classDef server fill:#e7f6ef,stroke:#21795d,color:#173e32;
     classDef outside fill:#f6f0ff,stroke:#8156b0,color:#40305b;
@@ -95,12 +95,17 @@ pos-supermercado/
 │   ├── ISSUE_TEMPLATE/       # Plantillas para HU, bugs y tareas técnicas
 │   ├── workflows/            # Verificación inicial del repositorio
 │   └── pull_request_template.md
-├── backend/                  # Se inicializará en el Hello World arquitectónico
-├── frontend/                 # Se inicializará en el Hello World arquitectónico
+├── backend/                  # Spring Boot, módulos y Flyway
+├── frontend/                 # React, TypeScript y Vite
 ├── docs/
 │   ├── arquitectura/         # C4 y diagramas complementarios
 │   ├── proceso/              # Convenciones del equipo y Definition of Done
 │   └── original/             # Requisitos y arquitectura recibidos (sin modificar)
+├── docker/                   # Inicialización de roles PostgreSQL
+├── docker-compose.yml       # PostgreSQL para desarrollo
+├── scripts/                  # Arranque cruzado con npm y Maven Wrapper
+├── package.json             # Comandos unificados desde la raíz
+├── .env.example             # Variables de ejemplo, nunca credenciales reales
 ├── .editorconfig
 ├── .gitattributes
 ├── .gitignore
@@ -108,7 +113,7 @@ pos-supermercado/
 └── README.md
 ```
 
-La estructura de paquetes Java y módulos React se definirá al inicializar las aplicaciones, siguiendo [la propuesta original](docs/original/Architecture.md).
+Los módulos Java y React ya tienen estructura inicial de Sprint 0, siguiendo [la propuesta original](docs/original/Architecture.md).
 
 ## 🌿 Flujo de trabajo
 
@@ -127,15 +132,68 @@ Los criterios de aceptación se documentan en las historias. No se debe hacer pu
 
 ## 🏃 Organización ágil
 
-El backlog original incluye 13 épicas; el plan arquitectónico propone **Sprint 0 de preparación** y **sprints 1–8** como punto de partida, sujeto a la capacidad y calendario real del equipo. Las tareas se administrarán como **GitHub Issues** y se agruparán en **GitHub Projects** cuando se defina el compromiso de cada sprint.
+El backlog original incluye **13 épicas y 167 historias de usuario**, de las cuales **115 HU** integran el alcance propuesto para la V1 (las otras 52 quedan para futuras etapas). El **Sprint 0** prepara el entorno y los **sprints 1–8** distribuyen las 115 HU. La distribución es una **meta orientativa**, no un compromiso cerrado ni un calendario de 25 semanas: se ajustará a la capacidad real del equipo de tres integrantes y a las fechas del curso.
+
+### 🗺️ Roadmap de sprints
+
+El esquema se lee **de arriba hacia abajo por etapas** y **de izquierda a derecha dentro de cada etapa**. Los colores distinguen la prioridad de las historias.
+
+```mermaid
+flowchart TB
+    subgraph BASE["Etapa 1 · Fundamentos"]
+        direction LR
+        S0["Sprint 0<br/>Preparación del entorno<br/>Base · sin HU"] --> S1["Sprint 1<br/>Acceso, usuarios y bitácora<br/>15 HU · Alta"] --> S2["Sprint 2<br/>Catálogo, IVA y apertura de caja<br/>17 HU · Alta"]
+    end
+
+    subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
+        direction LR
+        S3["Sprint 3<br/>Pantalla de venta y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+    end
+
+    subgraph MEJORAS["Etapa 3 · Reportes y operación"]
+        direction LR
+        S6["Sprint 6<br/>Reportes y exportación<br/>10 HU · Alta"] --> S7["Sprint 7<br/>Operación: suspendidas, cierres y correos<br/>14 HU · Media"] --> S8["Sprint 8<br/>Consultas, precios, bitácora y panel<br/>14 HU · Media/Baja"]
+    end
+
+    classDef base fill:#eaf5ff,stroke:#3275b3,color:#17324d;
+    classDef alta fill:#fff0e0,stroke:#c47420,color:#5a330c;
+    classDef media fill:#e7f6ef,stroke:#21795d,color:#173e32;
+    class S0 base;
+    class S1,S2,S3,S4,S5,S6 alta;
+    class S7,S8 media;
+```
+
+**Hitos previstos:** al cerrar el **Sprint 5**, contar con un flujo mínimo de venta, cobro, FEL, contingencia y cierre de caja; al completar el **Sprint 8**, cubrir las **115 HU** planificadas para la V1. Estos hitos describen objetivos, no funcionalidades ya implementadas.
+
+Las historias se administrarán como **GitHub Issues** y se agruparán en **GitHub Projects**, reajustando el compromiso de cada sprint según avance, prioridades y dependencias.
 
 - [Épicas](docs/original/epics.md)
 - [Historias de usuario por épica](docs/original/)
 - [Planificación y DoD](docs/proceso/scrum.md)
 
-## 🚀 Cómo ejecutar el proyecto
+## 🚀 Cómo ejecutar el proyecto (Sprint 0)
 
-**Pendiente del Hello World arquitectónico.** En Sprint 0 se prepararán `backend/`, `frontend/`, la base de datos para desarrollo y las instrucciones comprobadas de instalación. No se documentan comandos de ejecución hasta que sean funcionales y probados.
+**Requisitos:** Node.js 24, Java 21 y Docker Desktop abierto. Ejecutar desde la **raíz** del repositorio:
+
+```powershell
+npm install
+npm run dev
+```
+
+`npm install` crea el `.env` local a partir de `.env.example` (si no existe) e instala las dependencias del frontend; `npm run dev` arranca PostgreSQL con Docker Compose y luego ejecuta Spring Boot y Vite. **No es necesario instalar Maven globalmente**: el backend utiliza Maven Wrapper.
+
+- **Frontend:** http://localhost:5173/sistema
+- **Backend:** http://localhost:8080/api/sistema/info
+- **Health:** http://localhost:8080/actuator/health
+
+```powershell
+npm run build     # frontend + backend
+npm run test      # Vitest + JUnit/Testcontainers (Docker requerido)
+npm run lint      # frontend
+npm run db:down   # detener PostgreSQL sin eliminar datos
+```
+
+Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](docs/proceso/entorno-desarrollo.md). **El simulador FEL es solo para desarrollo**, no emite documentos tributarios reales.
 
 ## 📚 Documentación
 
@@ -147,6 +205,7 @@ El backlog original incluye 13 épicas; el plan arquitectónico propone **Sprint
 | [Diagramas C4](docs/arquitectura/README.md) | Contexto, contenedores y módulos |
 | [Colaboración](CONTRIBUTING.md) | Ramas, commits, PRs y revisiones |
 | [Guía GitHub](docs/proceso/repositorio-github.md) | Configuración de branches y opciones del repositorio |
+| [Entorno de desarrollo](docs/proceso/entorno-desarrollo.md) | Instalación, scripts npm, Maven y PostgreSQL |
 | [Scrum adaptado](docs/proceso/scrum.md) | Sprint 0, ceremonias mínimas y Definition of Done |
 
 > **Nota de trazabilidad:** `Architecture.md` hace referencia a `Documentacion_POS_Supermercado.pdf`; ese archivo no estaba incluido en el material proporcionado para preparar este repositorio.
