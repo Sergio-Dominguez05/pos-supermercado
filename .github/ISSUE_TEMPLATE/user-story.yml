@@ -1,0 +1,43 @@
+name: Historia de usuario
+description: Registrar una HU con criterios de aceptación
+body:
+  - type: input
+    id: id
+    attributes:
+      label: ID de HU
+      description: Por ejemplo, HU-03.06.
+      placeholder: HU-03.06
+    validations:
+      required: true
+  - type: textarea
+    id: historia
+    attributes:
+      label: Historia
+      description: Como [rol], quiero [funcionalidad], para [beneficio].
+    validations:
+      required: true
+  - type: textarea
+    id: aceptacion
+    attributes:
+      label: Criterios de aceptación
+      description: Pegue los criterios de la historia original y las aclaraciones confirmadas.
+      placeholder: |-
+        - [ ] Dado ... cuando ... entonces ...
+    validations:
+      required: true
+  - type: dropdown
+    id: alcance
+    attributes:
+      label: Alcance
+      options:
+        - V1
+        - Futuro
+    validations:
+      required: true
+  - type: textarea
+    id: dependencias
+    attributes:
+      label: Dependencias o notas
+      description: Indicar historias relacionadas, decisiones pendientes o enlaces a documentación.
+    validations:
+      required: false

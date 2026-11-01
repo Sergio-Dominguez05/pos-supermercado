@@ -1,0 +1,31 @@
+name: Repository checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  estructura:
+    name: Estructura y documentacion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+      - name: Verificar archivos esenciales
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s CONTRIBUTING.md
+          test -s docs/original/Architecture.md
+          test -s docs/original/epics.md
+          test -s docs/arquitectura/c4-contexto.md
+          test -s docs/arquitectura/c4-contenedores.md
+          for n in $(seq 1 13); do
+            test -s "docs/original/userStoriesE${n}.md"
+          done
+          echo "La estructura documental inicial es correcta."
+# Los jobs de build y test para backend/frontend se incorporaran cuando
+# exista el Hello World real de ambos proyectos.
