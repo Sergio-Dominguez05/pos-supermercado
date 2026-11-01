@@ -60,10 +60,10 @@ flowchart LR
     end
     FEL["☁️ Certificador FEL<br/>API externa"]
     Cajero -->|Utiliza| Web
-    Web -->|HTTP(S) / JSON| API
+    Web -->|"HTTP(S) / JSON"| API
     API -->|SQL| BD
-    API -->|TCP 9100, si es de red| Imp
-    API -->|HTTPS / DTE| FEL
+    API -->|"TCP 9100, si es de red"| Imp
+    API -->|"HTTPS / DTE"| FEL
     classDef app fill:#eaf5ff,stroke:#3275b3,color:#17324d;
     classDef server fill:#e7f6ef,stroke:#21795d,color:#173e32;
     classDef outside fill:#f6f0ff,stroke:#8156b0,color:#40305b;
