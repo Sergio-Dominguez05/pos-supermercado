@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** preparación del repositorio (Sprint 0). La documentación y las convenciones de colaboración están listas; la aplicación aún no ha sido inicializada ni desplegada.
+> **Estado:** Sprint 0 — scaffold de frontend, backend y PostgreSQL preparado para verificación local. Aún no incluye ventas ni certificación FEL real.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -95,12 +95,17 @@ pos-supermercado/
 │   ├── ISSUE_TEMPLATE/       # Plantillas para HU, bugs y tareas técnicas
 │   ├── workflows/            # Verificación inicial del repositorio
 │   └── pull_request_template.md
-├── backend/                  # Se inicializará en el Hello World arquitectónico
-├── frontend/                 # Se inicializará en el Hello World arquitectónico
+├── backend/                  # Spring Boot, módulos y Flyway
+├── frontend/                 # React, TypeScript y Vite
 ├── docs/
 │   ├── arquitectura/         # C4 y diagramas complementarios
 │   ├── proceso/              # Convenciones del equipo y Definition of Done
 │   └── original/             # Requisitos y arquitectura recibidos (sin modificar)
+├── docker/                   # Inicialización de roles PostgreSQL
+├── docker-compose.yml       # PostgreSQL para desarrollo
+├── scripts/                  # Arranque cruzado con npm y Maven Wrapper
+├── package.json             # Comandos unificados desde la raíz
+├── .env.example             # Variables de ejemplo, nunca credenciales reales
 ├── .editorconfig
 ├── .gitattributes
 ├── .gitignore
@@ -108,7 +113,7 @@ pos-supermercado/
 └── README.md
 ```
 
-La estructura de paquetes Java y módulos React se definirá al inicializar las aplicaciones, siguiendo [la propuesta original](docs/original/Architecture.md).
+Los módulos Java y React ya tienen estructura inicial de Sprint 0, siguiendo [la propuesta original](docs/original/Architecture.md).
 
 ## 🌿 Flujo de trabajo
 
@@ -166,9 +171,29 @@ Las historias se administrarán como **GitHub Issues** y se agruparán en **GitH
 - [Historias de usuario por épica](docs/original/)
 - [Planificación y DoD](docs/proceso/scrum.md)
 
-## 🚀 Cómo ejecutar el proyecto
+## 🚀 Cómo ejecutar el proyecto (Sprint 0)
 
-**Pendiente del Hello World arquitectónico.** En Sprint 0 se prepararán `backend/`, `frontend/`, la base de datos para desarrollo y las instrucciones comprobadas de instalación. No se documentan comandos de ejecución hasta que sean funcionales y probados.
+**Requisitos:** Node.js 24, Java 21 y Docker Desktop abierto. Ejecutar desde la **raíz** del repositorio:
+
+```powershell
+npm install
+npm run dev
+```
+
+`npm install` crea el `.env` local a partir de `.env.example` (si no existe) e instala las dependencias del frontend; `npm run dev` arranca PostgreSQL con Docker Compose y luego ejecuta Spring Boot y Vite. **No es necesario instalar Maven globalmente**: el backend utiliza Maven Wrapper.
+
+- **Frontend:** http://localhost:5173/sistema
+- **Backend:** http://localhost:8080/api/sistema/info
+- **Health:** http://localhost:8080/actuator/health
+
+```powershell
+npm run build     # frontend + backend
+npm run test      # Vitest + JUnit/Testcontainers (Docker requerido)
+npm run lint      # frontend
+npm run db:down   # detener PostgreSQL sin eliminar datos
+```
+
+Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](docs/proceso/entorno-desarrollo.md). **El simulador FEL es solo para desarrollo**, no emite documentos tributarios reales.
 
 ## 📚 Documentación
 
@@ -180,6 +205,7 @@ Las historias se administrarán como **GitHub Issues** y se agruparán en **GitH
 | [Diagramas C4](docs/arquitectura/README.md) | Contexto, contenedores y módulos |
 | [Colaboración](CONTRIBUTING.md) | Ramas, commits, PRs y revisiones |
 | [Guía GitHub](docs/proceso/repositorio-github.md) | Configuración de branches y opciones del repositorio |
+| [Entorno de desarrollo](docs/proceso/entorno-desarrollo.md) | Instalación, scripts npm, Maven y PostgreSQL |
 | [Scrum adaptado](docs/proceso/scrum.md) | Sprint 0, ceremonias mínimas y Definition of Done |
 
 > **Nota de trazabilidad:** `Architecture.md` hace referencia a `Documentacion_POS_Supermercado.pdf`; ese archivo no estaba incluido en el material proporcionado para preparar este repositorio.

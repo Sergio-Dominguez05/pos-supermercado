@@ -15,11 +15,11 @@ Se utilizarán sprints cortos con planificación, revisión y retrospectiva brev
 - [x] Convenciones de ramas, commits, PR y Definition of Done.
 - [x] Plantillas de GitHub Issues y PR.
 - [x] Estructura reservada para backend/frontend.
-- [ ] Crear repositorio remoto y rama `develop` en GitHub.
-- [ ] Configurar protección de ramas (según plan de GitHub).
-- [ ] Inicializar y verificar el Hello World de Spring Boot, React y PostgreSQL.
-- [ ] Instalar las dependencias y completar CI de compilación/pruebas.
-- [ ] Crear Issues y acordar las iteraciones reales con el equipo.
+- [x] Crear repositorio remoto y rama `develop` en GitHub.
+- [x] Configurar protección de ramas (según plan de GitHub).
+- [ ] Verificar **localmente** el Hello World preparado de Spring Boot, React y PostgreSQL.
+- [ ] Ejecutar instalación y confirmar que los workflows de compilación/pruebas pasan en el PR.
+- [x] Crear Issue #2 y plan de sprints en GitHub Projects (fechas sujetas a cambios).
 
 ## Propuesta de secuencia
 

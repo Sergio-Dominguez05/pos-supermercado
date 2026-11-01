@@ -1,45 +1,21 @@
-# Secretos y configuraciones locales
+# Secretos locales
 .env
 .env.*
 !.env.example
-!.env.*.example
-*.pem
-*.key
-*.p12
-*.pfx
-*.jks
-*.keystore
-secrets/
+**/.env
+**/.env.*
+!**/.env.example
 
-# Java, Maven, Gradle
-backend/target/
-backend/build/
-backend/.gradle/
-*.class
-*.log
-
-# Node, Vite, frontend
-frontend/node_modules/
+# Dependencias y salidas
+node_modules/
+**/node_modules/
 frontend/dist/
-frontend/coverage/
-frontend/.vite/
+backend/target/
+*.tsbuildinfo
 
-# IDE / sistema operativo
+# IDE, logs, sistema
 .idea/
 .vscode/
-*.iml
+*.log
 .DS_Store
 Thumbs.db
-
-# Datos locales y copias de BD
-*.dump
-*.backup
-*.sql.gz
-pgdata/
-postgres-data/
-*.sqlite
-
-# Archivos temporales
-*.tmp
-*.swp
-*.swo

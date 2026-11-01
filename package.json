@@ -1,0 +1,26 @@
+{
+  "name": "pos-supermercado",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Comandos unificados para frontend React, backend Spring Boot y PostgreSQL",
+  "scripts": {
+    "postinstall": "node scripts/setup.mjs && npm --prefix frontend ci",
+    "setup": "node scripts/setup.mjs",
+    "db:up": "node scripts/db.mjs up",
+    "db:down": "node scripts/db.mjs down",
+    "db:logs": "node scripts/db.mjs logs",
+    "dev": "node scripts/dev.mjs",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "node scripts/maven.mjs spring-boot:run",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "node scripts/maven.mjs -DskipTests package",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "npm --prefix frontend run test",
+    "test:backend": "node scripts/maven.mjs verify",
+    "lint": "npm --prefix frontend run lint"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
