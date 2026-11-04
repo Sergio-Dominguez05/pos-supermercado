@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.dominio;
 
 import java.util.List;
+import java.util.Optional;
 
 /** Consulta de usuarios para la lista de administración (HU-01.06). Solo lectura. */
 public interface DirectorioUsuarios {
@@ -14,4 +15,6 @@ public interface DirectorioUsuarios {
      * @param activo {@code null} para activos e inactivos
      */
     List<ResumenUsuario> buscar(String texto, Rol rol, Boolean activo);
+
+    Optional<ResumenUsuario> buscarPorId(long id);
 }

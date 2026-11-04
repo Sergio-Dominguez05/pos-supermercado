@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { crearUsuario, type Rol } from '../../api/usuarios'
 import { useSesion } from '../login/sesion'
-import { ROLES } from './formato'
+import { CampoCredencial } from './CampoCredencial'
+import { avisoCreacion, ROLES } from './formato'
 
 /** HU-01.05: el Administrador crea usuarios con una contraseña o PIN temporal. */
 export function NuevoUsuario() {
@@ -31,17 +32,15 @@ export function FormularioUsuario({ rolInicial = 'CAJERO' }: { rolInicial?: Rol 
   const [username, setUsername] = useState('')
   const [rol, setRol] = useState<Rol>(rolInicial)
   const [credencial, setCredencial] = useState('')
-  const [mostrar, setMostrar] = useState(false)
   const navegar = useNavigate()
   const clienteConsultas = useQueryClient()
-  const esPin = rol === 'CAJERO'
 
   const creacion = useMutation({
     mutationFn: () => crearUsuario({ nombreCompleto, username, rol, credencialTemporal: credencial }),
     // Vuelve a la lista ya actualizada; el aviso de creación se muestra allí. Si falla, se queda aquí con el error.
     onSuccess: async (nuevo) => {
       await clienteConsultas.invalidateQueries({ queryKey: ['usuarios'] })
-      navegar('/usuarios', { state: { creado: nuevo } })
+      navegar('/usuarios', { state: { aviso: avisoCreacion(nuevo) } })
     },
   })
 
@@ -95,45 +94,7 @@ export function FormularioUsuario({ rolInicial = 'CAJERO' }: { rolInicial?: Rol 
           ))}
         </select>
       </label>
-      {esPin ? (
-        <label>
-          PIN temporal
-          <input
-            type={mostrar ? 'text' : 'password'}
-            name="credencialTemporal"
-            inputMode="numeric"
-            pattern="\d{4,6}"
-            title="De 4 a 6 dígitos"
-            autoComplete="off"
-            required
-            minLength={4}
-            maxLength={6}
-            value={credencial}
-            onChange={(evento) => setCredencial(evento.target.value.replace(/\D/g, ''))}
-          />
-          <small>Numérico, de 4 a 6 dígitos.</small>
-        </label>
-      ) : (
-        <label>
-          Contraseña temporal
-          <input
-            type={mostrar ? 'text' : 'password'}
-            name="credencialTemporal"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            maxLength={128}
-            value={credencial}
-            onChange={(evento) => setCredencial(evento.target.value)}
-          />
-          <small>Al menos 8 caracteres, con letras y números.</small>
-        </label>
-      )}
-      {/* Quien crea el usuario debe entregarle la credencial temporal: puede revisarla antes de guardar. */}
-      <label className="casilla">
-        <input type="checkbox" checked={mostrar} onChange={(evento) => setMostrar(evento.target.checked)} />
-        Mostrar {esPin ? 'el PIN' : 'la contraseña'}
-      </label>
+      <CampoCredencial rol={rol} valor={credencial} onChange={setCredencial} />
 
       {creacion.error && (
         <p className="error" role="alert">

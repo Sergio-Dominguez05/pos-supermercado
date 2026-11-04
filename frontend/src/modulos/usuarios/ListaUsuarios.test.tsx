@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { claveUsuarios, FILTRO_INICIAL, type ResumenUsuario, type UsuarioCreado } from '../../api/usuarios'
 import { CLAVE_SESION } from '../login/sesion'
-import { formatearUltimoAcceso, nombreDelRol } from './formato'
+import { avisoCreacion, avisoEdicion, formatearUltimoAcceso, nombreDelRol, requiereCredencialNueva } from './formato'
 import { ListaUsuarios } from './ListaUsuarios'
 
 const USUARIOS: ResumenUsuario[] = [
@@ -22,14 +22,14 @@ const USUARIOS: ResumenUsuario[] = [
 const renderizar = (
   sesion: Partial<UsuarioSesion>,
   usuarios: ResumenUsuario[] = USUARIOS,
-  creado?: UsuarioCreado,
+  aviso?: string,
 ) => {
   const cliente = new QueryClient()
   cliente.setQueryData(CLAVE_SESION, sesion)
   cliente.setQueryData(claveUsuarios(FILTRO_INICIAL), usuarios)
   return renderToString(
     <QueryClientProvider client={cliente}>
-      <MemoryRouter initialEntries={[{ pathname: '/usuarios', state: creado ? { creado } : null }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/usuarios', state: aviso ? { aviso } : null }]}>
         <ListaUsuarios />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -75,13 +75,25 @@ describe('lista de usuarios (HU-01.06)', () => {
       id: 9, username: 'caja.prueba', nombreCompleto: 'Prueba Cajero', rol: 'CAJERO',
       activo: true, credencialTemporal: true,
     }
-    // React separa los textos con <!-- --> al renderizar en el servidor.
-    const html = renderizar(ADMIN, USUARIOS, creado).replaceAll('<!-- -->', '')
+    const html = renderizar(ADMIN, USUARIOS, avisoCreacion(creado))
+
+    expect(html).toContain('role="status">Se creó el usuario caja.prueba (Cajero), activo y con PIN temporal.')
+    expect(html).toContain('<table')
+  })
+
+  it('al volver de editar un usuario muestra la confirmación (HU-01.07)', () => {
+    const html = renderizar(ADMIN, USUARIOS, avisoEdicion(USUARIOS[0], true))
 
     expect(html).toContain(
-      'role="status">Se creó el usuario <strong>caja.prueba</strong> (Cajero), activo y con PIN temporal.',
+      'Se actualizó el usuario oscar.nunez. El nuevo rol se aplica a partir de su siguiente inicio de sesión.',
     )
-    expect(html).toContain('<table')
+  })
+
+  it('cada fila lleva a editar su usuario (HU-01.07)', () => {
+    const html = renderizar(ADMIN)
+
+    expect(html).toContain('href="/usuarios/1/editar"')
+    expect(html).toContain('href="/usuarios/2/editar"')
   })
 
   it('sin venir de crear un usuario no muestra la confirmación', () => {
@@ -101,6 +113,15 @@ describe('nombre del rol', () => {
     expect(nombreDelRol('ADMIN')).toBe('Administrador')
     expect(nombreDelRol('SUPERVISOR')).toBe('Supervisor')
     expect(nombreDelRol('CAJERO')).toBe('Cajero')
+  })
+})
+
+describe('credencial al cambiar de rol (HU-01.07 crit. 3)', () => {
+  it('se pide solo al pasar entre Cajero y Administrador o Supervisor', () => {
+    expect(requiereCredencialNueva('CAJERO', 'SUPERVISOR')).toBe(true)
+    expect(requiereCredencialNueva('ADMIN', 'CAJERO')).toBe(true)
+    expect(requiereCredencialNueva('SUPERVISOR', 'ADMIN')).toBe(false)
+    expect(requiereCredencialNueva('CAJERO', 'CAJERO')).toBe(false)
   })
 })
 

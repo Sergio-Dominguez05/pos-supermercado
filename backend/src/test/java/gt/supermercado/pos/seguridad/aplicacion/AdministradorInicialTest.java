@@ -82,6 +82,20 @@ class AdministradorInicialTest {
         }
 
         @Override
+        public Optional<Usuario> buscarPorId(long id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public long contarAdministradoresActivos() {
+            return hayAdministrador ? 1 : 0;
+        }
+
+        @Override
+        public void actualizar(long id, String nombreCompleto, Rol rol, String credencialHash) {
+        }
+
+        @Override
         public void registrarAcceso(long usuarioId) {
         }
     }

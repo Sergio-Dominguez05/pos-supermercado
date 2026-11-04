@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { crearUsuario, listarUsuarios } from './usuarios'
+import { crearUsuario, editarUsuario, listarUsuarios } from './usuarios'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -30,6 +30,21 @@ describe('usuarios', () => {
 
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/usuarios')
     expect(vi.mocked(fetch).mock.calls[1][0]).toBe('/api/usuarios?q=N%C3%BA%C3%B1ez&rol=CAJERO&activo=false')
+  })
+
+  it('edita con un PUT al usuario, sin enviar el nombre de usuario (HU-01.07)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 7 }), { status: 200 })))
+
+    await editarUsuario(7, { nombreCompleto: 'Lucía', rol: 'SUPERVISOR', credencialTemporal: 'Temporal2026' })
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/usuarios/7')
+    expect(opciones?.method).toBe('PUT')
+    expect(JSON.parse(opciones?.body as string)).toEqual({
+      nombreCompleto: 'Lucía',
+      rol: 'SUPERVISOR',
+      credencialTemporal: 'Temporal2026',
+    })
   })
 
   it('muestra el mensaje del servidor cuando el usuario ya existe (crit. 4)', async () => {

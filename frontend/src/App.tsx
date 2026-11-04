@@ -4,6 +4,7 @@ import { Inicio } from './modulos/inicio/Inicio'
 import { Login } from './modulos/login/Login'
 import { RutaProtegida } from './modulos/login/RutaProtegida'
 import { EstadoSistema } from './modulos/sistema/EstadoSistema'
+import { EditarUsuario } from './modulos/usuarios/EditarUsuario'
 import { ListaUsuarios } from './modulos/usuarios/ListaUsuarios'
 import { NuevoUsuario } from './modulos/usuarios/NuevoUsuario'
 import { Venta } from './modulos/venta/Venta'
@@ -49,6 +50,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <NuevoUsuario />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/usuarios/:id/editar"
+            element={
+              <RutaProtegida>
+                <EditarUsuario />
               </RutaProtegida>
             }
           />

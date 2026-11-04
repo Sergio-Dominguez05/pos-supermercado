@@ -52,5 +52,20 @@ export function listarUsuarios(filtro: FiltroUsuarios) {
   return pedir<ResumenUsuario[]>(`/api/usuarios${consulta ? `?${consulta}` : ''}`)
 }
 
+export const claveUsuario = (id: number) => ['usuarios', id] as const
+
+export const obtenerUsuario = (id: number) => pedir<ResumenUsuario>(`/api/usuarios/${id}`)
+
+/** Sin nombre de usuario: no se modifica después de creado (HU-01.07 crit. 2). */
+export interface CambiosUsuario {
+  nombreCompleto: string
+  rol: Rol
+  /** Solo al pasar entre Cajero y Administrador o Supervisor (crit. 3). */
+  credencialTemporal?: string
+}
+
+export const editarUsuario = (id: number, cambios: CambiosUsuario) =>
+  pedir<ResumenUsuario>(`/api/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(cambios) })
+
 export const crearUsuario = (datos: NuevoUsuario) =>
   pedir<UsuarioCreado>('/api/usuarios', { method: 'POST', body: JSON.stringify(datos) })
