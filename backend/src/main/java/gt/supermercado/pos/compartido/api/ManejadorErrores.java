@@ -1,6 +1,7 @@
 package gt.supermercado.pos.compartido.api;
 
 import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.compartido.dominio.NoAutenticadoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,11 @@ public class ManejadorErrores {
     @ExceptionHandler(NegocioException.class)
     ResponseEntity<ErrorApi> negocio(NegocioException e) {
         return ResponseEntity.status(422).body(ErrorApi.de(e.getCodigo(), e.getMessage()));
+    }
+
+    @ExceptionHandler(NoAutenticadoException.class)
+    ResponseEntity<ErrorApi> noAutenticado(NoAutenticadoException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ErrorApi.de(e.getCodigo(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

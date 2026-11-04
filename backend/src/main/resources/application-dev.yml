@@ -9,3 +9,8 @@ spring:
     # Las migraciones corren con el dueño del esquema; la aplicación usa pos_app (Architecture.md §5.3).
     user: pos_owner
     password: ${POS_OWNER_PASSWORD:pos_owner_dev}
+
+pos:
+  seguridad:
+    admin-inicial:
+      contrasena: ${POS_ADMIN_PASSWORD_INICIAL:admin_dev_2026}

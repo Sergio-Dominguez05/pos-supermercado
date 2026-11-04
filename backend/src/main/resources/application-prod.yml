@@ -11,3 +11,8 @@ spring:
 pos:
   fel:
     modo: ${POS_FEL_MODO}
+  seguridad:
+    cookie-segura: true
+    admin-inicial:
+      # Solo se usa la primera vez, mientras no exista ningún Administrador.
+      contrasena: ${POS_ADMIN_PASSWORD_INICIAL:}

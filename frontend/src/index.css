@@ -102,3 +102,71 @@ kbd {
   border-radius: 4px;
   font-family: ui-monospace, monospace;
 }
+
+.pagina-login {
+  max-width: 400px;
+  padding-top: 15vh;
+}
+
+.formulario {
+  display: grid;
+  gap: 16px;
+}
+
+.formulario label {
+  display: grid;
+  gap: 6px;
+  color: var(--texto-suave);
+}
+
+.formulario input {
+  font: inherit;
+  padding: 8px 10px;
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.formulario button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px;
+  color: #ffffff;
+  background: var(--ok);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.formulario button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.formulario .error {
+  margin: 0;
+}
+
+.opciones {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.opciones li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.pendiente {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
