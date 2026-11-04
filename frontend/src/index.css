@@ -144,7 +144,8 @@ kbd {
   color: var(--texto-suave);
 }
 
-.formulario input {
+.formulario input,
+.formulario select {
   font: inherit;
   padding: 8px 10px;
   color: var(--texto);
@@ -194,4 +195,28 @@ kbd {
 .pendiente {
   color: var(--texto-suave);
   font-size: 0.85rem;
+}
+
+.formulario small {
+  font-size: 0.8rem;
+}
+
+.formulario .casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exito {
+  margin: 0;
+  color: var(--ok);
+}
+
+.opciones a {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.subtitulo a {
+  color: inherit;
 }

@@ -4,6 +4,8 @@
 export interface OpcionMenu {
   etiqueta: string
   permiso: string
+  /** Pantalla disponible; sin ruta, la opción se muestra como "Próximamente". */
+  ruta?: string
 }
 
 export const OPCIONES: OpcionMenu[] = [
@@ -14,7 +16,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR' },
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR' },
-  { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR' },
+  // Lleva a la creación (HU-01.05) hasta que exista la lista de usuarios (HU-01.06).
+  { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios/nuevo' },
   { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR' },
 ]
 

@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -34,6 +36,18 @@ public class ManejadorErrores {
                 .toList();
         return ResponseEntity.badRequest()
                 .body(new ErrorApi("DATOS_INVALIDOS", "Revise los datos ingresados.", detalles));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<ErrorApi> cuerpoIlegible(HttpMessageNotReadableException e) {
+        return ResponseEntity.badRequest().body(ErrorApi.de("DATOS_INVALIDOS", "Revise los datos ingresados."));
+    }
+
+    /** Sin el permiso que exige el endpoint ({@code @PreAuthorize}). Registrarlo en la bitácora es HU-11.04. */
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ErrorApi> accesoDenegado(AccessDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorApi.de("ACCESO_DENEGADO", "No tiene permiso para realizar esta acción."));
     }
 
     @ExceptionHandler(Exception.class)

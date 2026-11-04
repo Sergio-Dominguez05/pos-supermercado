@@ -2,6 +2,7 @@ package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
+import gt.supermercado.pos.seguridad.dominio.ReglasCredencial;
 import gt.supermercado.pos.seguridad.dominio.RepositorioUsuarios;
 import gt.supermercado.pos.seguridad.dominio.Rol;
 import org.slf4j.Logger;
@@ -50,7 +51,7 @@ public class AdministradorInicial implements ApplicationRunner {
             log.warn("No existe ningún Administrador y POS_ADMIN_PASSWORD_INICIAL está vacía: nadie podrá iniciar sesión.");
             return;
         }
-        if (!esContrasenaValida(contrasena)) {
+        if (!ReglasCredencial.esContrasenaValida(contrasena)) {
             throw new IllegalStateException(
                     "POS_ADMIN_PASSWORD_INICIAL debe tener al menos 8 caracteres, con letras y números.");
         }
@@ -59,12 +60,5 @@ public class AdministradorInicial implements ApplicationRunner {
         bitacora.registrar(new EventoBitacora(null, null, "seguridad", "USUARIO_CREADO", true,
                 "Administrador inicial creado al arrancar el sistema", "usuario", id));
         log.info("Se creó el Administrador inicial '{}' con contraseña temporal.", USERNAME);
-    }
-
-    /** Regla de contraseñas de HU-01.05: al menos 8 caracteres, con letras y números. */
-    static boolean esContrasenaValida(String valor) {
-        return valor.length() >= 8
-                && valor.chars().anyMatch(Character::isLetter)
-                && valor.chars().anyMatch(Character::isDigit);
     }
 }

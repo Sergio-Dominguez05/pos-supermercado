@@ -18,6 +18,12 @@ describe('opciones del menú por rol', () => {
     expect(opcionesPara(OPCIONES.map((o) => o.permiso))).toEqual(OPCIONES)
   })
 
+  it('la opción Usuarios lleva a la creación de usuarios (HU-01.05)', () => {
+    expect(opcionesPara(['USUARIO_ADMINISTRAR'])).toEqual([
+      expect.objectContaining({ etiqueta: 'Usuarios', ruta: '/usuarios/nuevo' }),
+    ])
+  })
+
   it('sin permisos no hay opciones', () => {
     expect(opcionesPara([])).toEqual([])
   })

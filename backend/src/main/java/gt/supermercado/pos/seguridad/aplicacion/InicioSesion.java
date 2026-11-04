@@ -3,6 +3,7 @@ package gt.supermercado.pos.seguridad.aplicacion;
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.seguridad.dominio.CredencialesInvalidasException;
+import gt.supermercado.pos.seguridad.dominio.ReglasCredencial;
 import gt.supermercado.pos.seguridad.dominio.RepositorioSesiones;
 import gt.supermercado.pos.seguridad.dominio.RepositorioUsuarios;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -54,7 +55,7 @@ public class InicioSesion {
     }
 
     private SesionIniciada iniciar(String username, String credencial, TipoCredencial tipo) {
-        Optional<Usuario> encontrado = usuarios.buscarPorUsername(username.strip());
+        Optional<Usuario> encontrado = usuarios.buscarPorUsername(ReglasCredencial.normalizarUsername(username));
         boolean coincide = codificador.matches(credencial,
                 encontrado.map(Usuario::credencialHash).orElse(hashFicticio));
 
