@@ -49,10 +49,8 @@ public class CreacionUsuarios {
                     "El nombre de usuario debe tener de 3 a 30 caracteres: letras, números, punto, guion o guion bajo.");
         }
         if (!ReglasCredencial.esCredencialValida(tipo, datos.credencialTemporal())) {
-            throw tipo == TipoCredencial.PIN
-                    ? rechazar(actor, username, "PIN_INVALIDO", "El PIN temporal debe ser numérico, de 4 a 6 dígitos.")
-                    : rechazar(actor, username, "CONTRASENA_INVALIDA",
-                            "La contraseña temporal debe tener al menos 8 caracteres, con letras y números.");
+            throw rechazar(actor, username, ReglasCredencial.codigoCredencialInvalida(tipo),
+                    ReglasCredencial.mensajeCredencialInvalida(tipo));
         }
         if (usuarios.buscarPorUsername(username).isPresent()) {
             throw duplicado(actor, username);

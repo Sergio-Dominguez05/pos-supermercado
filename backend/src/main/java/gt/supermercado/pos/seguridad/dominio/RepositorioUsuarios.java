@@ -6,7 +6,19 @@ public interface RepositorioUsuarios {
 
     Optional<Usuario> buscarPorUsername(String username);
 
+    Optional<Usuario> buscarPorId(long id);
+
     boolean existeAlgunoConRol(Rol rol);
+
+    long contarAdministradoresActivos();
+
+    /**
+     * Cambia el nombre completo y el rol (HU-01.07). El nombre de usuario nunca cambia.
+     *
+     * @param credencialHash nueva credencial temporal (al pasar entre Cajero y los demás roles),
+     *                       o {@code null} para conservar la actual
+     */
+    void actualizar(long id, String nombreCompleto, Rol rol, String credencialHash);
 
     /** Crea el usuario activo y con credencial temporal. Devuelve su id. */
     long crear(String username, String nombreCompleto, Rol rol, String credencialHash);

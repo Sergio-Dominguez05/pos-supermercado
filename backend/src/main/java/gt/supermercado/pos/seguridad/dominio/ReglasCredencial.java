@@ -40,4 +40,15 @@ public final class ReglasCredencial {
     public static boolean esCredencialValida(TipoCredencial tipo, String credencial) {
         return tipo == TipoCredencial.PIN ? esPinValido(credencial) : esContrasenaValida(credencial);
     }
+
+    /** Código de error estable para una credencial temporal que no cumple su regla. */
+    public static String codigoCredencialInvalida(TipoCredencial tipo) {
+        return tipo == TipoCredencial.PIN ? "PIN_INVALIDO" : "CONTRASENA_INVALIDA";
+    }
+
+    public static String mensajeCredencialInvalida(TipoCredencial tipo) {
+        return tipo == TipoCredencial.PIN
+                ? "El PIN temporal debe ser numérico, de 4 a 6 dígitos."
+                : "La contraseña temporal debe tener al menos 8 caracteres, con letras y números.";
+    }
 }

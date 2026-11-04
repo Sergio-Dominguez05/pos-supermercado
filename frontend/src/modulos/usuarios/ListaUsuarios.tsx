@@ -1,15 +1,15 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { claveUsuarios, FILTRO_INICIAL, listarUsuarios, type FiltroUsuarios, type UsuarioCreado } from '../../api/usuarios'
+import { claveUsuarios, FILTRO_INICIAL, listarUsuarios, type FiltroUsuarios } from '../../api/usuarios'
 import { useSesion } from '../login/sesion'
-import { formatearUltimoAcceso, nombreDelRol } from './formato'
+import { formatearUltimoAcceso } from './formato'
 
 /** HU-01.06: lista de usuarios con búsqueda por nombre o usuario y filtros por rol y estado. */
 export function ListaUsuarios() {
   const { data: usuario } = useSesion()
-  // Al volver de "Nuevo usuario" llega el usuario recién creado (HU-01.05).
-  const creado = (useLocation().state as { creado?: UsuarioCreado } | null)?.creado
+  // Al volver de crear (HU-01.05) o editar (HU-01.07) un usuario llega el aviso a mostrar.
+  const aviso = (useLocation().state as { aviso?: string } | null)?.aviso
   if (!usuario) return null
 
   return (
@@ -18,10 +18,9 @@ export function ListaUsuarios() {
       <p className="subtitulo">
         <Link to="/inicio">Inicio</Link> · Usuarios
       </p>
-      {creado && (
+      {aviso && (
         <p className="tarjeta exito" role="status">
-          Se creó el usuario <strong>{creado.username}</strong> ({nombreDelRol(creado.rol)}), activo y con{' '}
-          {creado.rol === 'CAJERO' ? 'PIN' : 'contraseña'} temporal.
+          {aviso}
         </p>
       )}
       {/* El servidor exige el permiso; esto solo evita mostrar una lista que no se podrá cargar. */}
@@ -105,6 +104,9 @@ function TablaUsuarios() {
                 <th>Rol</th>
                 <th>Estado</th>
                 <th>Último acceso</th>
+                <th>
+                  <span className="solo-lector">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -119,6 +121,11 @@ function TablaUsuarios() {
                     </span>
                   </td>
                   <td>{formatearUltimoAcceso(fila.ultimoAcceso)}</td>
+                  <td>
+                    <Link to={`/usuarios/${fila.id}/editar`} aria-label={`Editar ${fila.username}`}>
+                      Editar
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

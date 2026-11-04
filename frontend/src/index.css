@@ -281,6 +281,11 @@ kbd {
   font-weight: 600;
 }
 
+.tabla a {
+  color: var(--ok);
+  font-weight: 600;
+}
+
 .estado {
   font-size: 0.85rem;
   font-weight: 600;
@@ -292,4 +297,26 @@ kbd {
 
 .estado-inactivo {
   color: var(--error);
+}
+
+.formulario input:disabled {
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+
+.aviso {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ok);
+  background: var(--fondo);
+}
+
+/* Visible solo para lectores de pantalla. */
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
