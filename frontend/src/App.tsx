@@ -4,6 +4,7 @@ import { Inicio } from './modulos/inicio/Inicio'
 import { Login } from './modulos/login/Login'
 import { RutaProtegida } from './modulos/login/RutaProtegida'
 import { EstadoSistema } from './modulos/sistema/EstadoSistema'
+import { Venta } from './modulos/venta/Venta'
 
 const clienteConsultas = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -22,6 +23,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <Inicio />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/venta"
+            element={
+              <RutaProtegida>
+                <Venta />
               </RutaProtegida>
             }
           />

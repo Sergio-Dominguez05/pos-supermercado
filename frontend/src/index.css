@@ -108,6 +108,31 @@ kbd {
   padding-top: 15vh;
 }
 
+.pestanas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pestanas button {
+  font: inherit;
+  padding: 8px;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  border: none;
+  cursor: pointer;
+}
+
+.pestanas button[aria-selected='true'] {
+  color: var(--texto);
+  font-weight: 600;
+  background: var(--fondo);
+  box-shadow: inset 0 -2px 0 var(--ok);
+}
+
 .formulario {
   display: grid;
   gap: 16px;

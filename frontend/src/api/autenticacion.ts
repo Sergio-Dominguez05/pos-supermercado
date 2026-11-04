@@ -16,6 +16,12 @@ export const iniciarSesion = (username: string, contrasena: string) =>
     body: JSON.stringify({ username, contrasena }),
   })
 
+export const iniciarSesionConPin = (username: string, pin: string) =>
+  pedir<UsuarioSesion>('/api/auth/login-pin', {
+    method: 'POST',
+    body: JSON.stringify({ username, pin }),
+  })
+
 /** Usuario de la sesión actual, o `null` si no hay sesión. */
 export async function obtenerSesion(): Promise<UsuarioSesion | null> {
   try {
