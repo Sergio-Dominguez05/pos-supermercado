@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,9 +17,11 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 /**
  * El estado del sistema y el inicio de sesión son públicos; todo lo demás exige una sesión válida
- * (cookie {@link CookieSesion}, tabla {@code sesion}).
+ * (cookie {@link CookieSesion}, tabla {@code sesion}). Cada endpoint declara además su permiso con
+ * {@code @PreAuthorize("hasAuthority('...')")} (Architecture.md §7.3).
  */
 @Configuration
+@EnableMethodSecurity
 public class SeguridadConfig {
 
     @Bean

@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { useSesion } from '../login/sesion'
 import { opcionesPara } from './opciones'
 
@@ -18,8 +19,14 @@ export function Inicio() {
         <ul className="opciones">
           {opcionesPara(usuario.permisos).map((opcion) => (
             <li key={opcion.permiso}>
-              <span>{opcion.etiqueta}</span>
-              <span className="pendiente">Próximamente</span>
+              {opcion.ruta ? (
+                <Link to={opcion.ruta}>{opcion.etiqueta}</Link>
+              ) : (
+                <>
+                  <span>{opcion.etiqueta}</span>
+                  <span className="pendiente">Próximamente</span>
+                </>
+              )}
             </li>
           ))}
         </ul>
