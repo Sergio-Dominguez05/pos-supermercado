@@ -6,6 +6,7 @@ import gt.supermercado.pos.seguridad.aplicacion.CreacionUsuarios.NuevoUsuario;
 import gt.supermercado.pos.seguridad.aplicacion.CreacionUsuarios.UsuarioCreado;
 import gt.supermercado.pos.seguridad.aplicacion.EdicionUsuarios;
 import gt.supermercado.pos.seguridad.aplicacion.EdicionUsuarios.CambiosUsuario;
+import gt.supermercado.pos.seguridad.aplicacion.EstadoUsuarios;
 import gt.supermercado.pos.seguridad.dominio.ResumenUsuario;
 import gt.supermercado.pos.seguridad.dominio.Rol;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -36,12 +37,27 @@ public class UsuariosController {
     private final CreacionUsuarios creacionUsuarios;
     private final ConsultaUsuarios consultaUsuarios;
     private final EdicionUsuarios edicionUsuarios;
+    private final EstadoUsuarios estadoUsuarios;
 
     public UsuariosController(CreacionUsuarios creacionUsuarios, ConsultaUsuarios consultaUsuarios,
-                              EdicionUsuarios edicionUsuarios) {
+                              EdicionUsuarios edicionUsuarios, EstadoUsuarios estadoUsuarios) {
         this.creacionUsuarios = creacionUsuarios;
         this.consultaUsuarios = consultaUsuarios;
         this.edicionUsuarios = edicionUsuarios;
+        this.estadoUsuarios = estadoUsuarios;
+    }
+
+    /** HU-01.08: el usuario deja de poder iniciar sesión; no se borra. */
+    @PostMapping("/{id}/desactivar")
+    @PreAuthorize("hasAuthority('USUARIO_ADMINISTRAR')")
+    public ResumenUsuario desactivar(@PathVariable long id, @AuthenticationPrincipal SesionActiva actor) {
+        return estadoUsuarios.desactivar(id, actor);
+    }
+
+    @PostMapping("/{id}/activar")
+    @PreAuthorize("hasAuthority('USUARIO_ADMINISTRAR')")
+    public ResumenUsuario activar(@PathVariable long id, @AuthenticationPrincipal SesionActiva actor) {
+        return estadoUsuarios.activar(id, actor);
     }
 
     /** HU-01.06: lista con búsqueda por nombre o usuario ({@code q}) y filtros por rol y estado. */

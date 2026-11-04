@@ -75,6 +75,11 @@ class RepositorioUsuariosJdbc implements RepositorioUsuarios {
     }
 
     @Override
+    public void cambiarActivo(long id, boolean activo) {
+        jdbc.update("UPDATE usuario SET activo = ? WHERE id = ?", activo, id);
+    }
+
+    @Override
     public void registrarAcceso(long usuarioId) {
         jdbc.update("UPDATE usuario SET ultimo_acceso = now() WHERE id = ?", usuarioId);
     }

@@ -96,6 +96,10 @@ class AdministradorInicialTest {
         }
 
         @Override
+        public void cambiarActivo(long id, boolean activo) {
+        }
+
+        @Override
         public void registrarAcceso(long usuarioId) {
         }
     }

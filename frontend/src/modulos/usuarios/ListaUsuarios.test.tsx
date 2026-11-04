@@ -5,7 +5,16 @@ import { describe, expect, it } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { claveUsuarios, FILTRO_INICIAL, type ResumenUsuario, type UsuarioCreado } from '../../api/usuarios'
 import { CLAVE_SESION } from '../login/sesion'
-import { avisoCreacion, avisoEdicion, formatearUltimoAcceso, nombreDelRol, requiereCredencialNueva } from './formato'
+import {
+  accionDeEstado,
+  avisoCreacion,
+  avisoEdicion,
+  avisoEstado,
+  confirmacionDesactivar,
+  formatearUltimoAcceso,
+  nombreDelRol,
+  requiereCredencialNueva,
+} from './formato'
 import { ListaUsuarios } from './ListaUsuarios'
 
 const USUARIOS: ResumenUsuario[] = [
@@ -36,7 +45,7 @@ const renderizar = (
   )
 }
 
-const ADMIN: Partial<UsuarioSesion> = { rol: 'ADMIN', permisos: ['USUARIO_ADMINISTRAR'] }
+const ADMIN: Partial<UsuarioSesion> = { username: 'admin', rol: 'ADMIN', permisos: ['USUARIO_ADMINISTRAR'] }
 
 describe('lista de usuarios (HU-01.06)', () => {
   it('muestra nombre completo, usuario, rol, estado y último acceso (crit. 1)', () => {
@@ -96,6 +105,24 @@ describe('lista de usuarios (HU-01.06)', () => {
     expect(html).toContain('href="/usuarios/2/editar"')
   })
 
+  it('ofrece desactivar a los activos y activar a los inactivos (HU-01.08)', () => {
+    const html = renderizar(ADMIN)
+
+    expect(html).toMatch(/aria-label="Desactivar oscar.nunez"[^>]*>Desactivar</)
+    expect(html).toMatch(/aria-label="Activar paula.q"[^>]*>Activar</)
+  })
+
+  it('no ofrece desactivar el propio usuario (HU-01.08 crit. 4)', () => {
+    const propio: ResumenUsuario = {
+      id: 3, username: 'admin', nombreCompleto: 'Administrador', rol: 'ADMIN', rolNombre: 'Administrador',
+      activo: true, ultimoAcceso: null,
+    }
+    const html = renderizar(ADMIN, [propio])
+
+    expect(html).toContain('href="/usuarios/3/editar"')
+    expect(html).not.toContain('Desactivar admin')
+  })
+
   it('sin venir de crear un usuario no muestra la confirmación', () => {
     expect(renderizar(ADMIN)).not.toContain('Se creó el usuario')
   })
@@ -122,6 +149,23 @@ describe('credencial al cambiar de rol (HU-01.07 crit. 3)', () => {
     expect(requiereCredencialNueva('ADMIN', 'CAJERO')).toBe(true)
     expect(requiereCredencialNueva('SUPERVISOR', 'ADMIN')).toBe(false)
     expect(requiereCredencialNueva('CAJERO', 'CAJERO')).toBe(false)
+  })
+})
+
+describe('activar y desactivar (HU-01.08)', () => {
+  const [activo, inactivo] = USUARIOS
+
+  it('cada fila ofrece la acción que corresponde a su estado', () => {
+    expect(accionDeEstado(activo, 'admin')).toBe('desactivar')
+    expect(accionDeEstado(inactivo, 'admin')).toBe('activar')
+    expect(accionDeEstado(activo, 'oscar.nunez')).toBeNull()
+  })
+
+  it('pide confirmar la desactivación y avisa el resultado', () => {
+    expect(confirmacionDesactivar(activo)).toContain('¿Desactivar a oscar.nunez?')
+    expect(confirmacionDesactivar(activo)).toContain('Su historial se conserva.')
+    expect(avisoEstado({ ...activo, activo: false })).toBe('Se desactivó el usuario oscar.nunez.')
+    expect(avisoEstado(activo)).toBe('Se activó el usuario oscar.nunez.')
   })
 })
 

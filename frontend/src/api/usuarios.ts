@@ -67,5 +67,11 @@ export interface CambiosUsuario {
 export const editarUsuario = (id: number, cambios: CambiosUsuario) =>
   pedir<ResumenUsuario>(`/api/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(cambios) })
 
+/** HU-01.08: el usuario desactivado no puede iniciar sesión; nunca se borra. */
+export const desactivarUsuario = (id: number) =>
+  pedir<ResumenUsuario>(`/api/usuarios/${id}/desactivar`, { method: 'POST' })
+
+export const activarUsuario = (id: number) => pedir<ResumenUsuario>(`/api/usuarios/${id}/activar`, { method: 'POST' })
+
 export const crearUsuario = (datos: NuevoUsuario) =>
   pedir<UsuarioCreado>('/api/usuarios', { method: 'POST', body: JSON.stringify(datos) })

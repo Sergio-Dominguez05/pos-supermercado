@@ -20,6 +20,9 @@ public interface RepositorioUsuarios {
      */
     void actualizar(long id, String nombreCompleto, Rol rol, String credencialHash);
 
+    /** Activa o desactiva; los usuarios nunca se borran (HU-01.08 crit. 2). */
+    void cambiarActivo(long id, boolean activo);
+
     /** Crea el usuario activo y con credencial temporal. Devuelve su id. */
     long crear(String username, String nombreCompleto, Rol rol, String credencialHash);
 
