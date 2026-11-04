@@ -27,7 +27,7 @@ public class SeguridadConfig {
         return http
                 .authorizeHttpRequests(peticiones -> peticiones
                         .requestMatchers("/api/sistema/**", "/actuator/health/**", "/actuator/info", "/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/login-pin").permitAll()
                         .anyRequest().authenticated())
                 // La cookie de sesión es SameSite=Strict, así que el navegador no la envía en peticiones
                 // iniciadas desde otro sitio; eso cubre CSRF sin un token adicional.

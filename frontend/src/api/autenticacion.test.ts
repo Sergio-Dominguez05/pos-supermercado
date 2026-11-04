@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { iniciarSesion, obtenerSesion } from './autenticacion'
+import { iniciarSesion, iniciarSesionConPin, obtenerSesion } from './autenticacion'
 
 const responder = (estado: number, cuerpo?: unknown) =>
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
@@ -29,5 +29,15 @@ describe('autenticación', () => {
     expect(url).toBe('/api/auth/login')
     expect(opciones?.method).toBe('POST')
     expect(JSON.parse(opciones?.body as string)).toEqual({ username: 'ana', contrasena: 'Clave2026' })
+  })
+
+  it('el PIN va a su propio endpoint, también en el cuerpo', async () => {
+    responder(200, { username: 'luis' })
+    await iniciarSesionConPin('luis', '4821')
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/auth/login-pin')
+    expect(opciones?.method).toBe('POST')
+    expect(JSON.parse(opciones?.body as string)).toEqual({ username: 'luis', pin: '4821' })
   })
 })

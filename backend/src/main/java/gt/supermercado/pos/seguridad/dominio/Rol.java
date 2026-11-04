@@ -15,9 +15,4 @@ public enum Rol {
     public int id() {
         return id;
     }
-
-    /** Administrador y Supervisor entran con contraseña (HU-01.01); el Cajero, con PIN (HU-01.02). */
-    public boolean usaContrasena() {
-        return this != CAJERO;
-    }
 }
