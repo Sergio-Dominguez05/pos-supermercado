@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -36,6 +37,13 @@ public class ManejadorErrores {
                 .toList();
         return ResponseEntity.badRequest()
                 .body(new ErrorApi("DATOS_INVALIDOS", "Revise los datos ingresados.", detalles));
+    }
+
+    /** Un parámetro de la URL con un valor que no corresponde a su tipo, por ejemplo {@code ?rol=GERENTE}. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ErrorApi> parametroInvalido(MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorApi("DATOS_INVALIDOS", "Revise los datos ingresados.", List.of(e.getName())));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

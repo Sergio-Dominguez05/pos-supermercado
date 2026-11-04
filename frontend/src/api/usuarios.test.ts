@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { crearUsuario } from './usuarios'
+import { crearUsuario, listarUsuarios } from './usuarios'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -20,6 +20,16 @@ describe('usuarios', () => {
       rol: 'CAJERO',
       credencialTemporal: '4821',
     })
+  })
+
+  it('la lista manda solo los filtros que tienen valor', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('[]', { status: 200 })))
+
+    await listarUsuarios({ q: '', rol: '', activo: '' })
+    await listarUsuarios({ q: '  Núñez ', rol: 'CAJERO', activo: 'false' })
+
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/usuarios')
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe('/api/usuarios?q=N%C3%BA%C3%B1ez&rol=CAJERO&activo=false')
   })
 
   it('muestra el mensaje del servidor cuando el usuario ya existe (crit. 4)', async () => {

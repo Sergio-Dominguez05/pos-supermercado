@@ -220,3 +220,76 @@ kbd {
 .subtitulo a {
   color: inherit;
 }
+
+.pagina-ancha {
+  max-width: 960px;
+}
+
+.barra-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.barra-filtros label {
+  display: grid;
+  gap: 6px;
+  color: var(--texto-suave);
+}
+
+.barra-filtros input,
+.barra-filtros select {
+  font: inherit;
+  padding: 8px 10px;
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.boton {
+  margin-left: auto;
+  padding: 9px 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--ok);
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.tabla-contenedor {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla th,
+.tabla td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+
+.tabla th {
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.estado {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.estado-activo {
+  color: var(--ok);
+}
+
+.estado-inactivo {
+  color: var(--error);
+}

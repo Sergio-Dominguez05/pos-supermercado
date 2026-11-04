@@ -1,16 +1,9 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link } from 'react-router'
-import { crearUsuario, type Rol, type UsuarioCreado } from '../../api/usuarios'
+import { Link, useNavigate } from 'react-router'
+import { crearUsuario, type Rol } from '../../api/usuarios'
 import { useSesion } from '../login/sesion'
-
-const ROLES:{ valor: Rol; nombre: string }[] = [
-  { valor: 'ADMIN', nombre: 'Administrador' },
-  { valor: 'SUPERVISOR', nombre: 'Supervisor' },
-  { valor: 'CAJERO', nombre: 'Cajero' },
-]
-
-const nombreDelRol = (rol: Rol) => ROLES.find((r) => r.valor === rol)?.nombre ?? rol
+import { ROLES } from './formato'
 
 /** HU-01.05: el Administrador crea usuarios con una contraseña o PIN temporal. */
 export function NuevoUsuario() {
@@ -21,7 +14,7 @@ export function NuevoUsuario() {
     <main className="pagina">
       <h1>Nuevo usuario</h1>
       <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Usuarios
+        <Link to="/inicio">Inicio</Link> · <Link to="/usuarios">Usuarios</Link> · Nuevo
       </p>
       {/* El servidor exige el permiso; esto solo evita mostrar un formulario que no se podrá usar. */}
       {usuario.permisos.includes('USUARIO_ADMINISTRAR') ? (
@@ -39,16 +32,16 @@ export function FormularioUsuario({ rolInicial = 'CAJERO' }: { rolInicial?: Rol 
   const [rol, setRol] = useState<Rol>(rolInicial)
   const [credencial, setCredencial] = useState('')
   const [mostrar, setMostrar] = useState(false)
-  const [creado, setCreado] = useState<UsuarioCreado>()
+  const navegar = useNavigate()
+  const clienteConsultas = useQueryClient()
   const esPin = rol === 'CAJERO'
 
   const creacion = useMutation({
     mutationFn: () => crearUsuario({ nombreCompleto, username, rol, credencialTemporal: credencial }),
-    onSuccess: (nuevo) => {
-      setCreado(nuevo)
-      setNombreCompleto('')
-      setUsername('')
-      setCredencial('')
+    // Vuelve a la lista ya actualizada; el aviso de creación se muestra allí. Si falla, se queda aquí con el error.
+    onSuccess: async (nuevo) => {
+      await clienteConsultas.invalidateQueries({ queryKey: ['usuarios'] })
+      navegar('/usuarios', { state: { creado: nuevo } })
     },
   })
 
@@ -57,7 +50,6 @@ export function FormularioUsuario({ rolInicial = 'CAJERO' }: { rolInicial?: Rol 
       className="tarjeta formulario"
       onSubmit={(evento) => {
         evento.preventDefault()
-        setCreado(undefined)
         creacion.mutate()
       }}
     >
@@ -146,12 +138,6 @@ export function FormularioUsuario({ rolInicial = 'CAJERO' }: { rolInicial?: Rol 
       {creacion.error && (
         <p className="error" role="alert">
           {creacion.error.message}
-        </p>
-      )}
-      {creado && (
-        <p className="exito" role="status">
-          Se creó el usuario <strong>{creado.username}</strong> ({nombreDelRol(creado.rol)}), activo y con{' '}
-          {creado.rol === 'CAJERO' ? 'PIN' : 'contraseña'} temporal.
         </p>
       )}
       <button type="submit" disabled={creacion.isPending}>
