@@ -1,0 +1,12 @@
+package gt.supermercado.pos.seguridad.dominio;
+
+import java.util.Optional;
+
+public interface RepositorioSesiones {
+
+    /** Abre una sesión con una copia de los permisos actuales del rol del usuario. Devuelve su id. */
+    long abrir(byte[] tokenHash, long usuarioId);
+
+    /** Sesión no cerrada cuyo usuario sigue activo. */
+    Optional<SesionActiva> buscarActiva(byte[] tokenHash);
+}

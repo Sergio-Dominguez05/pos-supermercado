@@ -3,6 +3,10 @@ spring:
     name: pos-backend
   profiles:
     default: dev
+  autoconfigure:
+    # La autenticación es propia (tabla usuario + sesion); sin esto Spring Boot crea un usuario
+    # en memoria e imprime su contraseña en el log.
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   jpa:
     open-in-view: false
     hibernate:
@@ -32,6 +36,12 @@ management:
 
 pos:
   version: '@project.version@'
+  seguridad:
+    # Secure en la cookie de sesión: solo funciona con HTTPS (producción).
+    cookie-segura: false
+    admin-inicial:
+      # Si no existe ningún Administrador, se crea 'admin' con esta contraseña temporal (vacía: no se crea).
+      contrasena: ''
   fel:
     # simulado: CertificadorFelSimulado (desarrollo y pruebas). rest: adaptador real (pendiente, Sprint 4).
     modo: simulado

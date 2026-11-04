@@ -52,6 +52,13 @@ Direcciones:
 - Cambiar `POS_DB_PORT` o los datos de acceso se refleja en Docker y en Spring Boot. **Si ya había un volumen de PostgreSQL, cambiar contraseñas no actualiza los roles existentes automáticamente**; consulte los logs y migre los valores manualmente. No use `docker compose down -v` con datos que quiera conservar.
 - Los valores de `.env.example` son exclusivamente de desarrollo, **nunca producción**.
 
+### Primer inicio de sesión
+
+Mientras no exista gestión de usuarios (HU-01.05), el backend crea al arrancar el usuario **`admin`** si todavía no hay ningún Administrador. Su contraseña temporal es `POS_ADMIN_PASSWORD_INICIAL` (al menos 8 caracteres, con letras y números); en desarrollo, si el `.env` no la define, se usa el valor de `.env.example`. Entrar en <http://localhost:5173/login>.
+
+- La variable solo se usa la primera vez; cambiarla después no modifica la contraseña de `admin`.
+- En producción no tiene valor por defecto: si falta y no hay Administrador, el backend lo advierte en el log y nadie puede entrar.
+
 ## Convenciones de GitHub
 
 1. Descargar o extraer el proyecto base **dentro del clon de `pos-supermercado`**; no copiar `.git` del ZIP anterior.
