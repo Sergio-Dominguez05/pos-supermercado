@@ -4,6 +4,7 @@ import { Inicio } from './modulos/inicio/Inicio'
 import { Login } from './modulos/login/Login'
 import { RutaProtegida } from './modulos/login/RutaProtegida'
 import { EstadoSistema } from './modulos/sistema/EstadoSistema'
+import { ListaUsuarios } from './modulos/usuarios/ListaUsuarios'
 import { NuevoUsuario } from './modulos/usuarios/NuevoUsuario'
 import { Venta } from './modulos/venta/Venta'
 
@@ -32,6 +33,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <Venta />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/usuarios"
+            element={
+              <RutaProtegida>
+                <ListaUsuarios />
               </RutaProtegida>
             }
           />

@@ -1,8 +1,10 @@
 package gt.supermercado.pos.seguridad.api;
 
+import gt.supermercado.pos.seguridad.aplicacion.ConsultaUsuarios;
 import gt.supermercado.pos.seguridad.aplicacion.CreacionUsuarios;
 import gt.supermercado.pos.seguridad.aplicacion.CreacionUsuarios.NuevoUsuario;
 import gt.supermercado.pos.seguridad.aplicacion.CreacionUsuarios.UsuarioCreado;
+import gt.supermercado.pos.seguridad.dominio.ResumenUsuario;
 import gt.supermercado.pos.seguridad.dominio.Rol;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import jakarta.validation.Valid;
@@ -13,20 +15,35 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/usuarios")
 public class UsuariosController {
 
     private final CreacionUsuarios creacionUsuarios;
+    private final ConsultaUsuarios consultaUsuarios;
 
-    public UsuariosController(CreacionUsuarios creacionUsuarios) {
+    public UsuariosController(CreacionUsuarios creacionUsuarios, ConsultaUsuarios consultaUsuarios) {
         this.creacionUsuarios = creacionUsuarios;
+        this.consultaUsuarios = consultaUsuarios;
+    }
+
+    /** HU-01.06: lista con búsqueda por nombre o usuario ({@code q}) y filtros por rol y estado. */
+    @GetMapping
+    @PreAuthorize("hasAuthority('USUARIO_ADMINISTRAR')")
+    public List<ResumenUsuario> listar(@RequestParam(required = false) String q,
+                                       @RequestParam(required = false) Rol rol,
+                                       @RequestParam(required = false) Boolean activo) {
+        return consultaUsuarios.listar(q, rol, activo);
     }
 
     /**
