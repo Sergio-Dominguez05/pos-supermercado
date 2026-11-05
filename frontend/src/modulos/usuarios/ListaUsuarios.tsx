@@ -36,7 +36,11 @@ export function ListaUsuarios() {
       )}
       {/* El servidor exige el permiso; esto solo evita mostrar una lista que no se podrá cargar. */}
       {usuario.permisos.includes('USUARIO_ADMINISTRAR') ? (
-        <TablaUsuarios usernameActual={usuario.username} onAviso={setAvisoAccion} />
+        <TablaUsuarios
+          usernameActual={usuario.username}
+          puedeRestablecer={usuario.permisos.includes('CREDENCIAL_RESTABLECER')}
+          onAviso={setAvisoAccion}
+        />
       ) : (
         <p className="tarjeta error">No tiene permiso para administrar usuarios.</p>
       )}
@@ -44,7 +48,15 @@ export function ListaUsuarios() {
   )
 }
 
-function TablaUsuarios({ usernameActual, onAviso }: { usernameActual: string; onAviso: (aviso?: string) => void }) {
+function TablaUsuarios({
+  usernameActual,
+  puedeRestablecer,
+  onAviso,
+}: {
+  usernameActual: string
+  puedeRestablecer: boolean
+  onAviso: (aviso?: string) => void
+}) {
   const [filtro, setFiltro] = useState<FiltroUsuarios>(FILTRO_INICIAL)
   const clienteConsultas = useQueryClient()
   const { data: usuarios, error, isPending } = useQuery({
@@ -154,6 +166,11 @@ function TablaUsuarios({ usernameActual, onAviso }: { usernameActual: string; on
                       <Link to={`/usuarios/${fila.id}/editar`} aria-label={`Editar ${fila.username}`}>
                         Editar
                       </Link>
+                      {puedeRestablecer && (
+                        <Link to={`/usuarios/${fila.id}/credencial`} aria-label={`Restablecer acceso de ${fila.username}`}>
+                          Restablecer
+                        </Link>
+                      )}
                       {accion && (
                         <button
                           type="button"

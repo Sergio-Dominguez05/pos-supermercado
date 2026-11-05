@@ -7,9 +7,11 @@ import gt.supermercado.pos.seguridad.aplicacion.CreacionUsuarios.UsuarioCreado;
 import gt.supermercado.pos.seguridad.aplicacion.EdicionUsuarios;
 import gt.supermercado.pos.seguridad.aplicacion.EdicionUsuarios.CambiosUsuario;
 import gt.supermercado.pos.seguridad.aplicacion.EstadoUsuarios;
+import gt.supermercado.pos.seguridad.aplicacion.RestablecimientoCredencial;
 import gt.supermercado.pos.seguridad.dominio.ResumenUsuario;
 import gt.supermercado.pos.seguridad.dominio.Rol;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
+import gt.supermercado.pos.seguridad.dominio.TipoCredencial;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -38,13 +40,30 @@ public class UsuariosController {
     private final ConsultaUsuarios consultaUsuarios;
     private final EdicionUsuarios edicionUsuarios;
     private final EstadoUsuarios estadoUsuarios;
+    private final RestablecimientoCredencial restablecimientoCredencial;
 
     public UsuariosController(CreacionUsuarios creacionUsuarios, ConsultaUsuarios consultaUsuarios,
-                              EdicionUsuarios edicionUsuarios, EstadoUsuarios estadoUsuarios) {
+                              EdicionUsuarios edicionUsuarios, EstadoUsuarios estadoUsuarios,
+                              RestablecimientoCredencial restablecimientoCredencial) {
         this.creacionUsuarios = creacionUsuarios;
         this.consultaUsuarios = consultaUsuarios;
         this.edicionUsuarios = edicionUsuarios;
         this.estadoUsuarios = estadoUsuarios;
+        this.restablecimientoCredencial = restablecimientoCredencial;
+    }
+
+    public record SolicitudRestablecer(@NotBlank @Size(max = 128) String credencialTemporal) {}
+
+    /** Respuesta sin ningún valor de credencial: solo qué tipo se asignó (HU-01.14 crit. 3). */
+    public record CredencialRestablecida(long id, String tipo, boolean temporal) {}
+
+    /** HU-01.14: solo quien tiene el permiso de restablecer credenciales (el Administrador, crit. 2). */
+    @PostMapping("/{id}/credencial")
+    @PreAuthorize("hasAuthority('CREDENCIAL_RESTABLECER')")
+    public CredencialRestablecida restablecer(@PathVariable long id, @Valid @RequestBody SolicitudRestablecer solicitud,
+                                              @AuthenticationPrincipal SesionActiva actor) {
+        TipoCredencial tipo = restablecimientoCredencial.restablecer(id, solicitud.credencialTemporal(), actor);
+        return new CredencialRestablecida(id, tipo.name(), true);
     }
 
     /** HU-01.08: el usuario deja de poder iniciar sesión; no se borra. */

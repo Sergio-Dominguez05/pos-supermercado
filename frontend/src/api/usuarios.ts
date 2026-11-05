@@ -67,6 +67,20 @@ export interface CambiosUsuario {
 export const editarUsuario = (id: number, cambios: CambiosUsuario) =>
   pedir<ResumenUsuario>(`/api/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(cambios) })
 
+/** Respuesta del restablecimiento: solo el tipo asignado, nunca la credencial (HU-01.14 crit. 3). */
+export interface CredencialRestablecida {
+  id: number
+  tipo: 'CONTRASENA' | 'PIN'
+  temporal: boolean
+}
+
+/** HU-01.14: el Administrador asigna una contraseña o PIN temporal a quien lo olvidó. */
+export const restablecerCredencial = (id: number, credencialTemporal: string) =>
+  pedir<CredencialRestablecida>(`/api/usuarios/${id}/credencial`, {
+    method: 'POST',
+    body: JSON.stringify({ credencialTemporal }),
+  })
+
 /** HU-01.08: el usuario desactivado no puede iniciar sesión; nunca se borra. */
 export const desactivarUsuario = (id: number) =>
   pedir<ResumenUsuario>(`/api/usuarios/${id}/desactivar`, { method: 'POST' })
