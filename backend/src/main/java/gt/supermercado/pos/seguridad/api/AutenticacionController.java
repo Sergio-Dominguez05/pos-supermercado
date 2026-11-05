@@ -1,5 +1,6 @@
 package gt.supermercado.pos.seguridad.api;
 
+import gt.supermercado.pos.seguridad.aplicacion.CambioCredencial;
 import gt.supermercado.pos.seguridad.aplicacion.CierreSesion;
 import gt.supermercado.pos.seguridad.aplicacion.InicioSesion;
 import gt.supermercado.pos.seguridad.aplicacion.InicioSesion.SesionIniciada;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,11 +28,14 @@ public class AutenticacionController {
 
     private final InicioSesion inicioSesion;
     private final CierreSesion cierreSesion;
+    private final CambioCredencial cambioCredencial;
     private final CookieSesion cookie;
 
-    public AutenticacionController(InicioSesion inicioSesion, CierreSesion cierreSesion, CookieSesion cookie) {
+    public AutenticacionController(InicioSesion inicioSesion, CierreSesion cierreSesion,
+                                   CambioCredencial cambioCredencial, CookieSesion cookie) {
         this.inicioSesion = inicioSesion;
         this.cierreSesion = cierreSesion;
+        this.cambioCredencial = cambioCredencial;
         this.cookie = cookie;
     }
 
@@ -69,6 +74,20 @@ public class AutenticacionController {
     @GetMapping("/sesion")
     public UsuarioSesion sesion(@AuthenticationPrincipal SesionActiva sesion) {
         return UsuarioSesion.de(sesion);
+    }
+
+    /** Las reglas de la nueva credencial se validan en {@link CambioCredencial}, para registrar los rechazos. */
+    public record SolicitudCambioCredencial(
+            @NotBlank @Size(max = 128) String actual,
+            @NotBlank @Size(max = 128) String nueva,
+            @NotBlank @Size(max = 128) String confirmacion) {}
+
+    /** HU-01.13: cambia la contraseña (o el PIN, si es Cajero) del usuario de la sesión. */
+    @PutMapping("/credencial")
+    public ResponseEntity<Void> cambiarCredencial(@Valid @RequestBody SolicitudCambioCredencial solicitud,
+                                                  @AuthenticationPrincipal SesionActiva sesion) {
+        cambioCredencial.cambiar(sesion, solicitud.actual(), solicitud.nueva(), solicitud.confirmacion());
+        return ResponseEntity.noContent().build();
     }
 
     /** HU-01.16: cierra la sesión en el servidor y borra la cookie del navegador. */

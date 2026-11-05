@@ -75,6 +75,11 @@ class RepositorioUsuariosJdbc implements RepositorioUsuarios {
     }
 
     @Override
+    public void cambiarCredencial(long id, String credencialHash) {
+        jdbc.update("UPDATE usuario SET credencial_hash = ?, credencial_temporal = false WHERE id = ?", credencialHash, id);
+    }
+
+    @Override
     public void cambiarActivo(long id, boolean activo) {
         jdbc.update("UPDATE usuario SET activo = ? WHERE id = ?", activo, id);
     }

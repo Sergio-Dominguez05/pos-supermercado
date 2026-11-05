@@ -96,6 +96,10 @@ class AdministradorInicialTest {
         }
 
         @Override
+        public void cambiarCredencial(long id, String credencialHash) {
+        }
+
+        @Override
         public void cambiarActivo(long id, boolean activo) {
         }
 

@@ -22,6 +22,16 @@ export const iniciarSesionConPin = (username: string, pin: string) =>
     body: JSON.stringify({ username, pin }),
   })
 
+export interface CambioCredencial {
+  actual: string
+  nueva: string
+  confirmacion: string
+}
+
+/** HU-01.13: cambia la contraseña (o el PIN, si es Cajero) del usuario de la sesión. */
+export const cambiarCredencial = (cambio: CambioCredencial) =>
+  pedir<void>('/api/auth/credencial', { method: 'PUT', body: JSON.stringify(cambio) })
+
 /** HU-01.16: cierra la sesión en el servidor, que además borra la cookie. */
 export const cerrarSesion = () => pedir<void>('/api/auth/logout', { method: 'POST' })
 

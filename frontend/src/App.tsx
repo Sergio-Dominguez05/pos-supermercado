@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Inicio } from './modulos/inicio/Inicio'
+import { CambioCredencial } from './modulos/login/CambioCredencial'
 import { Login } from './modulos/login/Login'
 import { RutaProtegida } from './modulos/login/RutaProtegida'
 import { EstadoSistema } from './modulos/sistema/EstadoSistema'
@@ -58,6 +59,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <EditarUsuario />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/credencial"
+            element={
+              <RutaProtegida>
+                <CambioCredencial />
               </RutaProtegida>
             }
           />

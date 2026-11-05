@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { cerrarSesion, type UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_SESION } from './sesion'
 
@@ -29,6 +29,7 @@ export function BarraSesion({ usuario }: { usuario: UsuarioSesion }) {
           {salida.error.message}
         </span>
       )}
+      <Link to="/credencial">{usuario.rol === 'CAJERO' ? 'Cambiar PIN' : 'Cambiar contraseña'}</Link>
       <button type="button" className="boton-texto" disabled={salida.isPending} onClick={() => salida.mutate()}>
         {salida.isPending ? 'Cerrando…' : 'Cerrar sesión'}
       </button>

@@ -356,3 +356,8 @@ kbd {
   background: var(--superficie);
   border-bottom: 1px solid var(--borde);
 }
+
+.barra-sesion a {
+  color: var(--ok);
+  font-weight: 600;
+}
