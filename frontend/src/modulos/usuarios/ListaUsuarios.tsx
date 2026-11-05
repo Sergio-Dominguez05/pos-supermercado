@@ -1,15 +1,26 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { claveUsuarios, FILTRO_INICIAL, listarUsuarios, type FiltroUsuarios } from '../../api/usuarios'
+import {
+  activarUsuario,
+  claveUsuarios,
+  desactivarUsuario,
+  FILTRO_INICIAL,
+  listarUsuarios,
+  type FiltroUsuarios,
+  type ResumenUsuario,
+} from '../../api/usuarios'
 import { useSesion } from '../login/sesion'
-import { formatearUltimoAcceso } from './formato'
+import { accionDeEstado, avisoEstado, confirmacionDesactivar, formatearUltimoAcceso } from './formato'
 
 /** HU-01.06: lista de usuarios con búsqueda por nombre o usuario y filtros por rol y estado. */
 export function ListaUsuarios() {
   const { data: usuario } = useSesion()
   // Al volver de crear (HU-01.05) o editar (HU-01.07) un usuario llega el aviso a mostrar.
-  const aviso = (useLocation().state as { aviso?: string } | null)?.aviso
+  const avisoNavegacion = (useLocation().state as { aviso?: string } | null)?.aviso
+  // Al activar o desactivar (HU-01.08) desde esta misma página.
+  const [avisoAccion, setAvisoAccion] = useState<string>()
+  const aviso = avisoAccion ?? avisoNavegacion
   if (!usuario) return null
 
   return (
@@ -25,7 +36,7 @@ export function ListaUsuarios() {
       )}
       {/* El servidor exige el permiso; esto solo evita mostrar una lista que no se podrá cargar. */}
       {usuario.permisos.includes('USUARIO_ADMINISTRAR') ? (
-        <TablaUsuarios />
+        <TablaUsuarios usernameActual={usuario.username} onAviso={setAvisoAccion} />
       ) : (
         <p className="tarjeta error">No tiene permiso para administrar usuarios.</p>
       )}
@@ -33,8 +44,9 @@ export function ListaUsuarios() {
   )
 }
 
-function TablaUsuarios() {
+function TablaUsuarios({ usernameActual, onAviso }: { usernameActual: string; onAviso: (aviso?: string) => void }) {
   const [filtro, setFiltro] = useState<FiltroUsuarios>(FILTRO_INICIAL)
+  const clienteConsultas = useQueryClient()
   const { data: usuarios, error, isPending } = useQuery({
     queryKey: claveUsuarios(filtro),
     queryFn: () => listarUsuarios(filtro),
@@ -42,6 +54,21 @@ function TablaUsuarios() {
     placeholderData: keepPreviousData,
   })
   const cambiar = (cambios: Partial<FiltroUsuarios>) => setFiltro((actual) => ({ ...actual, ...cambios }))
+
+  const estado = useMutation({
+    mutationFn: ({ fila, activar }: { fila: ResumenUsuario; activar: boolean }) =>
+      activar ? activarUsuario(fila.id) : desactivarUsuario(fila.id),
+    onMutate: () => onAviso(undefined),
+    onSuccess: async (actualizado) => {
+      await clienteConsultas.invalidateQueries({ queryKey: ['usuarios'] })
+      onAviso(avisoEstado(actualizado))
+    },
+  })
+
+  const cambiarEstado = (fila: ResumenUsuario, activar: boolean) => {
+    if (!activar && !window.confirm(confirmacionDesactivar(fila))) return
+    estado.mutate({ fila, activar })
+  }
 
   return (
     <section className="tarjeta">
@@ -87,9 +114,9 @@ function TablaUsuarios() {
         </Link>
       </div>
 
-      {error && (
+      {(error ?? estado.error) && (
         <p className="error" role="alert">
-          {error.message}
+          {(error ?? estado.error)?.message}
         </p>
       )}
       {isPending && <p>Cargando usuarios…</p>}
@@ -110,24 +137,38 @@ function TablaUsuarios() {
               </tr>
             </thead>
             <tbody>
-              {usuarios.map((fila) => (
-                <tr key={fila.id}>
-                  <td>{fila.nombreCompleto}</td>
-                  <td>{fila.username}</td>
-                  <td>{fila.rolNombre}</td>
-                  <td>
-                    <span className={fila.activo ? 'estado estado-activo' : 'estado estado-inactivo'}>
-                      {fila.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td>{formatearUltimoAcceso(fila.ultimoAcceso)}</td>
-                  <td>
-                    <Link to={`/usuarios/${fila.id}/editar`} aria-label={`Editar ${fila.username}`}>
-                      Editar
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {usuarios.map((fila) => {
+                const accion = accionDeEstado(fila, usernameActual)
+                return (
+                  <tr key={fila.id}>
+                    <td>{fila.nombreCompleto}</td>
+                    <td>{fila.username}</td>
+                    <td>{fila.rolNombre}</td>
+                    <td>
+                      <span className={fila.activo ? 'estado estado-activo' : 'estado estado-inactivo'}>
+                        {fila.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td>{formatearUltimoAcceso(fila.ultimoAcceso)}</td>
+                    <td className="acciones">
+                      <Link to={`/usuarios/${fila.id}/editar`} aria-label={`Editar ${fila.username}`}>
+                        Editar
+                      </Link>
+                      {accion && (
+                        <button
+                          type="button"
+                          className={accion === 'desactivar' ? 'boton-texto peligro' : 'boton-texto'}
+                          disabled={estado.isPending}
+                          aria-label={`${accion === 'activar' ? 'Activar' : 'Desactivar'} ${fila.username}`}
+                          onClick={() => cambiarEstado(fila, accion === 'activar')}
+                        >
+                          {accion === 'activar' ? 'Activar' : 'Desactivar'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

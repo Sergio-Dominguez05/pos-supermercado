@@ -58,7 +58,7 @@ Si todavía no hay ningún Administrador, el backend crea al arrancar el usuario
 
 - La variable solo se usa la primera vez; cambiarla después no modifica la contraseña de `admin`.
 - En producción no tiene valor por defecto: si falta y no hay Administrador, el backend lo advierte en el log y nadie puede entrar.
-- Con `admin`, la opción **Usuarios** (`/usuarios`, HU-01.06) muestra la lista con búsqueda y filtros; desde ahí, **Nuevo usuario** (HU-01.05) crea Administradores y Supervisores con contraseña temporal y Cajeros con PIN temporal, y **Editar** (HU-01.07) cambia el nombre completo y el rol. Los nombres de usuario no distinguen mayúsculas ni se pueden modificar.
+- Con `admin`, la opción **Usuarios** (`/usuarios`, HU-01.06) muestra la lista con búsqueda y filtros; desde ahí, **Nuevo usuario** (HU-01.05) crea Administradores y Supervisores con contraseña temporal y Cajeros con PIN temporal, **Editar** (HU-01.07) cambia el nombre completo y el rol, y **Desactivar/Activar** (HU-01.08) quita o devuelve el acceso sin borrar al usuario. Los nombres de usuario no distinguen mayúsculas ni se pueden modificar.
 
 ## Convenciones de GitHub
 

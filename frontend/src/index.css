@@ -320,3 +320,27 @@ kbd {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.acciones {
+  display: flex;
+  gap: 12px;
+}
+
+.boton-texto {
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  color: var(--ok);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.boton-texto.peligro {
+  color: var(--error);
+}
+
+.boton-texto:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}

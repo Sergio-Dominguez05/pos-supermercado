@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { crearUsuario, editarUsuario, listarUsuarios } from './usuarios'
+import { activarUsuario, crearUsuario, desactivarUsuario, editarUsuario, listarUsuarios } from './usuarios'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -45,6 +45,18 @@ describe('usuarios', () => {
       rol: 'SUPERVISOR',
       credencialTemporal: 'Temporal2026',
     })
+  })
+
+  it('activa y desactiva con un POST a la acción del usuario (HU-01.08)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{"id":7}', { status: 200 })))
+
+    await desactivarUsuario(7)
+    await activarUsuario(7)
+
+    expect(vi.mocked(fetch).mock.calls.map(([url, op]) => `${op?.method} ${url}`)).toEqual([
+      'POST /api/usuarios/7/desactivar',
+      'POST /api/usuarios/7/activar',
+    ])
   })
 
   it('muestra el mensaje del servidor cuando el usuario ya existe (crit. 4)', async () => {
