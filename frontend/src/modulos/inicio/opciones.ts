@@ -15,7 +15,7 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR' },
   { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR' },
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
-  { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR' },
+  { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
   // Por ahora la configuración tiene solo las cajas (HU-12.05); el resto de EP-12 se agrega aquí.
   { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR', ruta: '/configuracion/cajas' },
