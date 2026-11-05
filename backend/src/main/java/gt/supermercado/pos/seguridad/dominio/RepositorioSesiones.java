@@ -4,8 +4,12 @@ import java.util.Optional;
 
 public interface RepositorioSesiones {
 
-    /** Abre una sesión con una copia de los permisos actuales del rol del usuario. Devuelve su id. */
-    long abrir(byte[] tokenHash, long usuarioId);
+    /**
+     * Abre una sesión con una copia del rol y los permisos actuales del usuario. Devuelve su id.
+     *
+     * @param cajaId caja del equipo desde el que se inicia (HU-12.05), o {@code null}
+     */
+    long abrir(byte[] tokenHash, long usuarioId, Long cajaId);
 
     /** Sesión no cerrada cuyo usuario sigue activo. */
     Optional<SesionActiva> buscarActiva(byte[] tokenHash);

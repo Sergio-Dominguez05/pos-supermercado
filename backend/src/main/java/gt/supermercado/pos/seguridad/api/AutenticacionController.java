@@ -4,6 +4,7 @@ import gt.supermercado.pos.seguridad.aplicacion.CambioCredencial;
 import gt.supermercado.pos.seguridad.aplicacion.CierreSesion;
 import gt.supermercado.pos.seguridad.aplicacion.InicioSesion;
 import gt.supermercado.pos.seguridad.aplicacion.InicioSesion.SesionIniciada;
+import gt.supermercado.pos.seguridad.dominio.IdentificadorEquipo;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.seguridad.infraestructura.CookieSesion;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -49,25 +51,31 @@ public class AutenticacionController {
             @NotBlank @Size(max = 100) String username,
             @NotBlank @Pattern(regexp = "\\d{4,6}", message = "debe tener de 4 a 6 dígitos") String pin) {}
 
+    /** @param cajaNombre caja del equipo desde el que se inició sesión, o {@code null} (HU-12.05) */
     public record UsuarioSesion(String username, String nombreCompleto, String rol, String rolNombre,
-                                boolean credencialTemporal, List<String> permisos) {
+                                boolean credencialTemporal, List<String> permisos, String cajaNombre) {
 
         static UsuarioSesion de(SesionActiva sesion) {
             return new UsuarioSesion(sesion.username(), sesion.nombreCompleto(), sesion.rol().name(),
-                    sesion.rolNombre(), sesion.credencialTemporal(), sesion.permisos().stream().sorted().toList());
+                    sesion.rolNombre(), sesion.credencialTemporal(), sesion.permisos().stream().sorted().toList(),
+                    sesion.cajaNombre());
         }
     }
 
     /** HU-01.01: el token viaja solo en la cookie HttpOnly; la respuesta trae los datos y permisos del usuario. */
     @PostMapping("/login")
-    public ResponseEntity<UsuarioSesion> login(@Valid @RequestBody SolicitudLogin solicitud) {
-        return respuesta(inicioSesion.conContrasena(solicitud.username(), solicitud.contrasena()));
+    public ResponseEntity<UsuarioSesion> login(@Valid @RequestBody SolicitudLogin solicitud,
+                                               @CookieValue(name = IdentificadorEquipo.COOKIE, required = false)
+                                               String tokenEquipo) {
+        return respuesta(inicioSesion.conContrasena(solicitud.username(), solicitud.contrasena(), tokenEquipo));
     }
 
     /** HU-01.02: inicio de sesión de cajeros con PIN. */
     @PostMapping("/login-pin")
-    public ResponseEntity<UsuarioSesion> loginPin(@Valid @RequestBody SolicitudLoginPin solicitud) {
-        return respuesta(inicioSesion.conPin(solicitud.username(), solicitud.pin()));
+    public ResponseEntity<UsuarioSesion> loginPin(@Valid @RequestBody SolicitudLoginPin solicitud,
+                                                  @CookieValue(name = IdentificadorEquipo.COOKIE, required = false)
+                                                  String tokenEquipo) {
+        return respuesta(inicioSesion.conPin(solicitud.username(), solicitud.pin(), tokenEquipo));
     }
 
     /** Usuario de la sesión actual; el frontend lo usa al recargar la página. */

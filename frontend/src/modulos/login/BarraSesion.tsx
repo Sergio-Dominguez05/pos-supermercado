@@ -22,6 +22,7 @@ export function BarraSesion({ usuario }: { usuario: UsuarioSesion }) {
     <header className="barra-sesion">
       <span>
         {usuario.nombreCompleto} · {usuario.rolNombre}
+        {usuario.cajaNombre && <> · {usuario.cajaNombre}</>}
       </span>
       {/* Por ejemplo, con una venta en curso: el servidor pide finalizarla, suspenderla o cancelarla. */}
       {salida.error && (

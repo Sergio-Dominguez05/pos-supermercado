@@ -34,6 +34,11 @@ describe('pantallas protegidas', () => {
     expect(html).toContain('Contenido protegido')
   })
 
+  it('la barra muestra la caja cuando el equipo está vinculado (HU-12.05 crit. 4)', () => {
+    expect(renderizar({ ...CAJERA, cajaNombre: 'Caja 2' })).toContain('Lucía Méndez · Cajero · Caja 2')
+    expect(renderizar({ ...CAJERA, cajaNombre: null })).not.toContain('Cajero · ')
+  })
+
   it('sin sesión no muestran ni el contenido ni la barra', () => {
     const html = renderizar(null)
 

@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
+import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
 import { CambioCredencial } from './modulos/login/CambioCredencial'
 import { Login } from './modulos/login/Login'
@@ -68,6 +70,30 @@ export default function App() {
             element={
               <RutaProtegida>
                 <RestablecerCredencial />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/cajas"
+            element={
+              <RutaProtegida>
+                <ListaCajas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/cajas/nueva"
+            element={
+              <RutaProtegida>
+                <PaginaCaja />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/cajas/:id/editar"
+            element={
+              <RutaProtegida>
+                <PaginaCaja />
               </RutaProtegida>
             }
           />
