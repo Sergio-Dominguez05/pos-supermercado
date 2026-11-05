@@ -14,6 +14,14 @@ describe('opciones del menú por rol', () => {
     expect(etiquetas(supervisor)).not.toContain('Configuración')
   })
 
+  it('el cajero solo ve las opciones de su rol; las demás no aparecen (HU-01.11 crit. 1)', () => {
+    const cajero = [
+      'VENTA_REGISTRAR', 'VENTA_SUSPENDER_CANCELAR', 'PAGO_REGISTRAR', 'CLIENTE_GESTIONAR',
+      'FACTURA_REIMPRIMIR', 'CAJA_OPERAR_PROPIA', 'PRODUCTO_CONSULTAR',
+    ]
+    expect(etiquetas(cajero)).toEqual(['Venta', 'Caja', 'Clientes', 'Facturas', 'Catálogo'])
+  })
+
   it('el administrador ve todas las opciones', () => {
     expect(opcionesPara(OPCIONES.map((o) => o.permiso))).toEqual(OPCIONES)
   })

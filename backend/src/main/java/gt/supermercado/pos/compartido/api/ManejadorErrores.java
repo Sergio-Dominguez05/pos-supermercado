@@ -4,6 +4,8 @@ import gt.supermercado.pos.compartido.dominio.ConflictoException;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.NoAutenticadoException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
+import gt.supermercado.pos.compartido.dominio.RegistroAccesoDenegado;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,12 @@ import java.util.List;
 public class ManejadorErrores {
 
     private static final Logger log = LoggerFactory.getLogger(ManejadorErrores.class);
+
+    private final RegistroAccesoDenegado accesosDenegados;
+
+    public ManejadorErrores(RegistroAccesoDenegado accesosDenegados) {
+        this.accesosDenegados = accesosDenegados;
+    }
 
     @ExceptionHandler(NegocioException.class)
     ResponseEntity<ErrorApi> negocio(NegocioException e) {
@@ -63,9 +71,17 @@ public class ManejadorErrores {
         return ResponseEntity.badRequest().body(ErrorApi.de("DATOS_INVALIDOS", "Revise los datos ingresados."));
     }
 
-    /** Sin el permiso que exige el endpoint ({@code @PreAuthorize}). Registrarlo en la bitácora es HU-11.04. */
+    /**
+     * Sin el permiso que exige el endpoint ({@code @PreAuthorize}): se rechaza y queda en la bitácora
+     * (HU-01.11 crit. 2). Si el registro fallara, el rechazo se mantiene igual.
+     */
     @ExceptionHandler(AccessDeniedException.class)
-    ResponseEntity<ErrorApi> accesoDenegado(AccessDeniedException e) {
+    ResponseEntity<ErrorApi> accesoDenegado(AccessDeniedException e, HttpServletRequest peticion) {
+        try {
+            accesosDenegados.registrar(peticion.getMethod(), peticion.getRequestURI());
+        } catch (RuntimeException fallo) {
+            log.error("No se pudo registrar el acceso denegado en la bitácora", fallo);
+        }
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ErrorApi.de("ACCESO_DENEGADO", "No tiene permiso para realizar esta acción."));
     }

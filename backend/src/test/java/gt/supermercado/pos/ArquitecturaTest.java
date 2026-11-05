@@ -5,10 +5,14 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
@@ -35,6 +39,20 @@ class ArquitecturaTest {
             .that().resideInAPackage(BASE + "impuestos..")
             .should().onlyDependOnClassesThat().resideInAnyPackage("java..", BASE + "impuestos..", BASE + "compartido.dominio..")
             .allowEmptyShould(true);
+
+    /**
+     * HU-01.11 crit. 3: los permisos se validan en el servidor. Cada endpoint declara el suyo; un endpoint nuevo
+     * sin {@code @PreAuthorize} hace fallar el build. Excepciones: el estado del sistema (público) y la
+     * autenticación (iniciar y cerrar sesión, ver la sesión y cambiar la credencial propia: cualquier usuario).
+     */
+    @ArchTest
+    static final ArchRule cadaEndpointDeclaraSuPermiso = methods()
+            .that().areMetaAnnotatedWith(RequestMapping.class)
+            .and().areDeclaredInClassesThat().areAnnotatedWith(RestController.class)
+            .and().areDeclaredInClassesThat().doNotHaveSimpleName("SistemaController")
+            .and().areDeclaredInClassesThat().doNotHaveSimpleName("AutenticacionController")
+            .should().beAnnotatedWith(PreAuthorize.class)
+            .because("los permisos se validan en el servidor, no solo en la interfaz (HU-01.11)");
 
     @ArchTest
     static void apiEInfraestructuraSonPrivadasDeCadaModulo(JavaClasses clases) {
