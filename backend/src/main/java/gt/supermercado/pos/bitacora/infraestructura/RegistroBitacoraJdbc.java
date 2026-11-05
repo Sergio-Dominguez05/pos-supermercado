@@ -21,9 +21,10 @@ class RegistroBitacoraJdbc implements RegistroBitacora {
     public void agregar(EventoBitacora e) {
         String cambios = e.cambios() == null ? null : json.writeValueAsString(e.cambios());
         jdbc.update("""
-                INSERT INTO bitacora (usuario_id, rol, modulo, accion, exitoso, descripcion, entidad, entidad_id, cambios)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)""",
-                e.usuarioId(), e.rol(), e.modulo(), e.accion(), e.exitoso(), e.descripcion(), e.entidad(), e.entidadId(),
-                cambios);
+                INSERT INTO bitacora (usuario_id, rol, caja_id, modulo, accion, exitoso, descripcion, entidad, entidad_id,
+                                      cambios)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)""",
+                e.usuarioId(), e.rol(), e.cajaId(), e.modulo(), e.accion(), e.exitoso(), e.descripcion(), e.entidad(),
+                e.entidadId(), cambios);
     }
 }
