@@ -1,0 +1,92 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  activarUsuario,
+  crearUsuario,
+  desactivarUsuario,
+  editarUsuario,
+  listarUsuarios,
+  restablecerCredencial,
+} from './usuarios'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('usuarios', () => {
+  it('crea el usuario con un POST y la credencial en el cuerpo', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 7 }), { status: 201 })))
+
+    await crearUsuario({ nombreCompleto: 'Ana', username: 'ana', rol: 'CAJERO', credencialTemporal: '4821' })
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/usuarios')
+    expect(opciones?.method).toBe('POST')
+    expect(JSON.parse(opciones?.body as string)).toEqual({
+      nombreCompleto: 'Ana',
+      username: 'ana',
+      rol: 'CAJERO',
+      credencialTemporal: '4821',
+    })
+  })
+
+  it('la lista manda solo los filtros que tienen valor', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('[]', { status: 200 })))
+
+    await listarUsuarios({ q: '', rol: '', activo: '' })
+    await listarUsuarios({ q: '  Núñez ', rol: 'CAJERO', activo: 'false' })
+
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/usuarios')
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe('/api/usuarios?q=N%C3%BA%C3%B1ez&rol=CAJERO&activo=false')
+  })
+
+  it('edita con un PUT al usuario, sin enviar el nombre de usuario (HU-01.07)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 7 }), { status: 200 })))
+
+    await editarUsuario(7, { nombreCompleto: 'Lucía', rol: 'SUPERVISOR', credencialTemporal: 'Temporal2026' })
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/usuarios/7')
+    expect(opciones?.method).toBe('PUT')
+    expect(JSON.parse(opciones?.body as string)).toEqual({
+      nombreCompleto: 'Lucía',
+      rol: 'SUPERVISOR',
+      credencialTemporal: 'Temporal2026',
+    })
+  })
+
+  it('activa y desactiva con un POST a la acción del usuario (HU-01.08)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{"id":7}', { status: 200 })))
+
+    await desactivarUsuario(7)
+    await activarUsuario(7)
+
+    expect(vi.mocked(fetch).mock.calls.map(([url, op]) => `${op?.method} ${url}`)).toEqual([
+      'POST /api/usuarios/7/desactivar',
+      'POST /api/usuarios/7/activar',
+    ])
+  })
+
+  it('restablece con un POST y la credencial temporal en el cuerpo (HU-01.14)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 7, tipo: 'PIN', temporal: true }), { status: 200 }),
+    ))
+
+    await expect(restablecerCredencial(7, '730415')).resolves.toEqual({ id: 7, tipo: 'PIN', temporal: true })
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/usuarios/7/credencial')
+    expect(opciones?.method).toBe('POST')
+    expect(JSON.parse(opciones?.body as string)).toEqual({ credencialTemporal: '730415' })
+  })
+
+  it('muestra el mensaje del servidor cuando el usuario ya existe (crit. 4)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ codigo: 'USERNAME_DUPLICADO', mensaje: 'El nombre de usuario ya existe.', detalles: [] }),
+      { status: 422 },
+    )))
+
+    await expect(
+      crearUsuario({ nombreCompleto: 'Ana', username: 'ana', rol: 'CAJERO', credencialTemporal: '4821' }),
+    ).rejects.toThrow('El nombre de usuario ya existe.')
+  })
+})

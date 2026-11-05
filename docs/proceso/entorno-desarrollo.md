@@ -1,4 +1,4 @@
-# Entorno de desarrollo — Sprint 0
+# Entorno de desarrollo
 
 Esta guía documenta **la base de desarrollo**, no las HU funcionales. Se entrega para integrarse sobre el monorepo existente, sin alterar sus ramas, reglas de protección, Issues ni Project.
 
@@ -51,6 +51,15 @@ Direcciones:
 - El frontend utiliza el proxy `/api → localhost:8080` de Vite, sin credenciales ni URLs absolutas de API.
 - Cambiar `POS_DB_PORT` o los datos de acceso se refleja en Docker y en Spring Boot. **Si ya había un volumen de PostgreSQL, cambiar contraseñas no actualiza los roles existentes automáticamente**; consulte los logs y migre los valores manualmente. No use `docker compose down -v` con datos que quiera conservar.
 - Los valores de `.env.example` son exclusivamente de desarrollo, **nunca producción**.
+
+### Primer inicio de sesión
+
+Si todavía no hay ningún Administrador, el backend crea al arrancar el usuario **`admin`**. Su contraseña temporal es `POS_ADMIN_PASSWORD_INICIAL` (al menos 8 caracteres, con letras y números); en desarrollo, si el `.env` no la define, se usa el valor de `.env.example`. Entrar en <http://localhost:5173/login>.
+
+- La variable solo se usa la primera vez; cambiarla después no modifica la contraseña de `admin`.
+- En producción no tiene valor por defecto: si falta y no hay Administrador, el backend lo advierte en el log y nadie puede entrar.
+- Con `admin`, la opción **Usuarios** (`/usuarios`, HU-01.06) muestra la lista con búsqueda y filtros; desde ahí, **Nuevo usuario** (HU-01.05) crea Administradores y Supervisores con contraseña temporal y Cajeros con PIN temporal, **Editar** (HU-01.07) cambia el nombre completo y el rol, y **Desactivar/Activar** (HU-01.08) quita o devuelve el acceso sin borrar al usuario. Los nombres de usuario no distinguen mayúsculas ni se pueden modificar.
+- **Configuración → Cajas** (`/configuracion/cajas`, HU-12.05) registra las cajas. Con **Vincular este equipo**, el navegador actual queda como esa caja (cookie HttpOnly `POS_EQUIPO`): quien inicie sesión ahí trabaja en esa caja y la barra superior la muestra. Para probar sin caja, use otro navegador o borre esa cookie.
 
 ## Convenciones de GitHub
 

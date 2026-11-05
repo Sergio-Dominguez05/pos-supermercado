@@ -102,3 +102,262 @@ kbd {
   border-radius: 4px;
   font-family: ui-monospace, monospace;
 }
+
+.pagina-login {
+  max-width: 400px;
+  padding-top: 15vh;
+}
+
+.pestanas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pestanas button {
+  font: inherit;
+  padding: 8px;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  border: none;
+  cursor: pointer;
+}
+
+.pestanas button[aria-selected='true'] {
+  color: var(--texto);
+  font-weight: 600;
+  background: var(--fondo);
+  box-shadow: inset 0 -2px 0 var(--ok);
+}
+
+.formulario {
+  display: grid;
+  gap: 16px;
+}
+
+.formulario label {
+  display: grid;
+  gap: 6px;
+  color: var(--texto-suave);
+}
+
+.formulario input,
+.formulario select {
+  font: inherit;
+  padding: 8px 10px;
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.formulario button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px;
+  color: #ffffff;
+  background: var(--ok);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.formulario button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.formulario .error {
+  margin: 0;
+}
+
+.opciones {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.opciones li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.pendiente {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.formulario small {
+  font-size: 0.8rem;
+}
+
+.formulario .casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exito {
+  margin: 0;
+  color: var(--ok);
+}
+
+.opciones a {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.subtitulo a {
+  color: inherit;
+}
+
+.pagina-ancha {
+  max-width: 960px;
+}
+
+.barra-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.barra-filtros label {
+  display: grid;
+  gap: 6px;
+  color: var(--texto-suave);
+}
+
+.barra-filtros input,
+.barra-filtros select {
+  font: inherit;
+  padding: 8px 10px;
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.boton {
+  margin-left: auto;
+  padding: 9px 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--ok);
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.tabla-contenedor {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla th,
+.tabla td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--borde);
+  white-space: nowrap;
+}
+
+.tabla th {
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.tabla a {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.estado {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.estado-activo {
+  color: var(--ok);
+}
+
+.estado-inactivo {
+  color: var(--error);
+}
+
+.formulario input:disabled {
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+
+.aviso {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ok);
+  background: var(--fondo);
+}
+
+/* Visible solo para lectores de pantalla. */
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.acciones {
+  display: flex;
+  gap: 12px;
+}
+
+.boton-texto {
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  color: var(--ok);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.boton-texto.peligro {
+  color: var(--error);
+}
+
+.boton-texto:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.barra-sesion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 16px;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+
+.barra-sesion a {
+  color: var(--ok);
+  font-weight: 600;
+}
