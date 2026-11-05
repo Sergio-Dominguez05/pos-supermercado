@@ -8,6 +8,9 @@ export const ROLES: { valor: Rol; nombre: string }[] = [
 
 export const nombreDelRol = (rol: Rol) => ROLES.find((r) => r.valor === rol)?.nombre ?? rol
 
+/** Igual que el servidor (#136): el nombre de usuario se guarda en minúsculas y sin ningún espacio. */
+export const normalizarUsername = (username: string) => username.replace(/[\s\p{Z}]+/gu, '').toLowerCase()
+
 /**
  * Al pasar entre Cajero (PIN) y Administrador o Supervisor (contraseña) hay que asignar
  * una credencial temporal del nuevo tipo (HU-01.07 crit. 3).

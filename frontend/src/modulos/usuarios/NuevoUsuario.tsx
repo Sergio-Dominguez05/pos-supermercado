@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { crearUsuario, type Rol } from '../../api/usuarios'
 import { useSesion } from '../login/sesion'
 import { CampoCredencial } from './CampoCredencial'
-import { avisoCreacion, ROLES } from './formato'
+import { avisoCreacion, normalizarUsername, ROLES } from './formato'
 
 /** HU-01.05: el Administrador crea usuarios con una contraseña o PIN temporal. */
 export function NuevoUsuario() {
@@ -68,14 +68,19 @@ export function FormularioUsuario({ rolInicial = 'CAJERO' }: { rolInicial?: Rol 
           name="username"
           required
           minLength={3}
-          maxLength={30}
-          pattern="[A-Za-z0-9._\-]+"
+          maxLength={60}
+          pattern="[A-Za-z0-9._\- ]+"
           title="De 3 a 30 caracteres: letras, números, punto, guion o guion bajo"
           autoComplete="off"
           value={username}
           onChange={(evento) => setUsername(evento.target.value)}
         />
-        <small>Se guarda en minúsculas; no distingue mayúsculas al iniciar sesión.</small>
+        <small>
+          {username !== normalizarUsername(username) && normalizarUsername(username)
+            ? `Se guardará como «${normalizarUsername(username)}». `
+            : ''}
+          Se guarda en minúsculas y sin espacios; al iniciar sesión tampoco importan.
+        </small>
       </label>
       <label>
         Rol

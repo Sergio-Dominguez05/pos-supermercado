@@ -67,6 +67,11 @@ class CierreSesionTest {
             public void cerrar(long sesionId) {
                 sesionesCerradas.add(sesionId);
             }
+
+            @Override
+            public int cerrarTodasDe(long usuarioId) {
+                throw new UnsupportedOperationException();
+            }
         };
         return new CierreSesion(sesiones, usuarioId -> ventaEnCurso, new Bitacora(eventos::add));
     }

@@ -7,13 +7,19 @@ import java.util.regex.Pattern;
 public final class ReglasCaja {
 
     private static final Pattern SERIE = Pattern.compile("[A-Z0-9]{1,20}");
+    private static final Pattern ESPACIOS = Pattern.compile("[\\s\\p{Z}]+");
     private static final int LARGO_MAXIMO_NOMBRE = 40;
 
     private ReglasCaja() {
     }
 
+    /**
+     * Sin espacios al inicio ni al final y con uno solo entre palabras: "  Caja   Final " se guarda como
+     * "Caja Final". Para detectar duplicados la base compara además sin mayúsculas ni espacios, así que "cajafinal"
+     * es la misma caja (#136).
+     */
     public static String normalizarNombre(String nombre) {
-        return nombre.strip();
+        return ESPACIOS.matcher(nombre).replaceAll(" ").strip();
     }
 
     public static boolean esNombreValido(String nombre) {

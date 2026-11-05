@@ -9,14 +9,18 @@ public final class ReglasCredencial {
     /** De 3 a 30 caracteres: letras minúsculas, números, punto, guion o guion bajo. */
     private static final Pattern USERNAME = Pattern.compile("[a-z0-9._-]{3,30}");
     private static final Pattern PIN = Pattern.compile("\\d{4,6}");
+    private static final Pattern ESPACIOS = Pattern.compile("[\\s\\p{Z}]+");
     private static final int LARGO_MAXIMO_CONTRASENA = 128;
 
     private ReglasCredencial() {
     }
 
-    /** Los nombres de usuario no distinguen mayúsculas: se guardan y se buscan en minúsculas. */
+    /**
+     * Los nombres de usuario no distinguen mayúsculas ni espacios: se guardan y se buscan en minúsculas y sin ningún
+     * espacio, así " A d  Min " es "admin" tanto al crear el usuario como al iniciar sesión (#136).
+     */
     public static String normalizarUsername(String username) {
-        return username.strip().toLowerCase(Locale.ROOT);
+        return ESPACIOS.matcher(username).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
     /** Recibe el nombre ya normalizado. */

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_SESION } from '../login/sesion'
+import { normalizarUsername } from './formato'
 import { FormularioUsuario, NuevoUsuario } from './NuevoUsuario'
 
 const renderizar = (contenido: ReactNode, sesion?: Partial<UsuarioSesion>) => {
@@ -60,5 +61,20 @@ describe('creación de usuarios (HU-01.05)', () => {
     expect(supervisor).toContain('No tiene permiso para administrar usuarios.')
     expect(supervisor).not.toContain('<form')
     expect(admin).toContain('<form')
+  })
+})
+
+describe('espacios en el nombre de usuario (#136)', () => {
+  it('se quitan todos, como en el servidor', () => {
+    expect(normalizarUsername(' Juan  Perez ')).toBe('juanperez')
+    expect(normalizarUsername(' A d   Mi  N')).toBe('admin')
+    expect(normalizarUsername('ana	.lopez ')).toBe('ana.lopez')
+  })
+
+  it('el campo admite escribirlos y avisa que se guarda sin espacios', () => {
+    const html = renderizar(<FormularioUsuario />)
+
+    expect(campo(html, 'username')).toContain(String.raw`pattern="[A-Za-z0-9._\- ]+"`)
+    expect(html).toContain('Se guarda en minúsculas y sin espacios')
   })
 })

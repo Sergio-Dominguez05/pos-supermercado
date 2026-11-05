@@ -51,6 +51,12 @@ class InicioSesionIntegracionTest {
     // Criterio 1
 
     @Test
+    void elNombreDeUsuarioNoDistingueMayusculasNiEspacios() throws Exception {   // #136
+        assertThat(login("   SuPerVisora ", CONTRASENA).statusCode()).isEqualTo(200);
+        assertThat(login(" S u p e r   v i s o r a", CONTRASENA).statusCode()).isEqualTo(200);
+    }
+
+    @Test
     void elSupervisorEntraYRecibeLosPermisosDeSuRol() throws Exception {
         HttpResponse<String> respuesta = login("supervisora", CONTRASENA);
 

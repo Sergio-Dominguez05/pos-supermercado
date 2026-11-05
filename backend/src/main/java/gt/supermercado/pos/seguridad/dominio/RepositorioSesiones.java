@@ -16,4 +16,10 @@ public interface RepositorioSesiones {
 
     /** Marca la sesión como cerrada con la hora del servidor; el token deja de valer (HU-01.16). */
     void cerrar(long sesionId);
+
+    /**
+     * Cierra todas las sesiones abiertas del usuario, por ejemplo al restablecer su credencial: quien la tenía
+     * deja de tener acceso. Devuelve cuántas se cerraron.
+     */
+    int cerrarTodasDe(long usuarioId);
 }
