@@ -33,6 +33,11 @@ class RepositorioSesionesJdbc implements RepositorioSesiones {
     }
 
     @Override
+    public void cerrar(long sesionId) {
+        jdbc.update("UPDATE sesion SET cerrada_en = now() WHERE id = ? AND cerrada_en IS NULL", sesionId);
+    }
+
+    @Override
     public Optional<SesionActiva> buscarActiva(byte[] tokenHash) {
         return jdbc.query("""
                         SELECT s.id AS sesion_id, u.id AS usuario_id, u.username, u.nombre_completo,

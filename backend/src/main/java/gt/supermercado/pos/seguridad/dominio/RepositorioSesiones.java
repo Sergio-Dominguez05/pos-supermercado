@@ -9,4 +9,7 @@ public interface RepositorioSesiones {
 
     /** Sesión no cerrada cuyo usuario sigue activo. */
     Optional<SesionActiva> buscarActiva(byte[] tokenHash);
+
+    /** Marca la sesión como cerrada con la hora del servidor; el token deja de valer (HU-01.16). */
+    void cerrar(long sesionId);
 }

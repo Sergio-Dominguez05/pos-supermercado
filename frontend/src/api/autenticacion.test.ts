@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { iniciarSesion, iniciarSesionConPin, obtenerSesion } from './autenticacion'
+import { cerrarSesion, iniciarSesion, iniciarSesionConPin, obtenerSesion } from './autenticacion'
 
 const responder = (estado: number, cuerpo?: unknown) =>
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
@@ -29,6 +29,24 @@ describe('autenticación', () => {
     expect(url).toBe('/api/auth/login')
     expect(opciones?.method).toBe('POST')
     expect(JSON.parse(opciones?.body as string)).toEqual({ username: 'ana', contrasena: 'Clave2026' })
+  })
+
+  it('cerrar sesión es un POST al servidor, que responde sin contenido (HU-01.16)', async () => {
+    responder(204)
+    await expect(cerrarSesion()).resolves.toBeUndefined()
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/auth/logout')
+    expect(opciones?.method).toBe('POST')
+  })
+
+  it('con una venta en curso muestra lo que pide el servidor (HU-01.16 crit. 2)', async () => {
+    responder(409, {
+      codigo: 'VENTA_EN_CURSO',
+      mensaje: 'Tiene una venta en curso: finalícela, suspéndala o cancélela antes de cerrar sesión.',
+      detalles: [],
+    })
+    await expect(cerrarSesion()).rejects.toThrow('Tiene una venta en curso')
   })
 
   it('el PIN va a su propio endpoint, también en el cuerpo', async () => {

@@ -34,6 +34,17 @@ public class CookieSesion {
                 .build();
     }
 
+    /** Misma cookie vacía y vencida: el navegador la borra al cerrar sesión. */
+    public ResponseCookie borrar() {
+        return ResponseCookie.from(NOMBRE, "")
+                .httpOnly(true)
+                .secure(segura)
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(0)
+                .build();
+    }
+
     public Optional<String> leer(HttpServletRequest peticion) {
         Cookie[] cookies = peticion.getCookies();
         if (cookies == null) {
