@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -18,6 +19,7 @@ import java.net.http.HttpResponse;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** HU-12.05 Registrar las cajas, contra PostgreSQL real con las migraciones aplicadas. */
 @Import(TestcontainersConfiguration.class)
@@ -83,6 +85,41 @@ class CajasIntegracionTest {
 
         assertThat(repetida.statusCode()).isEqualTo(422);
         assertThat(repetida.body()).contains("CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
+    }
+
+    // #136: los espacios tampoco distinguen una caja de otra
+
+    @Test
+    void elNombreNoSeRepiteAunqueCambienLosEspacios() throws Exception {
+        crear("Caja Espacios", null);
+
+        assertThat(crear("cajaespacios", null).body()).contains("CAJA_DUPLICADA");
+        assertThat(crear(" C a j a   E s p a c i o s ", null).body()).contains("CAJA_DUPLICADA");
+    }
+
+    @Test
+    void alEditarTampocoSePuedeUsarElNombreDeOtraCajaConOtrosEspacios() throws Exception {
+        crear("Caja Norte", null);
+        long otra = idDe(crear("Caja Sur", null));
+
+        assertThat(editar(otra, "CAJANORTE", null).body()).contains("CAJA_DUPLICADA");
+    }
+
+    @Test
+    void elNombreSeGuardaConUnSoloEspacioEntrePalabras() throws Exception {
+        HttpResponse<String> creada = crear("  Caja    Express  ", null);
+
+        assertThat(creada.statusCode()).isEqualTo(201);
+        assertThat(creada.body()).contains("\"nombre\":\"Caja Express\"");
+    }
+
+    @Test
+    void laBaseDeDatosTambienImpideDuplicadosQueSoloDifierenEnEspacios() {
+        jdbc.update("INSERT INTO caja (sucursal_id, nombre) SELECT id, 'Caja Directa' FROM sucursal WHERE codigo = 'MATRIZ'");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO caja (sucursal_id, nombre) SELECT id, 'CAJADIRECTA' FROM sucursal WHERE codigo = 'MATRIZ'"))
+                .isInstanceOf(DuplicateKeyException.class);
     }
 
     @Test

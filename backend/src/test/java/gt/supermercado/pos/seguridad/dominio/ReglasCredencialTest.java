@@ -12,6 +12,13 @@ class ReglasCredencialTest {
     }
 
     @Test
+    void tambienSeQuitanLosEspaciosIntermediosYCualquierTipoDeEspacio() {   // #136
+        assertThat(ReglasCredencial.normalizarUsername(" A d   Mi  N")).isEqualTo("admin");
+        assertThat(ReglasCredencial.normalizarUsername("ana	.lopez ")).isEqualTo("ana.lopez");
+        assertThat(ReglasCredencial.normalizarUsername("   ")).isEmpty();
+    }
+
+    @Test
     void elNombreDeUsuarioTieneDe3A30CaracteresPermitidos() {
         assertThat(ReglasCredencial.esUsernameValido("ana")).isTrue();
         assertThat(ReglasCredencial.esUsernameValido("cajero_01-turno.b")).isTrue();

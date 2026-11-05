@@ -53,7 +53,8 @@ class RepositorioCajasJdbc implements RepositorioCajas {
     public boolean existeNombre(String nombre, Long excluirId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                         SELECT EXISTS (SELECT 1 FROM caja
-                                       WHERE sucursal_id = %s AND lower(nombre) = lower(?) AND id IS DISTINCT FROM ?)"""
+                                       WHERE sucursal_id = %s AND caja_clave_nombre(nombre) = caja_clave_nombre(?)
+                                         AND id IS DISTINCT FROM ?)"""
                         .formatted(SUCURSAL_MATRIZ),
                 Boolean.class, nombre, excluirId));
     }

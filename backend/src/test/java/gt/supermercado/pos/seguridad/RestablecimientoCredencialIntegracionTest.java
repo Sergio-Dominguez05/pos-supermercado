@@ -152,6 +152,39 @@ class RestablecimientoCredencialIntegracionTest {
                   AND (descripcion LIKE '%730415%' OR cambios::text LIKE '%730415%')""", Integer.class)).isZero();
     }
 
+    // #136: quien tenía la credencial anterior pierde el acceso al restablecerla
+
+    @Test
+    void restablecerCierraTodasLasSesionesAbiertasDelUsuarioYNoLasDeOtros() throws Exception {
+        long id = crearUsuario("rc.sesiones", 2, CONTRASENA, false);
+        String primera = cookie(login("/api/auth/login", "rc.sesiones", "contrasena", CONTRASENA));
+        String segunda = cookie(login("/api/auth/login", "rc.sesiones", "contrasena", CONTRASENA));
+        assertThat(enviar("/api/auth/sesion", "GET", null, primera).statusCode()).isEqualTo(200);
+
+        assertThat(restablecer(id, "Temporal2026", cookieAdmin).statusCode()).isEqualTo(200);
+
+        assertThat(enviar("/api/auth/sesion", "GET", null, primera).statusCode()).isEqualTo(401);
+        assertThat(enviar("/api/auth/sesion", "GET", null, segunda).statusCode()).isEqualTo(401);
+        assertThat(enviar("/api/auth/sesion", "GET", null, cookieAdmin).statusCode()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM sesion WHERE usuario_id = ? AND cerrada_en IS NULL",
+                Integer.class, id)).isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT descripcion FROM bitacora WHERE accion = 'CREDENCIAL_RESTABLECIDA' AND entidad_id = ?
+                ORDER BY secuencia DESC LIMIT 1""", String.class, id)).endsWith("se cerraron 2 sesiones abiertas");
+        // Con la credencial nueva vuelve a entrar.
+        assertThat(login("/api/auth/login", "rc.sesiones", "contrasena", "Temporal2026").statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void unRestablecimientoRechazadoNoCierraLasSesiones() throws Exception {
+        long id = crearUsuario("rc.rechazo", 3, PIN, false);
+        String sesion = cookie(login("/api/auth/login-pin", "rc.rechazo", "pin", PIN));
+
+        assertThat(restablecer(id, "12", cookieAdmin).statusCode()).isEqualTo(422);
+
+        assertThat(enviar("/api/auth/sesion", "GET", null, sesion).statusCode()).isEqualTo(200);
+    }
+
     @Test
     void unUsuarioQueNoExisteDa404() throws Exception {
         assertThat(restablecer(999999, "Temporal2026", cookieAdmin).statusCode()).isEqualTo(404);

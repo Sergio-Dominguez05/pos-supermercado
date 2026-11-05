@@ -109,10 +109,33 @@ class CreacionUsuariosIntegracionTest {
 
     @Test
     void elNombreDeUsuarioDebeTenerUnFormatoValido() throws Exception {
-        HttpResponse<String> respuesta = crear("Fabio", "fa bio", "SUPERVISOR", "Temporal2026");
+        HttpResponse<String> respuesta = crear("Fabio", "fa@bio", "SUPERVISOR", "Temporal2026");
 
         assertThat(respuesta.statusCode()).isEqualTo(422);
         assertThat(respuesta.body()).contains("USERNAME_INVALIDO");
+        assertThat(crear("Fabio", " a  b ", "SUPERVISOR", "Temporal2026").body()).contains("USERNAME_INVALIDO");   // "ab"
+    }
+
+    // #136: los espacios no cuentan en el nombre de usuario
+
+    @Test
+    void losEspaciosIntermediosSeQuitanAlCrearYAlIniciarSesion() throws Exception {
+        HttpResponse<String> creado = crear("Iris Mora", " Iris  Mora ", "SUPERVISOR", "Temporal2026");
+
+        assertThat(creado.statusCode()).isEqualTo(201);
+        assertThat(creado.body()).contains("\"username\":\"irismora\"");
+        assertThat(post("/api/auth/login", "{\"username\":\" i R i s m O r A \",\"contrasena\":\"Temporal2026\"}", null)
+                .statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void unNombreDeUsuarioQueSoloDifiereEnEspaciosEsDuplicado() throws Exception {
+        assertThat(crear("Julio", "julio.paz", "SUPERVISOR", "Temporal2026").statusCode()).isEqualTo(201);
+
+        HttpResponse<String> repetido = crear("Otro Julio", "Julio . Paz", "CAJERO", "1234");
+
+        assertThat(repetido.statusCode()).isEqualTo(422);
+        assertThat(repetido.body()).contains("USERNAME_DUPLICADO");
     }
 
     @Test
