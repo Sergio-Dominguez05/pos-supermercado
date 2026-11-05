@@ -32,6 +32,12 @@ describe('opciones del menú por rol', () => {
     ])
   })
 
+  it('la opción Configuración lleva a las cajas (HU-12.05)', () => {
+    expect(opcionesPara(['CONFIGURACION_MODIFICAR'])).toEqual([
+      expect.objectContaining({ etiqueta: 'Configuración', ruta: '/configuracion/cajas' }),
+    ])
+  })
+
   it('sin permisos no hay opciones', () => {
     expect(opcionesPara([])).toEqual([])
   })

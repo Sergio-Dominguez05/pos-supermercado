@@ -19,17 +19,17 @@ class RepositorioSesionesJdbc implements RepositorioSesiones {
     }
 
     @Override
-    public long abrir(byte[] tokenHash, long usuarioId) {
+    public long abrir(byte[] tokenHash, long usuarioId, Long cajaId) {
         // La copia del rol y de sus permisos se arma en la base de datos, a partir del rol actual del usuario.
         return jdbc.queryForObject("""
-                        INSERT INTO sesion (token_hash, usuario_id, rol_id, permisos)
-                        SELECT ?, u.id, u.rol_id, coalesce(array_agg(rp.permiso ORDER BY rp.permiso)
+                        INSERT INTO sesion (token_hash, usuario_id, caja_id, rol_id, permisos)
+                        SELECT ?, u.id, ?, u.rol_id, coalesce(array_agg(rp.permiso ORDER BY rp.permiso)
                                                  FILTER (WHERE rp.permiso IS NOT NULL), '{}')
                         FROM usuario u LEFT JOIN rol_permiso rp ON rp.rol_id = u.rol_id
                         WHERE u.id = ?
                         GROUP BY u.id
                         RETURNING id""",
-                Long.class, tokenHash, usuarioId);
+                Long.class, tokenHash, cajaId, usuarioId);
     }
 
     @Override
@@ -41,10 +41,12 @@ class RepositorioSesionesJdbc implements RepositorioSesiones {
     public Optional<SesionActiva> buscarActiva(byte[] tokenHash) {
         return jdbc.query("""
                         SELECT s.id AS sesion_id, u.id AS usuario_id, u.username, u.nombre_completo,
-                               r.codigo AS rol, r.nombre AS rol_nombre, u.credencial_temporal, s.permisos
+                               r.codigo AS rol, r.nombre AS rol_nombre, u.credencial_temporal, s.permisos,
+                               s.caja_id, c.nombre AS caja_nombre
                         FROM sesion s
                         JOIN usuario u ON u.id = s.usuario_id
                         JOIN rol r ON r.id = s.rol_id   -- el rol de cuando inició sesión (HU-01.07 crit. 4)
+                        LEFT JOIN caja c ON c.id = s.caja_id
                         WHERE s.token_hash = ? AND s.cerrada_en IS NULL AND u.activo""",
                 (rs, fila) -> new SesionActiva(
                         rs.getLong("sesion_id"),
@@ -54,7 +56,9 @@ class RepositorioSesionesJdbc implements RepositorioSesiones {
                         Rol.valueOf(rs.getString("rol")),
                         rs.getString("rol_nombre"),
                         rs.getBoolean("credencial_temporal"),
-                        Set.of((String[]) rs.getArray("permisos").getArray())),
+                        Set.of((String[]) rs.getArray("permisos").getArray()),
+                        rs.getObject("caja_id", Long.class),
+                        rs.getString("caja_nombre")),
                 tokenHash).stream().findFirst();
     }
 }

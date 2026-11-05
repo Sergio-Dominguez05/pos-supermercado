@@ -54,7 +54,7 @@ class CierreSesionTest {
     private CierreSesion cierre(boolean ventaEnCurso) {
         RepositorioSesiones sesiones = new RepositorioSesiones() {
             @Override
-            public long abrir(byte[] tokenHash, long usuarioId) {
+            public long abrir(byte[] tokenHash, long usuarioId, Long cajaId) {
                 throw new UnsupportedOperationException();
             }
 

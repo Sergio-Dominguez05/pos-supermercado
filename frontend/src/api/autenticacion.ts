@@ -7,6 +7,8 @@ export interface UsuarioSesion {
   rolNombre: string
   credencialTemporal: boolean
   permisos: string[]
+  /** Caja del equipo desde el que se inició sesión (HU-12.05), o `null` si el equipo no está vinculado. */
+  cajaNombre?: string | null
 }
 
 // El token de sesión viaja en una cookie HttpOnly que pone el backend; el frontend nunca lo ve.

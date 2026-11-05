@@ -17,7 +17,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
-  { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR' },
+  // Por ahora la configuración tiene solo las cajas (HU-12.05); el resto de EP-12 se agrega aquí.
+  { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR', ruta: '/configuracion/cajas' },
 ]
 
 export const opcionesPara = (permisos: readonly string[]) =>
