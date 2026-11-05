@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
@@ -23,7 +24,6 @@ import java.util.Map;
 @Service
 public class EstadoUsuarios {
 
-    static final String MODULO = "seguridad";
 
     private final RepositorioUsuarios usuarios;
     private final DirectorioUsuarios directorio;
@@ -65,7 +65,7 @@ public class EstadoUsuarios {
 
     private ResumenUsuario cambiar(Usuario usuario, boolean activo, SesionActiva actor) {
         usuarios.cambiarActivo(usuario.id(), activo);
-        bitacora.registrar(new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO, accion(activo), true,
+        bitacora.registrar(new EventoBitacora(actor.usuarioId(), actor.rol().name(), accion(activo), true,
                 "Usuario '%s' %s".formatted(usuario.username(), activo ? "activado" : "desactivado"),
                 "usuario", usuario.id(), Map.of("activo", EventoBitacora.cambio(!activo, activo))));
         return resumen(usuario.id());
@@ -75,8 +75,8 @@ public class EstadoUsuarios {
         return directorio.buscarPorId(id).orElseThrow(EstadoUsuarios::noEncontrado);
     }
 
-    private static String accion(boolean activo) {
-        return activo ? "USUARIO_ACTIVADO" : "USUARIO_DESACTIVADO";
+    private static AccionSensible accion(boolean activo) {
+        return activo ? AccionSensible.USUARIO_ACTIVADO : AccionSensible.USUARIO_DESACTIVADO;
     }
 
     private static RecursoNoEncontradoException noEncontrado() {
@@ -85,7 +85,7 @@ public class EstadoUsuarios {
 
     /** El intento rechazado también queda en la bitácora (HU-11.01 crit. 3). */
     private NegocioException rechazar(SesionActiva actor, Usuario usuario, String codigo, String mensaje) {
-        bitacora.registrarIntentoFallido(new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO,
+        bitacora.registrarIntentoFallido(new EventoBitacora(actor.usuarioId(), actor.rol().name(),
                 accion(false), false, "Desactivación del usuario '%s' rechazada: %s".formatted(usuario.username(), mensaje),
                 "usuario", usuario.id()));
         return new NegocioException(codigo, mensaje);

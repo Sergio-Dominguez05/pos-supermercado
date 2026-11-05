@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
@@ -27,8 +28,7 @@ import java.util.Map;
 @Service
 public class EdicionUsuarios {
 
-    static final String MODULO = "seguridad";
-    static final String ACCION = "USUARIO_EDITADO";
+    static final AccionSensible ACCION = AccionSensible.USUARIO_EDITADO;
 
     private final RepositorioUsuarios usuarios;
     private final DirectorioUsuarios directorio;
@@ -89,7 +89,7 @@ public class EdicionUsuarios {
         }
 
         usuarios.actualizar(id, nombreCompleto, datos.rol(), credencialHash);
-        bitacora.registrar(new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO, ACCION, true,
+        bitacora.registrar(new EventoBitacora(actor.usuarioId(), actor.rol().name(), ACCION, true,
                 "Usuario '%s' editado: %s".formatted(actual.username(), String.join(", ", cambios.keySet())),
                 "usuario", id, cambios));
         return obtener(id);
@@ -101,7 +101,7 @@ public class EdicionUsuarios {
 
     /** El intento rechazado queda en la bitácora sin la credencial (HU-11.01 crit. 3). */
     private NegocioException rechazar(SesionActiva actor, Usuario usuario, String codigo, String mensaje) {
-        bitacora.registrarIntentoFallido(new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO, ACCION,
+        bitacora.registrarIntentoFallido(new EventoBitacora(actor.usuarioId(), actor.rol().name(), ACCION,
                 false, "Edición del usuario '%s' rechazada: %s".formatted(usuario.username(), mensaje),
                 "usuario", usuario.id()));
         return new NegocioException(codigo, mensaje);

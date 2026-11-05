@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.infraestructura;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.RegistroAccesoDenegado;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -27,7 +28,7 @@ class RegistroAccesoDenegadoBitacora implements RegistroAccesoDenegado {
         if (autenticacion == null || !(autenticacion.getPrincipal() instanceof SesionActiva sesion)) {
             return;   // sin sesión la API responde 401 antes de llegar aquí; no hay actor que registrar
         }
-        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), "seguridad",
-                "ACCESO_DENEGADO", false, "Acción sin permiso rechazada: %s %s".formatted(metodo, ruta), null, null));
+        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.ACCESO_DENEGADO, false, "Acción sin permiso rechazada: %s %s".formatted(metodo, ruta), null, null));
     }
 }

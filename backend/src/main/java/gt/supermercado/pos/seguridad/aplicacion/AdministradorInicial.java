@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.seguridad.dominio.ReglasCredencial;
 import gt.supermercado.pos.seguridad.dominio.RepositorioUsuarios;
@@ -57,7 +58,7 @@ public class AdministradorInicial implements ApplicationRunner {
         }
 
         long id = usuarios.crear(USERNAME, "Administrador", Rol.ADMIN, codificador.encode(contrasena));
-        bitacora.registrar(new EventoBitacora(null, null, "seguridad", "USUARIO_CREADO", true,
+        bitacora.registrar(new EventoBitacora(null, null, AccionSensible.USUARIO_CREADO, true,
                 "Administrador inicial creado al arrancar el sistema", "usuario", id));
         log.info("Se creó el Administrador inicial '{}' con contraseña temporal.", USERNAME);
     }

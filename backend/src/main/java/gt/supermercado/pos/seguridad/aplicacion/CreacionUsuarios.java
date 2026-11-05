@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.seguridad.dominio.ReglasCredencial;
@@ -20,8 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CreacionUsuarios {
 
-    static final String MODULO = "seguridad";
-    static final String ACCION = "USUARIO_CREADO";
+    static final AccionSensible ACCION = AccionSensible.USUARIO_CREADO;
 
     private final RepositorioUsuarios usuarios;
     private final PasswordEncoder codificador;
@@ -64,7 +64,7 @@ public class CreacionUsuarios {
             throw duplicado(actor, username);
         }
 
-        bitacora.registrar(new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO, ACCION, true,
+        bitacora.registrar(new EventoBitacora(actor.usuarioId(), actor.rol().name(), ACCION, true,
                 "Usuario '%s' creado con rol %s".formatted(username, datos.rol().name()), "usuario", id));
         return new UsuarioCreado(id, username, nombreCompleto, datos.rol(), true, true);
     }
@@ -75,7 +75,7 @@ public class CreacionUsuarios {
 
     /** El intento fallido queda en la bitácora sin la credencial (HU-11.01 crit. 3, HU-11.02 crit. 4). */
     private NegocioException rechazar(SesionActiva actor, String username, String codigo, String mensaje) {
-        bitacora.registrarIntentoFallido(new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO, ACCION,
+        bitacora.registrarIntentoFallido(new EventoBitacora(actor.usuarioId(), actor.rol().name(), ACCION,
                 false, "Creación del usuario '%s' rechazada: %s".formatted(username, mensaje), null, null));
         return new NegocioException(codigo, mensaje);
     }
