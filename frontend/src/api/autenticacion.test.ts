@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cerrarSesion, iniciarSesion, iniciarSesionConPin, obtenerSesion } from './autenticacion'
+import { cambiarCredencial, cerrarSesion, iniciarSesion, iniciarSesionConPin, obtenerSesion } from './autenticacion'
 
 const responder = (estado: number, cuerpo?: unknown) =>
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
@@ -29,6 +29,20 @@ describe('autenticación', () => {
     expect(url).toBe('/api/auth/login')
     expect(opciones?.method).toBe('POST')
     expect(JSON.parse(opciones?.body as string)).toEqual({ username: 'ana', contrasena: 'Clave2026' })
+  })
+
+  it('cambia la credencial propia con un PUT, todo en el cuerpo (HU-01.13)', async () => {
+    responder(204)
+    await cambiarCredencial({ actual: 'Vieja2026', nueva: 'Nueva2027', confirmacion: 'Nueva2027' })
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/auth/credencial')
+    expect(opciones?.method).toBe('PUT')
+    expect(JSON.parse(opciones?.body as string)).toEqual({
+      actual: 'Vieja2026',
+      nueva: 'Nueva2027',
+      confirmacion: 'Nueva2027',
+    })
   })
 
   it('cerrar sesión es un POST al servidor, que responde sin contenido (HU-01.16)', async () => {

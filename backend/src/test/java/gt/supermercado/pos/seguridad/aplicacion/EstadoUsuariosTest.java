@@ -165,6 +165,11 @@ class EstadoUsuariosTest {
         }
 
         @Override
+        public void cambiarCredencial(long id, String credencialHash) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void registrarAcceso(long usuarioId) {
             throw new UnsupportedOperationException();
         }

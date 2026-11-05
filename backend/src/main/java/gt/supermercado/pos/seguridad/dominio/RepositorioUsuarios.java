@@ -20,6 +20,9 @@ public interface RepositorioUsuarios {
      */
     void actualizar(long id, String nombreCompleto, Rol rol, String credencialHash);
 
+    /** Guarda una credencial definitiva elegida por el propio usuario (HU-01.13): deja de ser temporal. */
+    void cambiarCredencial(long id, String credencialHash);
+
     /** Activa o desactiva; los usuarios nunca se borran (HU-01.08 crit. 2). */
     void cambiarActivo(long id, boolean activo);
 
