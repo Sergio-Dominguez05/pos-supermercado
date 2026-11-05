@@ -1,5 +1,6 @@
 package gt.supermercado.pos.seguridad.api;
 
+import gt.supermercado.pos.seguridad.aplicacion.CierreSesion;
 import gt.supermercado.pos.seguridad.aplicacion.InicioSesion;
 import gt.supermercado.pos.seguridad.aplicacion.InicioSesion.SesionIniciada;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -24,10 +25,12 @@ import java.util.List;
 public class AutenticacionController {
 
     private final InicioSesion inicioSesion;
+    private final CierreSesion cierreSesion;
     private final CookieSesion cookie;
 
-    public AutenticacionController(InicioSesion inicioSesion, CookieSesion cookie) {
+    public AutenticacionController(InicioSesion inicioSesion, CierreSesion cierreSesion, CookieSesion cookie) {
         this.inicioSesion = inicioSesion;
+        this.cierreSesion = cierreSesion;
         this.cookie = cookie;
     }
 
@@ -66,6 +69,13 @@ public class AutenticacionController {
     @GetMapping("/sesion")
     public UsuarioSesion sesion(@AuthenticationPrincipal SesionActiva sesion) {
         return UsuarioSesion.de(sesion);
+    }
+
+    /** HU-01.16: cierra la sesión en el servidor y borra la cookie del navegador. */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal SesionActiva sesion) {
+        cierreSesion.cerrar(sesion);
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cookie.borrar().toString()).build();
     }
 
     private ResponseEntity<UsuarioSesion> respuesta(SesionIniciada iniciada) {

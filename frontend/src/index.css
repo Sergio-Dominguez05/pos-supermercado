@@ -344,3 +344,15 @@ kbd {
   opacity: 0.5;
   cursor: wait;
 }
+
+.barra-sesion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 16px;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}

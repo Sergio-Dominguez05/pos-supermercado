@@ -1,5 +1,6 @@
 package gt.supermercado.pos.compartido.api;
 
+import gt.supermercado.pos.compartido.dominio.ConflictoException;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.NoAutenticadoException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
@@ -24,6 +25,11 @@ public class ManejadorErrores {
     @ExceptionHandler(NegocioException.class)
     ResponseEntity<ErrorApi> negocio(NegocioException e) {
         return ResponseEntity.status(422).body(ErrorApi.de(e.getCodigo(), e.getMessage()));
+    }
+
+    @ExceptionHandler(ConflictoException.class)
+    ResponseEntity<ErrorApi> conflicto(ConflictoException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorApi.de(e.getCodigo(), e.getMessage()));
     }
 
     @ExceptionHandler(RecursoNoEncontradoException.class)

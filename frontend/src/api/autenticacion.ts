@@ -22,6 +22,9 @@ export const iniciarSesionConPin = (username: string, pin: string) =>
     body: JSON.stringify({ username, pin }),
   })
 
+/** HU-01.16: cierra la sesión en el servidor, que además borra la cookie. */
+export const cerrarSesion = () => pedir<void>('/api/auth/logout', { method: 'POST' })
+
 /** Usuario de la sesión actual, o `null` si no hay sesión. */
 export async function obtenerSesion(): Promise<UsuarioSesion | null> {
   try {
