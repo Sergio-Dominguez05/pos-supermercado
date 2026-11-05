@@ -1,4 +1,4 @@
-# Entorno de desarrollo — Sprint 0
+# Entorno de desarrollo
 
 Esta guía documenta **la base de desarrollo**, no las HU funcionales. Se entrega para integrarse sobre el monorepo existente, sin alterar sus ramas, reglas de protección, Issues ni Project.
 
