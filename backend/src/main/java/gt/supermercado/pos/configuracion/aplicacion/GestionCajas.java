@@ -1,6 +1,7 @@
 package gt.supermercado.pos.configuracion.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
@@ -27,7 +28,6 @@ import java.util.Optional;
 @Service
 public class GestionCajas {
 
-    static final String MODULO = "configuracion";
 
     private final RepositorioCajas cajas;
     private final VerificadorTurnoAbiertoCaja turnos;
@@ -64,15 +64,15 @@ public class GestionCajas {
     public Caja crear(String nombre, String serieFel, SesionActiva actor) {
         String nombreNormal = ReglasCaja.normalizarNombre(nombre);
         String serie = ReglasCaja.normalizarSerie(serieFel);
-        validar(nombreNormal, serie, null, actor, "CAJA_CREADA");
+        validar(nombreNormal, serie, null, actor, AccionSensible.CAJA_CREADA);
 
         long id;
         try {
             id = cajas.crear(nombreNormal, serie);
         } catch (DuplicateKeyException e) {
-            throw rechazar(actor, "CAJA_CREADA", null, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
+            throw rechazar(actor, AccionSensible.CAJA_CREADA, null, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
         }
-        bitacora.registrar(evento(actor, "CAJA_CREADA", true, "Caja '%s' creada".formatted(nombreNormal), id, null));
+        bitacora.registrar(evento(actor, AccionSensible.CAJA_CREADA, true, "Caja '%s' creada".formatted(nombreNormal), id, null));
         return obtener(id);
     }
 
@@ -81,7 +81,7 @@ public class GestionCajas {
         Caja actual = obtener(id);
         String nombreNormal = ReglasCaja.normalizarNombre(nombre);
         String serie = ReglasCaja.normalizarSerie(serieFel);
-        validar(nombreNormal, serie, id, actor, "CAJA_EDITADA");
+        validar(nombreNormal, serie, id, actor, AccionSensible.CAJA_EDITADA);
 
         Map<String, Object> cambios = new LinkedHashMap<>();
         if (!nombreNormal.equals(actual.nombre())) {
@@ -96,9 +96,9 @@ public class GestionCajas {
         try {
             cajas.actualizar(id, nombreNormal, serie);
         } catch (DuplicateKeyException e) {
-            throw rechazar(actor, "CAJA_EDITADA", id, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
+            throw rechazar(actor, AccionSensible.CAJA_EDITADA, id, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
         }
-        bitacora.registrar(evento(actor, "CAJA_EDITADA", true,
+        bitacora.registrar(evento(actor, AccionSensible.CAJA_EDITADA, true,
                 "Caja '%s' editada: %s".formatted(nombreNormal, String.join(", ", cambios.keySet())), id, cambios));
         return obtener(id);
     }
@@ -110,7 +110,7 @@ public class GestionCajas {
             return caja;
         }
         if (turnos.tieneTurnoAbierto(id)) {
-            throw rechazar(actor, "CAJA_DESACTIVADA", id, "CAJA_CON_TURNO_ABIERTO",
+            throw rechazar(actor, AccionSensible.CAJA_DESACTIVADA, id, "CAJA_CON_TURNO_ABIERTO",
                     "La caja tiene un turno abierto: primero se debe cerrar el turno.");
         }
         return cambiarActivo(caja, false, actor);
@@ -130,11 +130,11 @@ public class GestionCajas {
     public EquipoVinculado vincularEquipo(long id, SesionActiva actor) {
         Caja caja = obtener(id);
         if (!caja.activo()) {
-            throw rechazar(actor, "EQUIPO_VINCULADO", id, "CAJA_INACTIVA", "No se puede vincular un equipo a una caja inactiva.");
+            throw rechazar(actor, AccionSensible.EQUIPO_VINCULADO, id, "CAJA_INACTIVA", "No se puede vincular un equipo a una caja inactiva.");
         }
         String token = TokenSesion.generar();
         cajas.vincularEquipo(id, TokenSesion.hash(token));
-        bitacora.registrar(evento(actor, "EQUIPO_VINCULADO", true,
+        bitacora.registrar(evento(actor, AccionSensible.EQUIPO_VINCULADO, true,
                 "Equipo vinculado a la caja '%s'%s".formatted(caja.nombre(),
                         caja.equipoVinculado() ? " (reemplaza al equipo anterior)" : ""), id, null));
         return new EquipoVinculado(obtener(id), token);
@@ -142,13 +142,13 @@ public class GestionCajas {
 
     private Caja cambiarActivo(Caja caja, boolean activo, SesionActiva actor) {
         cajas.cambiarActivo(caja.id(), activo);
-        bitacora.registrar(evento(actor, activo ? "CAJA_ACTIVADA" : "CAJA_DESACTIVADA", true,
+        bitacora.registrar(evento(actor, activo ? AccionSensible.CAJA_ACTIVADA : AccionSensible.CAJA_DESACTIVADA, true,
                 "Caja '%s' %s".formatted(caja.nombre(), activo ? "activada" : "desactivada"), caja.id(),
                 Map.of("activo", EventoBitacora.cambio(!activo, activo))));
         return obtener(caja.id());
     }
 
-    private void validar(String nombre, String serie, Long id, SesionActiva actor, String accion) {
+    private void validar(String nombre, String serie, Long id, SesionActiva actor, AccionSensible accion) {
         if (!ReglasCaja.esNombreValido(nombre)) {
             throw rechazar(actor, accion, id, "NOMBRE_CAJA_INVALIDO", "El nombre de la caja debe tener de 1 a 40 caracteres.");
         }
@@ -170,14 +170,14 @@ public class GestionCajas {
         return new RecursoNoEncontradoException("CAJA_NO_ENCONTRADA", "La caja no existe.");
     }
 
-    private static EventoBitacora evento(SesionActiva actor, String accion, boolean exitoso, String descripcion,
+    private static EventoBitacora evento(SesionActiva actor, AccionSensible accion, boolean exitoso, String descripcion,
                                          Long cajaId, Map<String, Object> cambios) {
-        return new EventoBitacora(actor.usuarioId(), actor.rol().name(), MODULO, accion, exitoso, descripcion,
+        return new EventoBitacora(actor.usuarioId(), actor.rol().name(), accion, exitoso, descripcion,
                 cajaId == null ? null : "caja", cajaId, cambios);
     }
 
     /** El intento rechazado también queda en la bitácora (HU-11.01 crit. 3). */
-    private NegocioException rechazar(SesionActiva actor, String accion, Long cajaId, String codigo, String mensaje) {
+    private NegocioException rechazar(SesionActiva actor, AccionSensible accion, Long cajaId, String codigo, String mensaje) {
         bitacora.registrarIntentoFallido(evento(actor, accion, false, "Operación sobre caja rechazada: " + mensaje,
                 cajaId, null));
         return new NegocioException(codigo, mensaje);

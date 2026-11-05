@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.ConflictoException;
 import gt.supermercado.pos.seguridad.dominio.RepositorioSesiones;
@@ -16,8 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CierreSesion {
 
-    static final String MODULO = "seguridad";
-    static final String ACCION = "CIERRE_SESION";
+    static final AccionSensible ACCION = AccionSensible.CIERRE_SESION;
 
     private final RepositorioSesiones sesiones;
     private final VerificadorVentaEnCurso ventas;
@@ -41,7 +41,7 @@ public class CierreSesion {
     }
 
     private static EventoBitacora evento(SesionActiva sesion, boolean exitoso, String descripcion) {
-        return new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), MODULO, ACCION, exitoso, descripcion,
+        return new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), ACCION, exitoso, descripcion,
                 "usuario", sesion.usuarioId());
     }
 }

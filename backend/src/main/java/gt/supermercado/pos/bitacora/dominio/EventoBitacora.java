@@ -27,19 +27,23 @@ public record EventoBitacora(
     /** Valor que se registra en lugar de un dato sensible, como una contraseña o un PIN (HU-11.03). */
     public static final String MODIFICADO = "modificado";
 
-    public EventoBitacora(Long usuarioId, String rol, String modulo, String accion, boolean exitoso,
+    /**
+     * Un evento de una de las {@link AccionSensible acciones del catálogo} (HU-11.01): el módulo y el código de la
+     * acción salen del catálogo. Es la forma de registrar que deben usar los casos de uso.
+     */
+    public EventoBitacora(Long usuarioId, String rol, AccionSensible accion, boolean exitoso,
                           String descripcion, String entidad, Long entidadId, Map<String, Object> cambios) {
-        this(usuarioId, rol, modulo, accion, exitoso, descripcion, entidad, entidadId, cambios, null);
+        this(usuarioId, rol, accion.modulo(), accion.codigo(), exitoso, descripcion, entidad, entidadId, cambios, null);
     }
 
-    public EventoBitacora(Long usuarioId, String rol, String modulo, String accion, boolean exitoso,
+    public EventoBitacora(Long usuarioId, String rol, AccionSensible accion, boolean exitoso,
                           String descripcion, String entidad, Long entidadId) {
-        this(usuarioId, rol, modulo, accion, exitoso, descripcion, entidad, entidadId, null, null);
+        this(usuarioId, rol, accion, exitoso, descripcion, entidad, entidadId, null);
     }
 
-    public static EventoBitacora de(Long usuarioId, String rol, String modulo, String accion,
+    public static EventoBitacora de(Long usuarioId, String rol, AccionSensible accion,
                                     boolean exitoso, String descripcion) {
-        return new EventoBitacora(usuarioId, rol, modulo, accion, exitoso, descripcion, null, null);
+        return new EventoBitacora(usuarioId, rol, accion, exitoso, descripcion, null, null);
     }
 
     /** Un campo modificado: {@code {"antes": ..., "despues": ...}}. */

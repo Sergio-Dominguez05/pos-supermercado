@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.seguridad.dominio.ReglasCredencial;
@@ -21,8 +22,7 @@ import java.util.Map;
 @Service
 public class CambioCredencial {
 
-    static final String MODULO = "seguridad";
-    static final String ACCION = "CREDENCIAL_CAMBIADA";
+    static final AccionSensible ACCION = AccionSensible.CREDENCIAL_CAMBIADA;
 
     private final RepositorioUsuarios usuarios;
     private final PasswordEncoder codificador;
@@ -62,14 +62,14 @@ public class CambioCredencial {
         }
 
         usuarios.cambiarCredencial(usuario.id(), codificador.encode(nueva));
-        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), MODULO, ACCION, true,
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), ACCION, true,
                 "Cambio de " + tipo.nombre() + " propio", "usuario", usuario.id(),
                 Map.of("credencial", EventoBitacora.MODIFICADO)));
     }
 
     /** El intento rechazado queda en la bitácora sin ningún valor de credencial (crit. 4). */
     private NegocioException rechazar(SesionActiva sesion, String codigo, String mensaje) {
-        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), MODULO, ACCION,
+        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), ACCION,
                 false, "Cambio de credencial rechazado: " + mensaje, "usuario", sesion.usuarioId()));
         return new NegocioException(codigo, mensaje);
     }

@@ -1,5 +1,6 @@
 package gt.supermercado.pos.bitacora.aplicacion;
 
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +18,8 @@ class BitacoraTest {
     void completaLaCajaConElContextoDelEvento() {
         Bitacora bitacora = new Bitacora(registrados::add, () -> 7L);
 
-        bitacora.registrar(EventoBitacora.de(1L, "CAJERO", "seguridad", "INICIO_SESION", true, "Inicio"));
-        bitacora.registrarIntentoFallido(EventoBitacora.de(1L, "CAJERO", "seguridad", "INICIO_SESION", false, "Fallo"));
+        bitacora.registrar(EventoBitacora.de(1L, "CAJERO", AccionSensible.INICIO_SESION, true, "Inicio"));
+        bitacora.registrarIntentoFallido(EventoBitacora.de(1L, "CAJERO", AccionSensible.INICIO_SESION, false, "Fallo"));
 
         assertThat(registrados).extracting(EventoBitacora::cajaId).containsExactly(7L, 7L);
     }
@@ -27,14 +28,14 @@ class BitacoraTest {
     void respetaLaCajaQueYaTraeElEvento() {
         Bitacora bitacora = new Bitacora(registrados::add, () -> 7L);
 
-        bitacora.registrar(EventoBitacora.de(1L, "ADMIN", "configuracion", "X", true, "X").enCaja(3L));
+        bitacora.registrar(EventoBitacora.de(1L, "ADMIN", AccionSensible.CAJA_CREADA, true, "X").enCaja(3L));
 
         assertThat(registrados).singleElement().extracting(EventoBitacora::cajaId).isEqualTo(3L);
     }
 
     @Test
     void fueraDeUnaCajaLaDejaVacia() {
-        new Bitacora(registrados::add).registrar(EventoBitacora.de(null, null, "seguridad", "X", true, "Arranque"));
+        new Bitacora(registrados::add).registrar(EventoBitacora.de(null, null, AccionSensible.USUARIO_CREADO, true, "Arranque"));
 
         assertThat(registrados).singleElement().extracting(EventoBitacora::cajaId).isNull();
     }

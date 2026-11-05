@@ -1,6 +1,7 @@
 package gt.supermercado.pos.seguridad.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.seguridad.dominio.CredencialesInvalidasException;
 import gt.supermercado.pos.seguridad.dominio.IdentificadorEquipo;
@@ -25,8 +26,7 @@ import java.util.Optional;
 @Service
 public class InicioSesion {
 
-    static final String MODULO = "seguridad";
-    static final String ACCION = "INICIO_SESION";
+    static final AccionSensible ACCION = AccionSensible.INICIO_SESION;
 
     private final RepositorioUsuarios usuarios;
     private final RepositorioSesiones sesiones;
@@ -98,8 +98,8 @@ public class InicioSesion {
 
     private static EventoBitacora evento(Usuario usuario, boolean exitoso, String descripcion) {
         return usuario == null
-                ? new EventoBitacora(null, null, MODULO, ACCION, exitoso, descripcion, null, null)
-                : new EventoBitacora(usuario.id(), usuario.rol().name(), MODULO, ACCION, exitoso, descripcion,
+                ? new EventoBitacora(null, null, ACCION, exitoso, descripcion, null, null)
+                : new EventoBitacora(usuario.id(), usuario.rol().name(), ACCION, exitoso, descripcion,
                         "usuario", usuario.id());
     }
 }
