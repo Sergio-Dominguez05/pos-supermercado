@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** Sprint 0 — scaffold de frontend, backend y PostgreSQL preparado para verificación local. Aún no incluye ventas ni certificación FEL real.
+> **Estado:** Sprint 1 completado (`v0.2.0`) — acceso con contraseña o PIN, usuarios y roles, permisos validados en el servidor, registro de cajas y bitácora protegida. Aún no incluye catálogo, ventas ni certificación FEL real.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -10,7 +10,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 
-[Descripción](#-descripción) · [Arquitectura C4](#-arquitectura-c4) · [Roadmap](#-roadmap-de-sprints) · [Estructura](#-estructura-del-repositorio) · [Organización del equipo](#-flujo-de-trabajo) · [Documentación](#-documentación)
+[Descripción](#-descripción) · [Funcionalidades](#-funcionalidades-disponibles) · [Arquitectura C4](#-arquitectura-c4) · [Roadmap](#-roadmap-de-sprints) · [Estructura](#-estructura-del-repositorio) · [Organización del equipo](#-flujo-de-trabajo) · [Documentación](#-documentación)
 
 ## 📌 Descripción
 
@@ -19,6 +19,20 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 **Principales áreas de negocio de la V1:** usuarios y permisos, catálogo, IVA, clientes, ventas, pagos con tarjeta registrados en el POS, facturación FEL, caja, reportes, bitácora y configuración. La arquitectura recoge **13 épicas y 167 historias de usuario: 115 propuestas para la V1 y 52 para etapas futuras**.
 
 **Fuera del alcance inicial:** integración con inventario externo (EP-02), sucursales múltiples (EP-13), otras historias expresamente marcadas como futuras en el documento arquitectónico.
+
+## ✅ Funcionalidades disponibles
+
+Entregadas en el **Sprint 1** (`v0.2.0`), con 15 historias de usuario aceptadas:
+
+| Área | Qué se puede hacer | Historias |
+|---|---|---|
+| Acceso | Iniciar sesión con contraseña (Administrador, Supervisor) o con PIN (Cajero); cerrar sesión; cambiar la contraseña o el PIN propio | HU-01.01, 01.02, 01.13, 01.16 |
+| Usuarios | Crear, consultar con búsqueda y filtros, editar, asignar rol, activar y desactivar; el Administrador restablece contraseñas y PIN (cierra las sesiones abiertas del usuario) | HU-01.05 a 01.09, 01.14 |
+| Permisos | Matriz de permisos por rol; cada endpoint exige su permiso en el servidor y los accesos denegados quedan registrados | HU-01.11 |
+| Configuración | Registrar cajas con su serie de facturación y vincular el equipo (navegador) de cada caja | HU-12.05 |
+| Bitácora | Registro automático de las acciones sensibles, con usuario, rol, caja y valores anteriores y nuevos; inmutable, encadenada con hashes y con verificación de integridad | HU-11.01, 11.02, 11.05 |
+
+Las reglas que dependen de módulos futuros (caja abierta, venta en curso, turnos) ya están implementadas con puertos e implementaciones provisionales y se completan en su sprint.
 
 ## 🧩 Arquitectura C4
 
@@ -85,7 +99,8 @@ Para una notación C4 específica de Mermaid y el mapa de módulos, consultar [d
 | Base de datos | PostgreSQL 16 | Persistencia de ventas, caja, clientes y facturas |
 | Migraciones | Flyway | Versionado del esquema SQL |
 | Desarrollo | Docker Compose | Base de datos reproducible por integrante |
-| Pruebas (futuras) | JUnit, Testcontainers, Playwright | Pruebas backend, integración y E2E |
+| Pruebas | JUnit 5, Testcontainers, ArchUnit, Vitest | Pruebas unitarias, de integración contra PostgreSQL real y reglas de arquitectura |
+| Pruebas E2E (futuras) | Playwright | Flujos completos en el navegador |
 
 ## 🗂️ Estructura del repositorio
 
@@ -113,7 +128,7 @@ pos-supermercado/
 └── README.md
 ```
 
-Los módulos Java y React ya tienen estructura inicial de Sprint 0, siguiendo [la propuesta original](docs/original/Architecture.md).
+Los módulos Java (`seguridad`, `configuracion`, `bitacora` y los demás, aún vacíos) y React siguen [la propuesta original](docs/original/Architecture.md); las reglas de dependencias entre módulos se verifican con ArchUnit.
 
 ## 🌿 Flujo de trabajo
 
@@ -142,7 +157,7 @@ El esquema se lee **de arriba hacia abajo por etapas** y **de izquierda a derech
 flowchart TB
     subgraph BASE["Etapa 1 · Fundamentos"]
         direction LR
-        S0["Sprint 0<br/>Preparación del entorno<br/>Base · sin HU"] --> S1["Sprint 1<br/>Acceso, usuarios y bitácora<br/>15 HU · Alta"] --> S2["Sprint 2<br/>Catálogo, IVA y apertura de caja<br/>17 HU · Alta"]
+        S0["Sprint 0<br/>Preparación del entorno<br/>Base · sin HU"] --> S1["✅ Sprint 1 · v0.2.0<br/>Acceso, usuarios y bitácora<br/>15 HU · Alta"] --> S2["Sprint 2<br/>Catálogo, IVA y apertura de caja<br/>17 HU · Alta"]
     end
 
     subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
@@ -171,7 +186,7 @@ Las historias se administrarán como **GitHub Issues** y se agruparán en **GitH
 - [Historias de usuario por épica](docs/original/)
 - [Planificación y DoD](docs/proceso/scrum.md)
 
-## 🚀 Cómo ejecutar el proyecto (Sprint 0)
+## 🚀 Cómo ejecutar el proyecto
 
 **Requisitos:** Node.js 24, Java 21 y Docker Desktop abierto. Ejecutar desde la **raíz** del repositorio:
 
@@ -182,7 +197,8 @@ npm run dev
 
 `npm install` crea el `.env` local a partir de `.env.example` (si no existe) e instala las dependencias del frontend; `npm run dev` arranca PostgreSQL con Docker Compose y luego ejecuta Spring Boot y Vite. **No es necesario instalar Maven globalmente**: el backend utiliza Maven Wrapper.
 
-- **Frontend:** http://localhost:5173/sistema
+- **Aplicación:** http://localhost:5173/login
+- **Estado del sistema:** http://localhost:5173/sistema
 - **Backend:** http://localhost:8080/api/sistema/info
 - **Health:** http://localhost:8080/actuator/health
 
@@ -192,6 +208,8 @@ npm run test      # Vitest + JUnit/Testcontainers (Docker requerido)
 npm run lint      # frontend
 npm run db:down   # detener PostgreSQL sin eliminar datos
 ```
+
+**Primer acceso:** si no existe ningún Administrador, el backend crea el usuario `admin` con la contraseña temporal `POS_ADMIN_PASSWORD_INICIAL` del `.env`. Desde ahí se crean los demás usuarios y las cajas.
 
 Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](docs/proceso/entorno-desarrollo.md). **El simulador FEL es solo para desarrollo**, no emite documentos tributarios reales.
 
@@ -212,4 +230,4 @@ Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](
 
 ---
 
-**Proyecto académico · Guatemala · Entrega inicial / Sprint 0**
+**Proyecto académico · Guatemala · Entrega del Sprint 1 (`v0.2.0`)**
