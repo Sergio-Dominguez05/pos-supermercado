@@ -25,6 +25,11 @@ export const avisoEdicion = (usuario: ResumenUsuario, rolCambio: boolean) =>
   `Se actualizó el usuario ${usuario.username}.` +
   (rolCambio ? ' El nuevo rol se aplica a partir de su siguiente inicio de sesión.' : '')
 
+export const avisoRestablecimiento = (username: string, tipo: 'CONTRASENA' | 'PIN') =>
+  tipo === 'PIN'
+    ? `Se restableció el PIN de ${username}. Entréguele el PIN temporal.`
+    : `Se restableció la contraseña de ${username}. Entréguele la contraseña temporal.`
+
 /**
  * Botón de estado de cada fila (HU-01.08). Nadie puede desactivar su propio usuario (crit. 4), así que en esa
  * fila no se ofrece; el servidor lo valida igual.

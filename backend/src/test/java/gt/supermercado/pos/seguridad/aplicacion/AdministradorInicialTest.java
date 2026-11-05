@@ -100,6 +100,10 @@ class AdministradorInicialTest {
         }
 
         @Override
+        public void restablecerCredencial(long id, String credencialHash) {
+        }
+
+        @Override
         public void cambiarActivo(long id, boolean activo) {
         }
 

@@ -8,6 +8,7 @@ import { EstadoSistema } from './modulos/sistema/EstadoSistema'
 import { EditarUsuario } from './modulos/usuarios/EditarUsuario'
 import { ListaUsuarios } from './modulos/usuarios/ListaUsuarios'
 import { NuevoUsuario } from './modulos/usuarios/NuevoUsuario'
+import { RestablecerCredencial } from './modulos/usuarios/RestablecerCredencial'
 import { Venta } from './modulos/venta/Venta'
 
 const clienteConsultas = new QueryClient({
@@ -59,6 +60,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <EditarUsuario />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/usuarios/:id/credencial"
+            element={
+              <RutaProtegida>
+                <RestablecerCredencial />
               </RutaProtegida>
             }
           />

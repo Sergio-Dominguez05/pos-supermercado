@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { activarUsuario, crearUsuario, desactivarUsuario, editarUsuario, listarUsuarios } from './usuarios'
+import {
+  activarUsuario,
+  crearUsuario,
+  desactivarUsuario,
+  editarUsuario,
+  listarUsuarios,
+  restablecerCredencial,
+} from './usuarios'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -57,6 +64,19 @@ describe('usuarios', () => {
       'POST /api/usuarios/7/desactivar',
       'POST /api/usuarios/7/activar',
     ])
+  })
+
+  it('restablece con un POST y la credencial temporal en el cuerpo (HU-01.14)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 7, tipo: 'PIN', temporal: true }), { status: 200 }),
+    ))
+
+    await expect(restablecerCredencial(7, '730415')).resolves.toEqual({ id: 7, tipo: 'PIN', temporal: true })
+
+    const [url, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toBe('/api/usuarios/7/credencial')
+    expect(opciones?.method).toBe('POST')
+    expect(JSON.parse(opciones?.body as string)).toEqual({ credencialTemporal: '730415' })
   })
 
   it('muestra el mensaje del servidor cuando el usuario ya existe (crit. 4)', async () => {
