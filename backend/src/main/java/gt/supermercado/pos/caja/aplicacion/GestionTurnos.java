@@ -41,6 +41,25 @@ public class GestionTurnos {
     }
 
     /**
+     * HU-09.02: el turno abierto del usuario en la caja de su sesión, al que se deben asociar sus ventas, pagos y
+     * anulaciones (crit. 2). Si la caja está cerrada o el turno es de otra persona, se rechaza la operación: los
+     * módulos de ventas (EP-06), pagos (EP-07) y facturación (EP-08) lo llaman antes de registrar cualquier cobro, así
+     * la regla se cumple en el servidor y no solo en la pantalla.
+     */
+    @Transactional(readOnly = true)
+    public Turno exigirTurnoAbierto(SesionActiva sesion) {
+        Turno turno = actualDeLaCaja(sesion).orElseThrow(() -> new NegocioException("CAJA_CERRADA",
+                sesion.cajaId() == null
+                        ? "Este equipo no está vinculado a ninguna caja: no se puede vender."
+                        : "La caja está cerrada. Abra su turno para empezar a vender."));
+        if (!turno.esDe(sesion.usuarioId())) {
+            throw new NegocioException("CAJA_CON_TURNO_DE_OTRO_USUARIO",
+                    "La caja tiene abierto el turno de %s: no puede vender en él.".formatted(turno.usuarioNombre()));
+        }
+        return turno;
+    }
+
+    /**
      * Abre el turno del usuario en la caja de su sesión con la hora del servidor (crit. 2), sin fondo inicial
      * (crit. 3), y lo registra en la bitácora (crit. 4). Una caja y un usuario tienen como máximo un turno abierto
      * (HU-09.03); la base de datos también lo garantiza.
