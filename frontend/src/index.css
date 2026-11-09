@@ -370,3 +370,41 @@ kbd {
   color: var(--ok);
   font-weight: 600;
 }
+
+/* Resultados de la búsqueda por descripción (HU-03.07): se recorren con el teclado. */
+.resultados {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.resultado {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr auto;
+  gap: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.resultado + .resultado {
+  border-top: 1px solid var(--borde);
+}
+
+.resultado.marcado {
+  background: var(--fondo);
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+
+.resultado-codigo {
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.resultado-precio {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

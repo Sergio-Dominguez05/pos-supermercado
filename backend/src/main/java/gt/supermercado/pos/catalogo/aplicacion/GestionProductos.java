@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -64,6 +65,26 @@ public class GestionProductos {
         return (normalizado.isEmpty() ? Optional.<Producto>empty() : productos.buscarPorCodigo(normalizado))
                 .orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO",
                         "No hay ningún producto con el código %s.".formatted(normalizado)));
+    }
+
+    /** Caracteres mínimos para buscar por descripción (HU-03.07 crit. 1). */
+    public static final int MINIMO_BUSQUEDA = 3;
+
+    /** Resultados que se muestran como máximo al buscar por descripción: el cajero sigue escribiendo para afinar. */
+    public static final int MAXIMO_RESULTADOS = 20;
+
+    /**
+     * HU-03.07: productos activos cuya descripción contiene el texto (crit. 1), sin distinguir mayúsculas, minúsculas
+     * ni tildes (crit. 2). Con menos de 3 caracteres se rechaza, para no devolver medio catálogo.
+     */
+    @Transactional(readOnly = true)
+    public List<Producto> buscarPorDescripcion(String texto) {
+        String limpio = ReglasProducto.normalizarDescripcion(texto);
+        if (limpio.length() < MINIMO_BUSQUEDA) {
+            throw new NegocioException("BUSQUEDA_MUY_CORTA",
+                    "Escriba al menos %d caracteres para buscar por descripción.".formatted(MINIMO_BUSQUEDA));
+        }
+        return productos.buscarActivosPorDescripcion(limpio, MAXIMO_RESULTADOS);
     }
 
     /**

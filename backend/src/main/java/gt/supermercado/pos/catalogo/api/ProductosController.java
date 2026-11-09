@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * EP-03 Catálogo. HU-03.01 registrar y HU-03.02 editar un producto, con el permiso de crear productos y cambiar
@@ -70,6 +71,13 @@ public class ProductosController {
     @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
     public Producto buscarPorCodigo(@PathVariable String codigo) {
         return gestionProductos.buscarPorCodigo(codigo);
+    }
+
+    /** HU-03.07: productos activos cuya descripción contiene el texto (mínimo 3 caracteres). */
+    @GetMapping("/busqueda")
+    @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
+    public List<Producto> buscarPorDescripcion(@RequestParam String q) {
+        return gestionProductos.buscarPorDescripcion(q);
     }
 
     @PostMapping
