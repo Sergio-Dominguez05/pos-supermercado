@@ -36,7 +36,6 @@ class CatalogoAccionesSensiblesTest {
             entry(FACTURA_REIMPRESA, "HU-08.12"),
             entry(FACTURA_RECHAZADA_CERTIFICADOR, "HU-08.06"),
             entry(PAGO_TARJETA_ELIMINADO, "HU-07.06"),
-            entry(TURNO_ABIERTO, "HU-09.01"),
             entry(TURNO_CERRADO, "HU-09.08"),
             entry(TURNO_CERRADO_POR_SUPERVISOR, "HU-09.12"),
             entry(PARAMETRO_MODIFICADO, "HU-12.01, 12.02, 12.03, 12.07, 12.08 y 12.13"),

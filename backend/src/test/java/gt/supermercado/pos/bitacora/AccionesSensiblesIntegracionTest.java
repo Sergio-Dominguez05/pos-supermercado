@@ -228,6 +228,23 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PRODUCTO_CREADO, false, adminId));   // código repetido
     }
 
+    // Caja
+
+    @Test
+    void aperturaDeTurnoExitosaYRechazada() throws Exception {
+        String nombre = "Caja turno " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+
+        assertThat(registrosDe(() -> enviar("/api/turnos", "POST", null, sesion)))
+                .containsExactly(new Registro(TURNO_ABIERTO, true, id));
+        assertThat(registrosDe(() -> enviar("/api/turnos", "POST", null, sesion)))
+                .containsExactly(new Registro(TURNO_ABIERTO, false, id));   // ya tiene el turno abierto
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test
