@@ -95,6 +95,17 @@ class RepositorioProductosJdbc implements RepositorioProductos {
     }
 
     @Override
+    public List<Producto> buscarActivosPorDescripcion(String texto, int limite) {
+        String patron = escaparLike(texto);
+        // El LIKE usa el índice trigram producto_desc_trgm; el CASE pone primero lo que empieza con el texto.
+        return jdbc.query(SELECT_PRODUCTO + """
+                WHERE activo AND f_unaccent(lower(descripcion)) LIKE '%' || f_unaccent(lower(?)) || '%'
+                ORDER BY CASE WHEN f_unaccent(lower(descripcion)) LIKE f_unaccent(lower(?)) || '%' THEN 0 ELSE 1 END,
+                         lower(descripcion), id
+                LIMIT ?""", PRODUCTO, patron, patron, limite);
+    }
+
+    @Override
     public long crear(String codigoBarras, String descripcion, BigDecimal precio) {
         return jdbc.queryForObject(
                 "INSERT INTO producto (codigo_barras, descripcion, precio) VALUES (?, ?, ?) RETURNING id",

@@ -82,6 +82,15 @@ export const activarProducto = (id: number) => pedir<Producto>(`/api/productos/$
 
 export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)
 
+/** Caracteres mínimos para buscar por descripción (HU-03.07 crit. 1); el servidor exige lo mismo. */
+export const MINIMO_BUSQUEDA = 3
+
+export const claveBusquedaDescripcion = (texto: string) => ['productos', 'busqueda', texto] as const
+
+/** HU-03.07: productos activos cuya descripción contiene el texto, sin importar mayúsculas ni tildes. */
+export const buscarPorDescripcion = (texto: string) =>
+  pedir<Producto[]>(`/api/productos/busqueda?${new URLSearchParams({ q: texto.trim() })}`)
+
 /** HU-03.06: búsqueda exacta por código; si no existe, el servidor responde 404 `PRODUCTO_NO_ENCONTRADO`. */
 export const buscarPorCodigo = (codigo: string) =>
   pedir<Producto>(`/api/productos/codigo/${encodeURIComponent(codigo.trim())}`)
