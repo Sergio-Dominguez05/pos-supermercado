@@ -4,6 +4,10 @@ import type { Producto } from '../../api/productos'
 
 export const formatoQuetzales = (monto: number) => `Q${monto.toFixed(2)}`
 
+/** HU-03.09 crit. 2: el mismo mensaje que da el servidor al intentar venderlo. */
+export const avisoProductoInactivo = (producto: Producto) =>
+  `${producto.descripcion} (${producto.codigoBarras}) no está disponible para la venta.`
+
 /** HU-03.08 crit. 1: el código se muestra como lo normaliza el servidor (sin espacios, en mayúsculas). */
 export const avisoCodigoNoEncontrado = (codigo: string) =>
   `El código ${codigo.replace(/\s+/g, '').toUpperCase()} no existe en el catálogo.`

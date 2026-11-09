@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { buscarPorCodigo, esCodigoNoEncontrado, type Producto } from '../../api/productos'
 import { avisoSonoro } from './sonido'
-import { avisoCodigoNoEncontrado, formatoQuetzales } from './textos'
+import { avisoCodigoNoEncontrado, avisoProductoInactivo, formatoQuetzales } from './textos'
 
 /**
  * HU-03.06: busca un producto por su código exacto. Pensado para el lector de código de barras, que escribe el
@@ -12,6 +12,9 @@ import { avisoCodigoNoEncontrado, formatoQuetzales } from './textos'
  *
  * HU-03.08: si el código no existe, avisa de forma visible y sonora (crit. 1) y ofrece buscar por descripción
  * (crit. 2). El servidor deja registrado el código para el administrador (crit. 4).
+ *
+ * HU-03.09 crit. 2: si el producto existe pero está inactivo, avisa que no está disponible para la venta y no se lo
+ * entrega a `onEncontrado`. El servidor también lo rechaza al vender (`GestionProductos.paraVender`).
  *
  * La pantalla de venta (HU-06.01) lo reutiliza con `onEncontrado` para agregar el producto.
  */
@@ -26,7 +29,10 @@ export function BuscadorPorCodigo({
   const campo = useRef<HTMLInputElement>(null)
   const busqueda = useMutation({
     mutationFn: buscarPorCodigo,
-    onSuccess: (producto) => onEncontrado?.(producto),
+    onSuccess: (producto) => {
+      if (producto.activo) onEncontrado?.(producto)
+      else avisoSonoro()
+    },
     onError: (error) => {
       if (esCodigoNoEncontrado(error)) avisoSonoro()
     },
@@ -65,7 +71,7 @@ export function BuscadorPorCodigo({
             {busqueda.error.message}
           </p>
         ))}
-      {busqueda.data && !busqueda.error && <ResultadoProducto producto={busqueda.data} />}
+      {busqueda.data && !busqueda.error && <ResultadoEscaneo producto={busqueda.data} />}
     </form>
   )
 }
@@ -109,5 +115,19 @@ export function ResultadoProducto({ producto }: { producto: Producto }) {
         </>
       )}
     </dl>
+  )
+}
+
+/** HU-03.09: el resultado de un escaneo; si el producto está inactivo, lo marca como no disponible para la venta. */
+export function ResultadoEscaneo({ producto }: { producto: Producto }) {
+  return (
+    <>
+      {!producto.activo && (
+        <p className="aviso-alerta" role="alert">
+          <strong>{avisoProductoInactivo(producto)}</strong>
+        </p>
+      )}
+      <ResultadoProducto producto={producto} />
+    </>
   )
 }
