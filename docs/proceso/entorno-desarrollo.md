@@ -60,6 +60,7 @@ Si todavía no hay ningún Administrador, el backend crea al arrancar el usuario
 - En producción no tiene valor por defecto: si falta y no hay Administrador, el backend lo advierte en el log y nadie puede entrar.
 - Con `admin`, la opción **Usuarios** (`/usuarios`, HU-01.06) muestra la lista con búsqueda y filtros; desde ahí, **Nuevo usuario** (HU-01.05) crea Administradores y Supervisores con contraseña temporal y Cajeros con PIN temporal, **Editar** (HU-01.07) cambia el nombre completo y el rol, y **Desactivar/Activar** (HU-01.08) quita o devuelve el acceso sin borrar al usuario. Los nombres de usuario no distinguen mayúsculas ni se pueden modificar.
 - **Configuración → Cajas** (`/configuracion/cajas`, HU-12.05) registra las cajas. Con **Vincular este equipo**, el navegador actual queda como esa caja (cookie HttpOnly `POS_EQUIPO`): quien inicie sesión ahí trabaja en esa caja y la barra superior la muestra. Para probar sin caja, use otro navegador o borre esa cookie.
+- **Nuevo producto** (`/catalogo/nuevo`, HU-03.01) registra productos con código de barras, descripción y precio con IVA. El código se puede escanear: el Enter que envía el lector pasa a la descripción en lugar de guardar. Tras registrar, el formulario queda vacío para el siguiente producto.
 
 ## Convenciones de GitHub
 

@@ -215,6 +215,19 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(CAJA_ACTIVADA, true, adminId));
     }
 
+    // Catálogo
+
+    @Test
+    void altaDeProductoExitosaYRechazada() throws Exception {
+        String codigo = "AUD-" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        String producto = "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":9.99}".formatted(codigo);
+
+        assertThat(registrosDe(() -> enviar("/api/productos", "POST", producto, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_CREADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos", "POST", producto, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_CREADO, false, adminId));   // código repetido
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

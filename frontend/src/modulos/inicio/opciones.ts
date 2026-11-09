@@ -14,6 +14,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR' },
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR' },
   { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR' },
+  // HU-03.01. Cuando exista la lista del catálogo (HU-03.04), el alta se ofrecerá desde allí.
+  { etiqueta: 'Nuevo producto', permiso: 'PRODUCTO_EDITAR', ruta: '/catalogo/nuevo' },
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
