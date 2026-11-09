@@ -81,3 +81,7 @@ export const desactivarProducto = (id: number) => pedir<Producto>(`/api/producto
 export const activarProducto = (id: number) => pedir<Producto>(`/api/productos/${id}/activar`, { method: 'POST' })
 
 export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)
+
+/** HU-03.06: búsqueda exacta por código; si no existe, el servidor responde 404 `PRODUCTO_NO_ENCONTRADO`. */
+export const buscarPorCodigo = (codigo: string) =>
+  pedir<Producto>(`/api/productos/codigo/${encodeURIComponent(codigo.trim())}`)

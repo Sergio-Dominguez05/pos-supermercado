@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Bitacora } from './modulos/bitacora/Bitacora'
+import { BuscarProducto } from './modulos/catalogo/BuscarProducto'
 import { EditarProducto } from './modulos/catalogo/EditarProducto'
 import { ListaProductos } from './modulos/catalogo/ListaProductos'
 import { NuevoProducto } from './modulos/catalogo/NuevoProducto'
@@ -114,6 +115,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <ListaProductos />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/catalogo/buscar"
+            element={
+              <RutaProtegida>
+                <BuscarProducto />
               </RutaProtegida>
             }
           />

@@ -65,6 +65,13 @@ public class ProductosController {
         return gestionProductos.obtener(id);
     }
 
+    /** HU-03.06: búsqueda exacta por código, escaneado o escrito a mano; 404 si no existe. */
+    @GetMapping("/codigo/{codigo}")
+    @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
+    public Producto buscarPorCodigo(@PathVariable String codigo) {
+        return gestionProductos.buscarPorCodigo(codigo);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")

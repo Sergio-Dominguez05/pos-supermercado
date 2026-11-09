@@ -91,6 +91,9 @@ export function TablaProductos({ puedeEditar }: { puedeEditar: boolean }) {
             <option value="MODIFICADO:asc">Modificados hace más tiempo</option>
           </select>
         </label>
+        <Link className="boton" to="/catalogo/buscar">
+          Buscar producto
+        </Link>
         {puedeEditar && (
           <Link className="boton" to="/catalogo/nuevo">
             Nuevo producto
