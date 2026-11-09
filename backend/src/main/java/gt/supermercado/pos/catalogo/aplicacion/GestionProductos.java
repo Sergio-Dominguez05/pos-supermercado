@@ -17,8 +17,8 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 /**
- * Catálogo de productos. HU-03.01: registrar un producto. HU-03.02: editar su descripción y precio. Activar y
- * desactivar (HU-03.03) y consultar (HU-03.04 a 03.07) se agregan aquí.
+ * Catálogo de productos. HU-03.01: registrar un producto. HU-03.02: editar su descripción y precio. HU-03.03:
+ * activarlo y desactivarlo. Consultar (HU-03.04 a 03.07) se agrega aquí.
  */
 @Service
 public class GestionProductos {
@@ -120,6 +120,33 @@ public class GestionProductos {
                     id, Map.of("precio", EventoBitacora.cambio(actual.precio(), precioNormal))));
         }
         return obtener(id);
+    }
+
+    /**
+     * Desactiva un producto que ya no se vende (HU-03.03 crit. 1): deja de poder agregarse a nuevas ventas
+     * (HU-03.09), pero no se borra, para conservar las ventas y facturas en las que aparece (crit. 2). Queda en la
+     * bitácora (crit. 4). Si ya estaba inactivo, no se hace ni se registra nada.
+     */
+    @Transactional
+    public Producto desactivar(long id, SesionActiva actor) {
+        Producto producto = obtener(id);
+        return producto.activo() ? cambiarActivo(producto, false, actor) : producto;
+    }
+
+    /** Reactiva un producto desactivado (HU-03.03 crit. 3); queda en la bitácora (crit. 4). */
+    @Transactional
+    public Producto activar(long id, SesionActiva actor) {
+        Producto producto = obtener(id);
+        return producto.activo() ? producto : cambiarActivo(producto, true, actor);
+    }
+
+    private Producto cambiarActivo(Producto producto, boolean activo, SesionActiva actor) {
+        productos.cambiarActivo(producto.id(), activo);
+        bitacora.registrar(evento(actor, activo ? AccionSensible.PRODUCTO_ACTIVADO : AccionSensible.PRODUCTO_DESACTIVADO,
+                true, "Producto '%s' (%s) %s".formatted(producto.descripcion(), producto.codigoBarras(),
+                        activo ? "activado" : "desactivado"),
+                producto.id(), Map.of("activo", EventoBitacora.cambio(!activo, activo))));
+        return obtener(producto.id());
     }
 
     /** HU-03.01 crit. 2: el mensaje dice a qué producto está asignado el código. */

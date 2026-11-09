@@ -244,6 +244,18 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PRECIO_CAMBIADO, false, adminId));   // precio en cero
     }
 
+    @Test
+    void desactivacionYActivacionDeProductos() throws Exception {
+        String codigo = "AUD-A" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long id = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Estado\",\"precio\":1.00}".formatted(codigo), cookieAdmin));
+
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id + "/desactivar", "POST", null, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_DESACTIVADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id + "/activar", "POST", null, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_ACTIVADO, true, adminId));
+    }
+
     // Caja
 
     @Test

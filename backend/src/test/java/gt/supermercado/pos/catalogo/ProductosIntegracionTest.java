@@ -247,6 +247,62 @@ class ProductosIntegracionTest {
         assertThat(editar(999_999_999, "Nadie", "1.00").statusCode()).isEqualTo(404);
     }
 
+    // HU-03.03 Activar y desactivar un producto
+
+    @Test
+    void seDesactivaYSeReactivaUnProductoYQuedaEnLaBitacora() throws Exception {   // HU-03.03 crit. 1, 3 y 4
+        long id = idDe(crear(nuevoCodigo(), "Galletas surtidas", "12.00"));
+
+        HttpResponse<String> desactivado = enviar("/api/productos/" + id + "/desactivar", "POST", null, cookieAdmin);
+        HttpResponse<String> activado = enviar("/api/productos/" + id + "/activar", "POST", null, cookieAdmin);
+
+        assertThat(desactivado.statusCode()).isEqualTo(200);
+        assertThat(desactivado.body()).contains("\"activo\":false");
+        assertThat(activado.body()).contains("\"activo\":true");
+        assertThat(jdbc.queryForList("""
+                SELECT accion || ':' || coalesce(cambios->'activo'->>'despues', '-') FROM bitacora
+                WHERE entidad = 'producto' AND entidad_id = ? AND exitoso ORDER BY id""", String.class, id))
+                .containsExactly("PRODUCTO_CREADO:-", "PRODUCTO_DESACTIVADO:false", "PRODUCTO_ACTIVADO:true");
+    }
+
+    @Test
+    void unProductoDesactivadoSigueExistiendoConSusDatos() throws Exception {   // HU-03.03 crit. 2
+        String codigo = nuevoCodigo();
+        long id = idDe(crear(codigo, "Descontinuado", "4.00"));
+
+        enviar("/api/productos/" + id + "/desactivar", "POST", null, cookieAdmin);
+
+        assertThat(enviar("/api/productos/" + id, "GET", null, cookieAdmin).body())
+                .contains("\"codigoBarras\":\"%s\"".formatted(codigo), "\"activo\":false");
+        assertThat(enviar("/api/productos/" + id, "DELETE", null, cookieAdmin).statusCode())
+                .as("no existe un endpoint para borrar productos").isGreaterThanOrEqualTo(400);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM producto WHERE id = ?", Integer.class, id)).isEqualTo(1);
+    }
+
+    @Test
+    void desactivarDosVecesNoRegistraDosVeces() throws Exception {
+        long id = idDe(crear(nuevoCodigo(), "Doble", "1.00"));
+
+        enviar("/api/productos/" + id + "/desactivar", "POST", null, cookieAdmin);
+        enviar("/api/productos/" + id + "/desactivar", "POST", null, cookieAdmin);
+        enviar("/api/productos/" + id + "/activar", "POST", null, cookieAdmin);
+        enviar("/api/productos/" + id + "/activar", "POST", null, cookieAdmin);
+
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE entidad_id = ?
+                  AND accion IN ('PRODUCTO_ACTIVADO', 'PRODUCTO_DESACTIVADO')""", Integer.class, id)).isEqualTo(2);
+    }
+
+    @Test
+    void soloQuienPuedeCrearProductosLosActivaODesactiva() throws Exception {
+        String cajera = cookie(login("/api/auth/login-pin", "cat.cajera", "pin", PIN), "POS_SESION");
+        long id = idDe(crear(nuevoCodigo(), "Activo protegido", "1.00"));
+
+        assertThat(enviar("/api/productos/" + id + "/desactivar", "POST", null, cajera).statusCode()).isEqualTo(403);
+        assertThat(enviar("/api/productos/999999999/desactivar", "POST", null, cookieAdmin).statusCode()).isEqualTo(404);
+        assertThat(jdbc.queryForObject("SELECT activo FROM producto WHERE id = ?", Boolean.class, id)).isTrue();
+    }
+
     @Test
     void soloQuienPuedeCambiarPreciosEditaProductos() throws Exception {
         String cajera = cookie(login("/api/auth/login-pin", "cat.cajera", "pin", PIN), "POS_SESION");

@@ -62,4 +62,17 @@ public class ProductosController {
                            @AuthenticationPrincipal SesionActiva actor) {
         return gestionProductos.editar(id, solicitud.descripcion(), solicitud.precio(), actor);
     }
+
+    /** HU-03.03: los productos no se borran; se desactivan y se pueden volver a activar. */
+    @PostMapping("/{id}/desactivar")
+    @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")
+    public Producto desactivar(@PathVariable long id, @AuthenticationPrincipal SesionActiva actor) {
+        return gestionProductos.desactivar(id, actor);
+    }
+
+    @PostMapping("/{id}/activar")
+    @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")
+    public Producto activar(@PathVariable long id, @AuthenticationPrincipal SesionActiva actor) {
+        return gestionProductos.activar(id, actor);
+    }
 }

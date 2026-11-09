@@ -16,4 +16,7 @@ public interface RepositorioProductos {
 
     /** Cambia la descripción y el precio, y actualiza la fecha de modificación. El código no se toca (HU-03.02). */
     void actualizar(long id, String descripcion, BigDecimal precio);
+
+    /** Activa o desactiva el producto y actualiza la fecha de modificación (HU-03.03). Nunca se borra. */
+    void cambiarActivo(long id, boolean activo);
 }
