@@ -43,4 +43,10 @@ class RepositorioProductosJdbc implements RepositorioProductos {
                 "INSERT INTO producto (codigo_barras, descripcion, precio) VALUES (?, ?, ?) RETURNING id",
                 Long.class, codigoBarras, descripcion, precio);
     }
+
+    @Override
+    public void actualizar(long id, String descripcion, BigDecimal precio) {
+        jdbc.update("UPDATE producto SET descripcion = ?, precio = ?, modificado_en = now() WHERE id = ?",
+                descripcion, precio, id);
+    }
 }

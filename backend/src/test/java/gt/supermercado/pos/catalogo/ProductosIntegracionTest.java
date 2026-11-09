@@ -171,6 +171,93 @@ class ProductosIntegracionTest {
                 .containsEntry("descripcion", "Producto 'Aceite 1 L' (%s) creado con precio Q28.50".formatted(codigo));
     }
 
+    // HU-03.02 Editar la descripción y el precio
+
+    @Test
+    void seEditanLaDescripcionYElPrecio() throws Exception {   // HU-03.02 crit. 1
+        String codigo = nuevoCodigo();
+        long id = idDe(crear(codigo, "Café 400 g", "35.00"));
+        jdbc.update("UPDATE producto SET modificado_en = now() - interval '1 day' WHERE id = ?", id);
+
+        HttpResponse<String> respuesta = editar(id, "  Café molido   400 g ", "37.5");
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"codigoBarras\":\"%s\"".formatted(codigo),
+                "\"descripcion\":\"Café molido 400 g\"", "\"precio\":37.50");
+        assertThat(jdbc.queryForObject("SELECT modificado_en > now() - interval '1 minute' FROM producto WHERE id = ?",
+                Boolean.class, id)).as("se actualiza la fecha de modificación").isTrue();
+    }
+
+    @Test
+    void elCodigoNoSeModificaAunqueSeEnvie() throws Exception {   // HU-03.02 crit. 2
+        String codigo = nuevoCodigo();
+        long id = idDe(crear(codigo, "Sal 1 lb", "3.00"));
+
+        HttpResponse<String> respuesta = enviar("/api/productos/" + id, "PUT",
+                "{\"codigoBarras\":\"OTRO-CODIGO\",\"descripcion\":\"Sal yodada 1 lb\",\"precio\":3.00}", cookieAdmin);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT codigo_barras FROM producto WHERE id = ?", String.class, id)).isEqualTo(codigo);
+    }
+
+    @Test
+    void laBaseDeDatosImpideCambiarElCodigo() throws Exception {   // HU-03.02 crit. 2
+        long id = idDe(crear(nuevoCodigo(), "Inmutable", "1.00"));
+
+        assertThatThrownBy(() -> jdbc.update("UPDATE producto SET codigo_barras = 'CAMBIADO' WHERE id = ?", id))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("no se puede modificar");
+    }
+
+    @Test
+    void cadaCambioQuedaEnLaBitacoraConElValorAnteriorYElNuevo() throws Exception {   // HU-03.02 crit. 6
+        long id = idDe(crear(nuevoCodigo(), "Harina 1 lb", "5.00"));
+
+        editar(id, "Harina de trigo 1 lb", "5.75");
+
+        Map<String, Object> descripcion = jdbc.queryForMap("""
+                SELECT cambios->'descripcion'->>'antes' AS antes, cambios->'descripcion'->>'despues' AS despues
+                FROM bitacora WHERE accion = 'PRODUCTO_EDITADO' AND entidad_id = ? AND exitoso""", id);
+        Map<String, Object> precio = jdbc.queryForMap("""
+                SELECT cambios->'precio'->>'antes' AS antes, cambios->'precio'->>'despues' AS despues
+                FROM bitacora WHERE accion = 'PRECIO_CAMBIADO' AND entidad_id = ? AND exitoso""", id);
+        assertThat(descripcion).containsEntry("antes", "Harina 1 lb").containsEntry("despues", "Harina de trigo 1 lb");
+        assertThat(precio).containsEntry("antes", "5.00").containsEntry("despues", "5.75");
+    }
+
+    @Test
+    void siNoCambiaNadaNoSeRegistraNada() throws Exception {
+        long id = idDe(crear(nuevoCodigo(), "Sin cambios", "2.00"));
+
+        assertThat(editar(id, "Sin cambios", "2").statusCode()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE entidad = 'producto' AND entidad_id = ?
+                  AND accion IN ('PRODUCTO_EDITADO', 'PRECIO_CAMBIADO')""", Integer.class, id)).isZero();
+    }
+
+    @Test
+    void alEditarSeAplicanLasMismasReglasQueAlRegistrar() throws Exception {
+        long id = idDe(crear(nuevoCodigo(), "Reglas", "2.00"));
+
+        assertThat(editar(id, "   ", "2.00").body()).contains("DESCRIPCION_INVALIDA");
+        assertThat(editar(id, "x".repeat(101), "2.00").body()).contains("DESCRIPCION_INVALIDA");
+        assertThat(editar(id, "Reglas", "0").body()).contains("PRECIO_INVALIDO");
+        assertThat(editar(id, "Reglas", "2.005").body()).contains("PRECIO_INVALIDO");
+        assertThat(editar(id, "Reglas", null).body()).contains("PRECIO_INVALIDO");
+        assertThat(editar(999_999_999, "Nadie", "1.00").statusCode()).isEqualTo(404);
+    }
+
+    @Test
+    void soloQuienPuedeCambiarPreciosEditaProductos() throws Exception {
+        String cajera = cookie(login("/api/auth/login-pin", "cat.cajera", "pin", PIN), "POS_SESION");
+        long id = idDe(crear(nuevoCodigo(), "Protegido", "1.00"));
+
+        assertThat(enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Hackeado\",\"precio\":0.01}", cajera)
+                .statusCode()).isEqualTo(403);
+        assertThat(jdbc.queryForObject("SELECT precio FROM producto WHERE id = ?", BigDecimal.class, id))
+                .isEqualByComparingTo("1.00");
+    }
+
     // Permisos
 
     @Test
@@ -199,6 +286,11 @@ class ProductosIntegracionTest {
 
     private HttpResponse<String> crear(String codigo, String descripcion, String precio) throws Exception {
         return enviar("/api/productos", "POST", cuerpo(codigo, descripcion, precio), cookieAdmin);
+    }
+
+    private HttpResponse<String> editar(long id, String descripcion, String precio) throws Exception {
+        return enviar("/api/productos/" + id, "PUT",
+                "{\"descripcion\":\"%s\",\"precio\":%s}".formatted(descripcion, precio), cookieAdmin);
     }
 
     private static String cuerpo(String codigo, String descripcion, String precio) {

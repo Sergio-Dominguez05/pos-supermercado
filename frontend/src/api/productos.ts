@@ -17,16 +17,23 @@ export interface DatosProducto {
 }
 
 export const CLAVE_PRODUCTOS = ['productos'] as const
+export const claveProducto = (id: number) => ['productos', id] as const
 
-/** HU-03.01: registra un producto activo. Un precio vacío viaja como `null` para que el servidor lo rechace. */
+/** Un precio vacío viaja como `null` para que el servidor lo rechace; se acepta la coma decimal. */
+const precioParaEnviar = (precio: string) => (precio.trim() === '' ? null : Number(precio.trim().replace(',', '.')))
+
+/** HU-03.01: registra un producto activo. */
 export const crearProducto = ({ codigoBarras, descripcion, precio }: DatosProducto) =>
   pedir<Producto>('/api/productos', {
     method: 'POST',
-    body: JSON.stringify({
-      codigoBarras,
-      descripcion,
-      precio: precio.trim() === '' ? null : Number(precio.trim().replace(',', '.')),
-    }),
+    body: JSON.stringify({ codigoBarras, descripcion, precio: precioParaEnviar(precio) }),
+  })
+
+/** HU-03.02: cambia la descripción y el precio. El código no se envía porque no se puede modificar. */
+export const editarProducto = (id: number, { descripcion, precio }: Omit<DatosProducto, 'codigoBarras'>) =>
+  pedir<Producto>(`/api/productos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ descripcion, precio: precioParaEnviar(precio) }),
   })
 
 export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)

@@ -13,4 +13,7 @@ public interface RepositorioProductos {
 
     /** Crea el producto activo (HU-03.01 crit. 6) y devuelve su id. */
     long crear(String codigoBarras, String descripcion, BigDecimal precio);
+
+    /** Cambia la descripción y el precio, y actualiza la fecha de modificación. El código no se toca (HU-03.02). */
+    void actualizar(long id, String descripcion, BigDecimal precio);
 }

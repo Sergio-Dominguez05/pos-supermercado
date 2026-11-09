@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { CLAVE_PRODUCTOS, crearProducto } from '../../api/productos'
+import { CLAVE_PRODUCTOS, crearProducto, type Producto } from '../../api/productos'
 import { useSesion } from '../login/sesion'
 import { avisoProductoCreado } from './textos'
 
@@ -30,7 +30,7 @@ export function FormularioProducto() {
   const [codigoBarras, setCodigoBarras] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
-  const [aviso, setAviso] = useState<string>()
+  const [registrado, setRegistrado] = useState<Producto>()
   const campoCodigo = useRef<HTMLInputElement>(null)
   const campoDescripcion = useRef<HTMLInputElement>(null)
   const clienteConsultas = useQueryClient()
@@ -39,14 +39,14 @@ export function FormularioProducto() {
     mutationFn: () => crearProducto({ codigoBarras, descripcion, precio }),
     // Se queda en el formulario, vacío y listo para escanear el siguiente producto.
     onSuccess: async (nuevo) => {
-      setAviso(avisoProductoCreado(nuevo))
+      setRegistrado(nuevo)
       setCodigoBarras('')
       setDescripcion('')
       setPrecio('')
       campoCodigo.current?.focus()
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_PRODUCTOS })
     },
-    onMutate: () => setAviso(undefined),
+    onMutate: () => setRegistrado(undefined),
   })
 
   return (
@@ -57,9 +57,9 @@ export function FormularioProducto() {
         creacion.mutate()
       }}
     >
-      {aviso && (
+      {registrado && (
         <p className="aviso" role="status">
-          {aviso}
+          {avisoProductoCreado(registrado)} <Link to={`/catalogo/${registrado.id}/editar`}>Editar</Link>
         </p>
       )}
       <label>
