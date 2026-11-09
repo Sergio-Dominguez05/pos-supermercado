@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Catálogo de productos. HU-03.01: registrar un producto. HU-03.02: editar su descripción y precio. HU-03.03:
@@ -47,6 +48,22 @@ public class GestionProductos {
     public Producto obtener(long id) {
         return productos.buscarPorId(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO", "El producto no existe."));
+    }
+
+    /**
+     * HU-03.06: busca un producto por su código exacto (crit. 4), tal como lo envía el lector de código de barras o
+     * como lo escribe el cajero cuando el código está dañado (crit. 2 y 3). Se ignoran los espacios, el salto de
+     * línea del lector y las mayúsculas, igual que al registrarlo. Usa el índice único de {@code codigo_barras}, así
+     * que responde de inmediato aunque el catálogo tenga miles de productos (crit. 1).
+     *
+     * <p>Devuelve también los productos inactivos, con su estado: la venta decide qué hacer con ellos (HU-03.09).
+     */
+    @Transactional(readOnly = true)
+    public Producto buscarPorCodigo(String codigo) {
+        String normalizado = ReglasProducto.normalizarCodigo(codigo);
+        return (normalizado.isEmpty() ? Optional.<Producto>empty() : productos.buscarPorCodigo(normalizado))
+                .orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO",
+                        "No hay ningún producto con el código %s.".formatted(normalizado)));
     }
 
     /**
