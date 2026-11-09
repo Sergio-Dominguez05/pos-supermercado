@@ -45,4 +45,26 @@ public final class CalculadoraIva {
         BigDecimal iva = precioConIva.setScale(DECIMALES, REDONDEO).subtract(base);
         return new DesgloseIva(precioConIva, base, iva);
     }
+
+    /** Calcula una línea de venta con la tasa vigente del 12 % (HU-04.03). */
+    public static LineaCalculada linea(BigDecimal precioUnitario, int cantidad) {
+        return linea(precioUnitario, cantidad, TasaIva.VIGENTE);
+    }
+
+    /**
+     * Calcula una línea de venta (HU-04.03): el subtotal con IVA es {@code precioUnitario × cantidad} (exacto) y se
+     * desglosa una sola vez sobre ese subtotal, no por unidad, para no acumular redondeos.
+     *
+     * @param cantidad entero mayor que cero (HU-06.04 crit. 3)
+     */
+    public static LineaCalculada linea(BigDecimal precioUnitario, int cantidad, TasaIva tasa) {
+        Objects.requireNonNull(precioUnitario, "El precio unitario es obligatorio.");
+        if (cantidad <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser un entero mayor que cero: " + cantidad);
+        }
+        BigDecimal subtotalConIva = precioUnitario.multiply(BigDecimal.valueOf(cantidad));
+        DesgloseIva desglose = desglosar(subtotalConIva, tasa);
+        return new LineaCalculada(cantidad, precioUnitario, subtotalConIva.setScale(DECIMALES, REDONDEO),
+                desglose.base(), desglose.iva());
+    }
 }
