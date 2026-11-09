@@ -1,4 +1,4 @@
-import { pedir } from './cliente'
+import { ErrorDeApi, pedir } from './cliente'
 
 /** EP-03: producto del catálogo. El precio incluye el IVA. */
 export interface Producto {
@@ -81,6 +81,24 @@ export const desactivarProducto = (id: number) => pedir<Producto>(`/api/producto
 export const activarProducto = (id: number) => pedir<Producto>(`/api/productos/${id}/activar`, { method: 'POST' })
 
 export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)
+
+/** Si el error es el de un código que no existe en el catálogo (HU-03.08). */
+export const esCodigoNoEncontrado = (error: unknown) =>
+  error instanceof ErrorDeApi && error.codigo === 'PRODUCTO_NO_ENCONTRADO'
+
+/** HU-03.08 crit. 4: código buscado que no existe, pendiente de registrar. */
+export interface CodigoNoEncontrado {
+  codigo: string
+  veces: number
+  /** Búsqueda más reciente, en ISO 8601. */
+  ultimaVez: string
+  /** Caja de la búsqueda más reciente, o `null` si fue desde un equipo sin caja. */
+  ultimaCaja: string | null
+}
+
+export const CLAVE_CODIGOS_NO_ENCONTRADOS = ['productos', 'no-encontrados'] as const
+
+export const listarCodigosNoEncontrados = () => pedir<CodigoNoEncontrado[]>('/api/productos/codigos-no-encontrados')
 
 /** Caracteres mínimos para buscar por descripción (HU-03.07 crit. 1); el servidor exige lo mismo. */
 export const MINIMO_BUSQUEDA = 3

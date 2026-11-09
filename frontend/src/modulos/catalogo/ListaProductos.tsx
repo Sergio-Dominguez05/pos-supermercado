@@ -8,6 +8,7 @@ import {
   type FiltroProductos,
 } from '../../api/productos'
 import { useSesion } from '../login/sesion'
+import { CodigosNoEncontrados } from './CodigosNoEncontrados'
 import { formatoFecha, formatoQuetzales, resumenPagina } from './textos'
 
 /**
@@ -26,7 +27,11 @@ export function ListaProductos() {
       </p>
       {/* El servidor exige el permiso; esto solo evita mostrar una lista que no se podrá cargar. */}
       {usuario.permisos.includes('PRODUCTO_CONSULTAR') ? (
-        <TablaProductos puedeEditar={usuario.permisos.includes('PRODUCTO_EDITAR')} />
+        <>
+          {/* HU-03.08 crit. 4: los códigos que no se encontraron, para registrarlos. */}
+          {usuario.permisos.includes('PRODUCTO_EDITAR') && <CodigosNoEncontrados />}
+          <TablaProductos puedeEditar={usuario.permisos.includes('PRODUCTO_EDITAR')} />
+        </>
       ) : (
         <p className="tarjeta error">No tiene permiso para consultar el catálogo.</p>
       )}

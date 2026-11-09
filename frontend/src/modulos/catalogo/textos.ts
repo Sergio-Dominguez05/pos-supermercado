@@ -4,6 +4,10 @@ import type { Producto } from '../../api/productos'
 
 export const formatoQuetzales = (monto: number) => `Q${monto.toFixed(2)}`
 
+/** HU-03.08 crit. 1: el código se muestra como lo normaliza el servidor (sin espacios, en mayúsculas). */
+export const avisoCodigoNoEncontrado = (codigo: string) =>
+  `El código ${codigo.replace(/\s+/g, '').toUpperCase()} no existe en el catálogo.`
+
 const FORMATO_FECHA = new Intl.DateTimeFormat('es-GT', {
   dateStyle: 'medium',
   timeStyle: 'short',

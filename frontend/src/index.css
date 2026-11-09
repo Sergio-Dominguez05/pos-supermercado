@@ -408,3 +408,22 @@ kbd {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* Aviso que no se puede pasar por alto, como un código que no existe (HU-03.08 crit. 1). */
+.aviso-alerta {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, var(--superficie));
+  border: 2px solid var(--error);
+  border-radius: 6px;
+}
+
+.aviso-alerta p {
+  margin: 0;
+}
+
+.aviso-alerta button {
+  justify-self: start;
+}

@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { buscarPorCodigo, type Producto } from '../../api/productos'
-import { formatoQuetzales } from './textos'
+import { buscarPorCodigo, esCodigoNoEncontrado, type Producto } from '../../api/productos'
+import { avisoSonoro } from './sonido'
+import { avisoCodigoNoEncontrado, formatoQuetzales } from './textos'
 
 /**
  * HU-03.06: busca un producto por su código exacto. Pensado para el lector de código de barras, que escribe el
@@ -9,14 +10,26 @@ import { formatoQuetzales } from './textos'
  * cajero lo escribe a mano y presiona Enter (crit. 3). Después de cada búsqueda el texto queda seleccionado, así el
  * siguiente escaneo lo reemplaza sin borrar nada.
  *
+ * HU-03.08: si el código no existe, avisa de forma visible y sonora (crit. 1) y ofrece buscar por descripción
+ * (crit. 2). El servidor deja registrado el código para el administrador (crit. 4).
+ *
  * La pantalla de venta (HU-06.01) lo reutiliza con `onEncontrado` para agregar el producto.
  */
-export function BuscadorPorCodigo({ onEncontrado }: { onEncontrado?: (producto: Producto) => void }) {
+export function BuscadorPorCodigo({
+  onEncontrado,
+  onBuscarPorDescripcion,
+}: {
+  onEncontrado?: (producto: Producto) => void
+  onBuscarPorDescripcion?: () => void
+}) {
   const [codigo, setCodigo] = useState('')
   const campo = useRef<HTMLInputElement>(null)
   const busqueda = useMutation({
     mutationFn: buscarPorCodigo,
     onSuccess: (producto) => onEncontrado?.(producto),
+    onError: (error) => {
+      if (esCodigoNoEncontrado(error)) avisoSonoro()
+    },
     onSettled: () => campo.current?.select(),
   })
 
@@ -44,13 +57,39 @@ export function BuscadorPorCodigo({ onEncontrado }: { onEncontrado?: (producto: 
           onChange={(evento) => setCodigo(evento.target.value)}
         />
       </label>
-      {busqueda.error && (
-        <p className="error" role="alert">
-          {busqueda.error.message}
-        </p>
-      )}
+      {busqueda.error &&
+        (esCodigoNoEncontrado(busqueda.error) ? (
+          <AvisoNoEncontrado codigo={busqueda.variables ?? codigo} onBuscarPorDescripcion={onBuscarPorDescripcion} />
+        ) : (
+          <p className="error" role="alert">
+            {busqueda.error.message}
+          </p>
+        ))}
       {busqueda.data && !busqueda.error && <ResultadoProducto producto={busqueda.data} />}
     </form>
+  )
+}
+
+/** HU-03.08 crit. 1 y 2: aviso visible de que el código no existe, con la opción de buscar por descripción. */
+export function AvisoNoEncontrado({
+  codigo,
+  onBuscarPorDescripcion,
+}: {
+  codigo: string
+  onBuscarPorDescripcion?: () => void
+}) {
+  return (
+    <div className="aviso-alerta" role="alert">
+      <p>
+        <strong>{avisoCodigoNoEncontrado(codigo)}</strong>
+      </p>
+      <p>No se agregó ningún producto. El código quedó anotado para que un administrador lo registre.</p>
+      {onBuscarPorDescripcion && (
+        <button type="button" onClick={onBuscarPorDescripcion}>
+          Buscar por descripción
+        </button>
+      )}
+    </div>
   )
 }
 
