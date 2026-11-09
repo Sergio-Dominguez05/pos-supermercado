@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { CLAVE_PRODUCTOS, crearProducto, type Producto } from '../../api/productos'
 import { useSesion } from '../login/sesion'
 import { avisoProductoCreado } from './textos'
@@ -27,7 +27,9 @@ export function NuevoProducto() {
 }
 
 export function FormularioProducto() {
-  const [codigoBarras, setCodigoBarras] = useState('')
+  // HU-03.08 crit. 4: desde la lista de códigos no encontrados se llega con el código ya escrito.
+  const [parametros] = useSearchParams()
+  const [codigoBarras, setCodigoBarras] = useState(parametros.get('codigo') ?? '')
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
   const [registrado, setRegistrado] = useState<Producto>()

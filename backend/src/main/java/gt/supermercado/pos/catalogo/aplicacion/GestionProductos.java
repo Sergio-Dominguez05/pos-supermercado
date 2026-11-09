@@ -3,10 +3,12 @@ package gt.supermercado.pos.catalogo.aplicacion;
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
+import gt.supermercado.pos.catalogo.dominio.CodigoNoEncontrado;
 import gt.supermercado.pos.catalogo.dominio.FiltroProductos;
 import gt.supermercado.pos.catalogo.dominio.PaginaProductos;
 import gt.supermercado.pos.catalogo.dominio.Producto;
 import gt.supermercado.pos.catalogo.dominio.ReglasProducto;
+import gt.supermercado.pos.catalogo.dominio.RepositorioCodigosNoEncontrados;
 import gt.supermercado.pos.catalogo.dominio.RepositorioProductos;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
@@ -32,10 +34,13 @@ public class GestionProductos {
     private static final String MENSAJE_PRECIO = "El precio debe ser mayor que cero y tener como máximo 2 decimales.";
 
     private final RepositorioProductos productos;
+    private final RepositorioCodigosNoEncontrados codigosNoEncontrados;
     private final Bitacora bitacora;
 
-    public GestionProductos(RepositorioProductos productos, Bitacora bitacora) {
+    public GestionProductos(RepositorioProductos productos, RepositorioCodigosNoEncontrados codigosNoEncontrados,
+                            Bitacora bitacora) {
         this.productos = productos;
+        this.codigosNoEncontrados = codigosNoEncontrados;
         this.bitacora = bitacora;
     }
 
@@ -58,13 +63,25 @@ public class GestionProductos {
      * que responde de inmediato aunque el catálogo tenga miles de productos (crit. 1).
      *
      * <p>Devuelve también los productos inactivos, con su estado: la venta decide qué hacer con ellos (HU-03.09).
+     *
+     * <p>HU-03.08 crit. 4: si el código no existe, la búsqueda queda registrada con la caja y el usuario para que un
+     * administrador registre el producto. El registro se guarda aunque la respuesta sea 404 ({@code noRollbackFor}).
      */
-    @Transactional(readOnly = true)
-    public Producto buscarPorCodigo(String codigo) {
+    @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
+    public Producto buscarPorCodigo(String codigo, SesionActiva sesion) {
         String normalizado = ReglasProducto.normalizarCodigo(codigo);
-        return (normalizado.isEmpty() ? Optional.<Producto>empty() : productos.buscarPorCodigo(normalizado))
-                .orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO",
-                        "No hay ningún producto con el código %s.".formatted(normalizado)));
+        Optional<Producto> producto = normalizado.isEmpty() ? Optional.empty() : productos.buscarPorCodigo(normalizado);
+        if (producto.isEmpty() && ReglasProducto.esCodigoValido(normalizado)) {
+            codigosNoEncontrados.registrar(normalizado, sesion.cajaId(), sesion.usuarioId());
+        }
+        return producto.orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO",
+                "No hay ningún producto con el código %s.".formatted(normalizado)));
+    }
+
+    /** HU-03.08 crit. 4: códigos buscados que no existen, para que el administrador registre esos productos. */
+    @Transactional(readOnly = true)
+    public List<CodigoNoEncontrado> codigosNoEncontrados() {
+        return codigosNoEncontrados.pendientes();
     }
 
     /** Caracteres mínimos para buscar por descripción (HU-03.07 crit. 1). */
@@ -119,6 +136,8 @@ public class GestionProductos {
             // Otro usuario registró el mismo código al mismo tiempo.
             throw codigoDuplicado(actor, null);
         }
+        // HU-03.08 crit. 4: si alguien había buscado este código sin encontrarlo, deja de estar pendiente.
+        codigosNoEncontrados.resolver(codigo);
         bitacora.registrar(evento(actor, AccionSensible.PRODUCTO_CREADO, true,
                 "Producto '%s' (%s) creado con precio Q%s".formatted(descripcionNormal, codigo, precioNormal), id, null));
         return obtener(id);

@@ -1,6 +1,7 @@
 package gt.supermercado.pos.catalogo.api;
 
 import gt.supermercado.pos.catalogo.aplicacion.GestionProductos;
+import gt.supermercado.pos.catalogo.dominio.CodigoNoEncontrado;
 import gt.supermercado.pos.catalogo.dominio.FiltroProductos;
 import gt.supermercado.pos.catalogo.dominio.FiltroProductos.OrdenProductos;
 import gt.supermercado.pos.catalogo.dominio.PaginaProductos;
@@ -69,8 +70,8 @@ public class ProductosController {
     /** HU-03.06: búsqueda exacta por código, escaneado o escrito a mano; 404 si no existe. */
     @GetMapping("/codigo/{codigo}")
     @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
-    public Producto buscarPorCodigo(@PathVariable String codigo) {
-        return gestionProductos.buscarPorCodigo(codigo);
+    public Producto buscarPorCodigo(@PathVariable String codigo, @AuthenticationPrincipal SesionActiva sesion) {
+        return gestionProductos.buscarPorCodigo(codigo, sesion);
     }
 
     /** HU-03.07: productos activos cuya descripción contiene el texto (mínimo 3 caracteres). */
@@ -78,6 +79,13 @@ public class ProductosController {
     @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
     public List<Producto> buscarPorDescripcion(@RequestParam String q) {
         return gestionProductos.buscarPorDescripcion(q);
+    }
+
+    /** HU-03.08 crit. 4: códigos buscados que no existen, para que quien registra productos los dé de alta. */
+    @GetMapping("/codigos-no-encontrados")
+    @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")
+    public List<CodigoNoEncontrado> codigosNoEncontrados() {
+        return gestionProductos.codigosNoEncontrados();
     }
 
     @PostMapping
