@@ -36,4 +36,9 @@ export const editarProducto = (id: number, { descripcion, precio }: Omit<DatosPr
     body: JSON.stringify({ descripcion, precio: precioParaEnviar(precio) }),
   })
 
-export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)
+/** HU-03.03: los productos no se borran; se desactivan y se pueden volver a activar. */
+export const desactivarProducto = (id: number) => pedir<Producto>(`/api/productos/${id}/desactivar`, { method: 'POST' })
+
+export const activarProducto = (id: number) => pedir<Producto>(`/api/productos/${id}/activar`, { method: 'POST' })
+
+export const obtenerProducto =(id: number) => pedir<Producto>(`/api/productos/${id}`)

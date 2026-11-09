@@ -68,6 +68,10 @@ describe('edición de productos (HU-03.02)', () => {
     )
   })
 
+  it('la pantalla del producto incluye su estado', () => {
+    expect(renderizar(<EditarProducto />)).toContain('Desactivar producto')
+  })
+
   it('la edición es un PUT con descripción y precio, sin el código (crit. 2)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(LECHE), { status: 200 })))
 

@@ -49,4 +49,9 @@ class RepositorioProductosJdbc implements RepositorioProductos {
         jdbc.update("UPDATE producto SET descripcion = ?, precio = ?, modificado_en = now() WHERE id = ?",
                 descripcion, precio, id);
     }
+
+    @Override
+    public void cambiarActivo(long id, boolean activo) {
+        jdbc.update("UPDATE producto SET activo = ?, modificado_en = now() WHERE id = ?", activo, id);
+    }
 }

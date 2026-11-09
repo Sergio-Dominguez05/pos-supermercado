@@ -1,9 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { CLAVE_PRODUCTOS, claveProducto, editarProducto, obtenerProducto, type Producto } from '../../api/productos'
+import {
+  activarProducto,
+  CLAVE_PRODUCTOS,
+  claveProducto,
+  desactivarProducto,
+  editarProducto,
+  obtenerProducto,
+  type Producto,
+} from '../../api/productos'
 import { useSesion } from '../login/sesion'
-import { avisoProductoEditado } from './textos'
+import { avisoEstadoProducto, avisoProductoEditado, confirmacionDesactivarProducto } from './textos'
 
 /** HU-03.02: el Administrador cambia la descripción y el precio de un producto. */
 export function EditarProducto() {
@@ -32,7 +40,59 @@ function CargaProducto({ id }: { id: number }) {
 
   if (isPending) return <p className="tarjeta">Cargando producto…</p>
   if (error) return <p className="tarjeta error">{error.message}</p>
-  return <FormularioEdicionProducto producto={producto} />
+  return (
+    <>
+      <FormularioEdicionProducto producto={producto} />
+      <EstadoProducto producto={producto} />
+    </>
+  )
+}
+
+/** HU-03.03: activar o desactivar el producto. No hay opción de borrarlo. */
+export function EstadoProducto({ producto }: { producto: Producto }) {
+  const [aviso, setAviso] = useState<string>()
+  const clienteConsultas = useQueryClient()
+  const cambio = useMutation({
+    mutationFn: () => (producto.activo ? desactivarProducto(producto.id) : activarProducto(producto.id)),
+    onMutate: () => setAviso(undefined),
+    onSuccess: async (cambiado) => {
+      setAviso(avisoEstadoProducto(cambiado))
+      clienteConsultas.setQueryData(claveProducto(cambiado.id), cambiado)
+      await clienteConsultas.invalidateQueries({ queryKey: CLAVE_PRODUCTOS, exact: true })
+    },
+  })
+
+  return (
+    <section className="tarjeta formulario" aria-label="Estado del producto">
+      <h2>Estado</h2>
+      {aviso && (
+        <p className="aviso" role="status">
+          {aviso}
+        </p>
+      )}
+      <p>
+        <span className={`estado ${producto.activo ? 'estado-activo' : 'estado-inactivo'}`}>
+          {producto.activo ? 'Activo' : 'Inactivo'}
+        </span>{' '}
+        {producto.activo ? 'Se puede agregar a las ventas.' : 'No se puede agregar a nuevas ventas.'}
+      </p>
+      {cambio.error && (
+        <p className="error" role="alert">
+          {cambio.error.message}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={cambio.isPending}
+        onClick={() => {
+          if (producto.activo && !window.confirm(confirmacionDesactivarProducto(producto))) return
+          cambio.mutate()
+        }}
+      >
+        {producto.activo ? 'Desactivar producto' : 'Activar producto'}
+      </button>
+    </section>
+  )
 }
 
 export function FormularioEdicionProducto({ producto }: { producto: Producto }) {
