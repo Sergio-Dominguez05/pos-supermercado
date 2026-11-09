@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { EstadoTurno } from '../caja/EstadoTurno'
 import { useSesion } from '../login/sesion'
 import { opcionesPara } from './opciones'
 
@@ -13,6 +14,9 @@ export function Inicio() {
       <p className="subtitulo">
         {usuario.nombreCompleto} · {usuario.rolNombre}
       </p>
+
+      {/* HU-09.01 crit. 1: en una caja cerrada se pide abrir el turno. */}
+      <EstadoTurno />
 
       <section className="tarjeta">
         <h2>Opciones de su rol</h2>

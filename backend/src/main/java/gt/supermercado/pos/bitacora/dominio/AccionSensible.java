@@ -48,7 +48,6 @@ public enum AccionSensible {
     PAGO_TARJETA_ELIMINADO(Categoria.PAGOS, "pagos"),
 
     // Caja
-    /** Pendiente: HU-09.01. */
     TURNO_ABIERTO(Categoria.CAJA, "caja"),
     /** Pendiente: HU-09.08. */
     TURNO_CERRADO(Categoria.CAJA, "caja"),
