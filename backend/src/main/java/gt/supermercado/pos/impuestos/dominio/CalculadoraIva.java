@@ -24,13 +24,25 @@ public final class CalculadoraIva {
     /** Decimales de los montos intermedios; coinciden con {@code numeric(18,6)} de {@code venta_linea}. */
     public static final int DECIMALES = 6;
 
-    /** Redondeo de los montos intermedios. */
+    /**
+     * Redondeo al medio hacia arriba (HU-04.05 crit. 3): si el primer decimal que se elimina es 5 o más, el anterior
+     * sube en 1 (10.715 → 10.72; 10.714 → 10.71). Se usa solo al dividir para obtener la base imponible con
+     * 6 decimales y al redondear los totales a 2. Reglas completas: {@code docs/arquitectura/calculo-iva.md}.
+     */
     public static final RoundingMode REDONDEO = RoundingMode.HALF_UP;
 
     /** Decimales de los totales del comprobante (Subtotal, IVA y TOTAL); coinciden con {@code numeric(12,2)}. */
     public static final int DECIMALES_TOTALES = 2;
 
     private CalculadoraIva() {
+    }
+
+    /**
+     * Redondea un resultado final a 2 decimales al medio hacia arriba (HU-04.05 crit. 2 y 3). Los valores por línea y
+     * las sumas intermedias nunca pasan por aquí: conservan sus 6 decimales (crit. 1).
+     */
+    public static BigDecimal redondearTotal(BigDecimal monto) {
+        return Objects.requireNonNull(monto, "El monto es obligatorio.").setScale(DECIMALES_TOTALES, REDONDEO);
     }
 
     /** Desglosa un precio con IVA usando la tasa vigente del 12 %. */
@@ -89,8 +101,8 @@ public final class CalculadoraIva {
      */
     public static Totales totales(List<LineaCalculada> lineas) {
         Objects.requireNonNull(lineas, "Las líneas son obligatorias.");
-        BigDecimal total = suma(lineas, LineaCalculada::subtotalConIva).setScale(DECIMALES_TOTALES, REDONDEO);
-        BigDecimal iva = suma(lineas, LineaCalculada::iva).setScale(DECIMALES_TOTALES, REDONDEO);
+        BigDecimal total = redondearTotal(suma(lineas, LineaCalculada::subtotalConIva));
+        BigDecimal iva = redondearTotal(suma(lineas, LineaCalculada::iva));
         return new Totales(total.subtract(iva), iva, total);
     }
 
