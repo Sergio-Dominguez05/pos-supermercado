@@ -172,9 +172,13 @@ class BitacoraCompletaIntegracionTest {
                 "{\"credencialTemporal\":\"%s\"}".formatted(pinRestablecido), cookieAdmin);
         enviar("/api/auth/login-pin", "POST", "{\"username\":\"bc.secreto.pin\",\"pin\":\"%s\"}".formatted(pinRestablecido), equipo);
 
+        // Se revisan todas las columnas salvo hash y hash_anterior: son SHA-256 en hexadecimal (128 caracteres al azar
+        // por fila) y, con miles de registros, contienen por casualidad los dígitos de un PIN de vez en cuando. No
+        // pueden guardar un secreto: los calcula el trigger a partir de las demás columnas, que sí se revisan.
         for (String secreto : new String[] {contrasena, contrasenaNueva, pin, pinRestablecido}) {
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM bitacora b WHERE b::text LIKE ?", Integer.class,
-                    "%" + secreto + "%")).as("la bitácora no debe contener '%s'", secreto).isZero();
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM bitacora b WHERE (to_jsonb(b) - 'hash' - 'hash_anterior')::text LIKE ?""",
+                    Integer.class, "%" + secreto + "%")).as("la bitácora no debe contener '%s'", secreto).isZero();
         }
     }
 
