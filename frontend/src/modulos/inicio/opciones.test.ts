@@ -38,6 +38,13 @@ describe('opciones del menú por rol', () => {
     ])
   })
 
+  it('quien puede crear productos tiene el registro de productos (HU-03.01); el cajero no', () => {
+    expect(opcionesPara(['PRODUCTO_EDITAR'])).toEqual([
+      expect.objectContaining({ etiqueta: 'Nuevo producto', ruta: '/catalogo/nuevo' }),
+    ])
+    expect(etiquetas(['PRODUCTO_CONSULTAR'])).not.toContain('Nuevo producto')
+  })
+
   it('sin permisos no hay opciones', () => {
     expect(opcionesPara([])).toEqual([])
   })

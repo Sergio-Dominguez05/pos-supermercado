@@ -1,0 +1,51 @@
+package gt.supermercado.pos.catalogo.api;
+
+import gt.supermercado.pos.catalogo.aplicacion.GestionProductos;
+import gt.supermercado.pos.catalogo.dominio.Producto;
+import gt.supermercado.pos.seguridad.dominio.SesionActiva;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.math.BigDecimal;
+
+/** EP-03 Catálogo. HU-03.01: registrar un producto, con el permiso de crear productos (el Administrador). */
+@RestController
+@RequestMapping("/api/productos")
+public class ProductosController {
+
+    private final GestionProductos gestionProductos;
+
+    public ProductosController(GestionProductos gestionProductos) {
+        this.gestionProductos = gestionProductos;
+    }
+
+    /**
+     * Las reglas de formato se validan en {@link GestionProductos} para que los rechazos queden en la bitácora; aquí
+     * solo se limita el tamaño de lo que se acepta.
+     */
+    public record SolicitudProducto(@Size(max = 200) String codigoBarras, @Size(max = 400) String descripcion,
+                                    BigDecimal precio) {}
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
+    public Producto obtener(@PathVariable long id) {
+        return gestionProductos.obtener(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")
+    public Producto crear(@Valid @RequestBody SolicitudProducto solicitud, @AuthenticationPrincipal SesionActiva actor) {
+        return gestionProductos.crear(solicitud.codigoBarras(), solicitud.descripcion(), solicitud.precio(), actor);
+    }
+}

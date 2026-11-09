@@ -65,7 +65,6 @@ public enum AccionSensible {
     PARAMETRO_MODIFICADO(Categoria.CONFIGURACION, "configuracion"),
 
     // Catálogo
-    /** Pendiente: HU-03.01. */
     PRODUCTO_CREADO(Categoria.CATALOGO, "catalogo"),
     /** Cambio de descripción. Pendiente: HU-03.02. */
     PRODUCTO_EDITADO(Categoria.CATALOGO, "catalogo"),
