@@ -84,6 +84,24 @@ public class GestionProductos {
         return codigosNoEncontrados.pendientes();
     }
 
+    /**
+     * HU-03.09 crit. 2: el producto que se puede agregar a una venta a partir del código escaneado. Si existe pero
+     * está desactivado (HU-03.03), se rechaza con un mensaje claro y no se agrega. Si no existe, se comporta igual que
+     * {@link #buscarPorCodigo} (404 y registro del código, HU-03.08).
+     *
+     * <p>La venta (HU-06.01) debe usar este método, no {@code buscarPorCodigo}: así la regla se cumple en el servidor
+     * aunque la pantalla no la aplique.
+     */
+    @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
+    public Producto paraVender(String codigo, SesionActiva sesion) {
+        Producto producto = buscarPorCodigo(codigo, sesion);
+        if (!producto.activo()) {
+            throw new NegocioException("PRODUCTO_INACTIVO",
+                    "%s (%s) no está disponible para la venta.".formatted(producto.descripcion(), producto.codigoBarras()));
+        }
+        return producto;
+    }
+
     /** Caracteres mínimos para buscar por descripción (HU-03.07 crit. 1). */
     public static final int MINIMO_BUSQUEDA = 3;
 
