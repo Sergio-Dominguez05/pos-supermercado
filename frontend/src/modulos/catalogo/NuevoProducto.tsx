@@ -14,7 +14,7 @@ export function NuevoProducto() {
     <main className="pagina">
       <h1>Nuevo producto</h1>
       <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Catálogo · Nuevo producto
+        <Link to="/inicio">Inicio</Link> · <Link to="/catalogo">Catálogo</Link> · Nuevo producto
       </p>
       {/* El servidor exige el permiso; esto solo evita mostrar un formulario que no se podrá usar. */}
       {usuario.permisos.includes('PRODUCTO_EDITAR') ? (

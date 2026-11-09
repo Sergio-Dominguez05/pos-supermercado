@@ -4,6 +4,22 @@ import type { Producto } from '../../api/productos'
 
 export const formatoQuetzales = (monto: number) => `Q${monto.toFixed(2)}`
 
+const FORMATO_FECHA = new Intl.DateTimeFormat('es-GT', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'America/Guatemala',
+})
+
+/** Fecha de la última modificación, en hora de Guatemala (HU-03.04 crit. 1). */
+export const formatoFecha = (iso: string) => FORMATO_FECHA.format(new Date(iso))
+
+/** "Página 2 de 5 · 112 productos"; sin resultados, solo la cantidad (HU-03.04 crit. 5). */
+export const resumenPagina = (pagina: number, tamano: number, total: number) => {
+  const paginas = Math.max(1, Math.ceil(total / tamano))
+  const cantidad = `${total} ${total === 1 ? 'producto' : 'productos'}`
+  return total === 0 ? cantidad : `Página ${pagina + 1} de ${paginas} · ${cantidad}`
+}
+
 export const avisoProductoEditado = (producto: Producto) =>
   `Se actualizó ${producto.descripcion} (${producto.codigoBarras}): ahora cuesta ${formatoQuetzales(producto.precio)}. ` +
   'El precio nuevo se aplica a lo que se agregue a una venta desde ahora.'

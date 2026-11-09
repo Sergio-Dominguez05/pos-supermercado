@@ -10,7 +10,7 @@ import { EditarProducto, FormularioEdicionProducto } from './EditarProducto'
 import { avisoProductoEditado } from './textos'
 
 const ADMIN: Partial<UsuarioSesion> = { rol: 'ADMIN', permisos: ['PRODUCTO_CONSULTAR', 'PRODUCTO_EDITAR'] }
-const LECHE: Producto = { id: 4, codigoBarras: '7401234567890', descripcion: 'Leche entera 1 L', precio: 11.2, activo: true }
+const LECHE: Producto = { id: 4, codigoBarras: '7401234567890', descripcion: 'Leche entera 1 L', precio: 11.2, activo: true, modificadoEn: '2026-11-08T14:05:00Z' }
 
 const renderizar = (contenido: ReactNode, sesion: Partial<UsuarioSesion> = ADMIN) => {
   const cliente = new QueryClient()

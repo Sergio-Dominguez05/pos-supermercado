@@ -56,7 +56,7 @@ describe('registro de productos (HU-03.01)', () => {
   })
 
   it('el aviso confirma el producto y que ya se puede vender (crit. 6)', () => {
-    const producto = { id: 1, codigoBarras: '7401234567890', descripcion: 'Leche entera 1 L', precio: 11.2, activo: true }
+    const producto = { id: 1, codigoBarras: '7401234567890', descripcion: 'Leche entera 1 L', precio: 11.2, activo: true, modificadoEn: '2026-11-08T14:05:00Z' }
 
     expect(avisoProductoCreado(producto)).toBe(
       'Se registró Leche entera 1 L (7401234567890) a Q11.20. Ya está disponible para la venta.',
