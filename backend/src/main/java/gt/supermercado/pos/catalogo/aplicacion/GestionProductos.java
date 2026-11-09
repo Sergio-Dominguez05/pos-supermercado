@@ -3,6 +3,8 @@ package gt.supermercado.pos.catalogo.aplicacion;
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
+import gt.supermercado.pos.catalogo.dominio.FiltroProductos;
+import gt.supermercado.pos.catalogo.dominio.PaginaProductos;
 import gt.supermercado.pos.catalogo.dominio.Producto;
 import gt.supermercado.pos.catalogo.dominio.ReglasProducto;
 import gt.supermercado.pos.catalogo.dominio.RepositorioProductos;
@@ -33,6 +35,12 @@ public class GestionProductos {
     public GestionProductos(RepositorioProductos productos, Bitacora bitacora) {
         this.productos = productos;
         this.bitacora = bitacora;
+    }
+
+    /** HU-03.04: lista del catálogo con búsqueda, filtro por estado, orden y paginación. */
+    @Transactional(readOnly = true)
+    public PaginaProductos listar(FiltroProductos filtro) {
+        return productos.buscar(filtro);
     }
 
     @Transactional(readOnly = true)

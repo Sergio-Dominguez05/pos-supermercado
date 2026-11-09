@@ -7,6 +7,8 @@ export interface Producto {
   descripcion: string
   precio: number
   activo: boolean
+  /** Última modificación (alta, edición o cambio de estado), en ISO 8601. */
+  modificadoEn: string
 }
 
 export interface DatosProducto {
@@ -16,8 +18,45 @@ export interface DatosProducto {
   precio: string
 }
 
+/** HU-03.04: búsqueda, filtro, orden y página de la lista del catálogo. */
+export interface FiltroProductos {
+  q: string
+  activo: 'true' | 'false' | ''
+  orden: 'DESCRIPCION' | 'PRECIO' | 'MODIFICADO'
+  descendente: boolean
+  pagina: number
+}
+
+export const FILTRO_PRODUCTOS_INICIAL: FiltroProductos = {
+  q: '',
+  activo: '',
+  orden: 'DESCRIPCION',
+  descendente: false,
+  pagina: 0,
+}
+
+export interface PaginaProductos {
+  productos: Producto[]
+  pagina: number
+  tamano: number
+  /** Productos que cumplen el filtro, en todas las páginas. */
+  total: number
+}
+
 export const CLAVE_PRODUCTOS = ['productos'] as const
 export const claveProducto = (id: number) => ['productos', id] as const
+export const claveListaProductos = (filtro: FiltroProductos) => ['productos', 'lista', filtro] as const
+
+/** HU-03.04: una página de la lista del catálogo. */
+export function listarProductos(filtro: FiltroProductos) {
+  const parametros = new URLSearchParams()
+  if (filtro.q.trim()) parametros.set('q', filtro.q.trim())
+  if (filtro.activo) parametros.set('activo', filtro.activo)
+  parametros.set('orden', filtro.orden)
+  if (filtro.descendente) parametros.set('descendente', 'true')
+  if (filtro.pagina > 0) parametros.set('pagina', String(filtro.pagina))
+  return pedir<PaginaProductos>(`/api/productos?${parametros}`)
+}
 
 /** Un precio vacío viaja como `null` para que el servidor lo rechace; se acepta la coma decimal. */
 const precioParaEnviar = (precio: string) => (precio.trim() === '' ? null : Number(precio.trim().replace(',', '.')))
@@ -41,4 +80,4 @@ export const desactivarProducto = (id: number) => pedir<Producto>(`/api/producto
 
 export const activarProducto = (id: number) => pedir<Producto>(`/api/productos/${id}/activar`, { method: 'POST' })
 
-export const obtenerProducto =(id: number) => pedir<Producto>(`/api/productos/${id}`)
+export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)

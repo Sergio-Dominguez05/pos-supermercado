@@ -5,7 +5,7 @@ import { activarProducto, desactivarProducto, type Producto } from '../../api/pr
 import { EstadoProducto } from './EditarProducto'
 import { avisoEstadoProducto, confirmacionDesactivarProducto } from './textos'
 
-const LECHE: Producto = { id: 4, codigoBarras: '7401234567890', descripcion: 'Leche entera 1 L', precio: 11.2, activo: true }
+const LECHE: Producto = { id: 4, codigoBarras: '7401234567890', descripcion: 'Leche entera 1 L', precio: 11.2, activo: true, modificadoEn: '2026-11-08T14:05:00Z' }
 
 const renderizar = (producto: Producto) =>
   renderToString(

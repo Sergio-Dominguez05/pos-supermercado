@@ -1,6 +1,9 @@
 package gt.supermercado.pos.catalogo.api;
 
 import gt.supermercado.pos.catalogo.aplicacion.GestionProductos;
+import gt.supermercado.pos.catalogo.dominio.FiltroProductos;
+import gt.supermercado.pos.catalogo.dominio.FiltroProductos.OrdenProductos;
+import gt.supermercado.pos.catalogo.dominio.PaginaProductos;
 import gt.supermercado.pos.catalogo.dominio.Producto;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import jakarta.validation.Valid;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,6 +43,21 @@ public class ProductosController {
      */
     public record SolicitudProducto(@Size(max = 200) String codigoBarras, @Size(max = 400) String descripcion,
                                     BigDecimal precio) {}
+
+    /**
+     * HU-03.04: lista del catálogo. Cualquiera con permiso de consulta la ve; crear y editar siguen exigiendo
+     * {@code PRODUCTO_EDITAR} en sus propios endpoints (crit. 6).
+     */
+    @GetMapping
+    @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
+    public PaginaProductos listar(@RequestParam(required = false) String q,
+                                  @RequestParam(required = false) Boolean activo,
+                                  @RequestParam(defaultValue = "DESCRIPCION") OrdenProductos orden,
+                                  @RequestParam(defaultValue = "false") boolean descendente,
+                                  @RequestParam(defaultValue = "0") int pagina,
+                                  @RequestParam(defaultValue = "" + FiltroProductos.TAMANO_POR_DEFECTO) int tamano) {
+        return gestionProductos.listar(new FiltroProductos(q, activo, orden, descendente, pagina, tamano));
+    }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")

@@ -23,7 +23,7 @@ export function EditarProducto() {
     <main className="pagina">
       <h1>Editar producto</h1>
       <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Catálogo · Editar producto
+        <Link to="/inicio">Inicio</Link> · <Link to="/catalogo">Catálogo</Link> · Editar producto
       </p>
       {/* El servidor exige el permiso; esto solo evita mostrar un formulario que no se podrá usar. */}
       {usuario.permisos.includes('PRODUCTO_EDITAR') ? (
