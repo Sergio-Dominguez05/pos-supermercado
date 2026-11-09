@@ -65,9 +65,9 @@ public enum AccionSensible {
 
     // Catálogo
     PRODUCTO_CREADO(Categoria.CATALOGO, "catalogo"),
-    /** Cambio de descripción. Pendiente: HU-03.02. */
+    /** Cambio de descripción (HU-03.02). */
     PRODUCTO_EDITADO(Categoria.CATALOGO, "catalogo"),
-    /** Base del historial de precios (HU-03.11). Pendiente: HU-03.02. */
+    /** Cambio de precio (HU-03.02); base del historial de precios (HU-03.11). */
     PRECIO_CAMBIADO(Categoria.CATALOGO, "catalogo"),
     /** Pendiente: HU-03.03. */
     PRODUCTO_ACTIVADO(Categoria.CATALOGO, "catalogo"),

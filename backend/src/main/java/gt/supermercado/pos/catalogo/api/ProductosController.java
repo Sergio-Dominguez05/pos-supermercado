@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -18,7 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 
-/** EP-03 Catálogo. HU-03.01: registrar un producto, con el permiso de crear productos (el Administrador). */
+/**
+ * EP-03 Catálogo. HU-03.01 registrar y HU-03.02 editar un producto, con el permiso de crear productos y cambiar
+ * precios (el Administrador).
+ */
 @RestController
 @RequestMapping("/api/productos")
 public class ProductosController {
@@ -47,5 +51,15 @@ public class ProductosController {
     @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")
     public Producto crear(@Valid @RequestBody SolicitudProducto solicitud, @AuthenticationPrincipal SesionActiva actor) {
         return gestionProductos.crear(solicitud.codigoBarras(), solicitud.descripcion(), solicitud.precio(), actor);
+    }
+
+    /** HU-03.02: solo la descripción y el precio; el código no se puede modificar y por eso no se recibe. */
+    public record SolicitudEdicionProducto(@Size(max = 400) String descripcion, BigDecimal precio) {}
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PRODUCTO_EDITAR')")
+    public Producto editar(@PathVariable long id, @Valid @RequestBody SolicitudEdicionProducto solicitud,
+                           @AuthenticationPrincipal SesionActiva actor) {
+        return gestionProductos.editar(id, solicitud.descripcion(), solicitud.precio(), actor);
     }
 }

@@ -39,8 +39,6 @@ class CatalogoAccionesSensiblesTest {
             entry(TURNO_CERRADO, "HU-09.08"),
             entry(TURNO_CERRADO_POR_SUPERVISOR, "HU-09.12"),
             entry(PARAMETRO_MODIFICADO, "HU-12.01, 12.02, 12.03, 12.07, 12.08 y 12.13"),
-            entry(PRODUCTO_EDITADO, "HU-03.02"),
-            entry(PRECIO_CAMBIADO, "HU-03.02"),
             entry(PRODUCTO_ACTIVADO, "HU-03.03"),
             entry(PRODUCTO_DESACTIVADO, "HU-03.03"),
             entry(CATALOGO_CARGADO, "HU-03.05"));

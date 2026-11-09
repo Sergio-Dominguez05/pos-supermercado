@@ -228,6 +228,22 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PRODUCTO_CREADO, false, adminId));   // código repetido
     }
 
+    @Test
+    void edicionDeDescripcionYPrecioExitosaYRechazada() throws Exception {
+        String codigo = "AUD-E" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long id = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Antes\",\"precio\":1.00}".formatted(codigo), cookieAdmin));
+
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Después\",\"precio\":1.00}", cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_EDITADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Después\",\"precio\":2.50}", cookieAdmin)))
+                .containsExactly(new Registro(PRECIO_CAMBIADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"  \",\"precio\":2.50}", cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_EDITADO, false, adminId));   // descripción vacía
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Después\",\"precio\":0}", cookieAdmin)))
+                .containsExactly(new Registro(PRECIO_CAMBIADO, false, adminId));   // precio en cero
+    }
+
     // Caja
 
     @Test
