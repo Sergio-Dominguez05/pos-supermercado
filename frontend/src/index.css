@@ -304,6 +304,15 @@ kbd {
   cursor: not-allowed;
 }
 
+/* Agrupa campos que se deshabilitan juntos, como la venta sin turno abierto (HU-09.02). */
+.formulario fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .aviso {
   margin: 0;
   padding: 8px 12px;

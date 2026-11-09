@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { abrirTurno, CLAVE_TURNO_ACTUAL, turnoActual } from '../../api/turnos'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { abrirTurno, CLAVE_TURNO_ACTUAL } from '../../api/turnos'
 import { useSesion } from '../login/sesion'
 import { pedidoAbrirTurno, turnoAbierto, turnoDeOtroUsuario } from './textos'
+import { operaCaja as usuarioOperaCaja, useTurnoActual } from './turno'
 
 /**
  * HU-09.01: estado del turno de la caja de este equipo. Si la caja está cerrada pide abrir el turno (crit. 1).
@@ -9,12 +10,8 @@ import { pedidoAbrirTurno, turnoAbierto, turnoDeOtroUsuario } from './textos'
  */
 export function EstadoTurno() {
   const { data: usuario } = useSesion()
-  const operaCaja = !!usuario?.cajaNombre && usuario.permisos.includes('CAJA_OPERAR_PROPIA')
-  const { data: turno, isPending, error } = useQuery({
-    queryKey: CLAVE_TURNO_ACTUAL,
-    queryFn: turnoActual,
-    enabled: operaCaja,
-  })
+  const operaCaja = usuarioOperaCaja(usuario)
+  const { data: turno, isPending, error } = useTurnoActual(usuario)
   const clienteConsultas = useQueryClient()
   const apertura = useMutation({
     mutationFn: abrirTurno,
