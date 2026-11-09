@@ -2,7 +2,9 @@ package gt.supermercado.pos.impuestos.dominio;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Cálculo puro del IVA (Architecture.md §7.1). No depende de Spring ni de la base de datos.
@@ -24,6 +26,9 @@ public final class CalculadoraIva {
 
     /** Redondeo de los montos intermedios. */
     public static final RoundingMode REDONDEO = RoundingMode.HALF_UP;
+
+    /** Decimales de los totales del comprobante (Subtotal, IVA y TOTAL); coinciden con {@code numeric(12,2)}. */
+    public static final int DECIMALES_TOTALES = 2;
 
     private CalculadoraIva() {
     }
@@ -66,5 +71,30 @@ public final class CalculadoraIva {
         DesgloseIva desglose = desglosar(subtotalConIva, tasa);
         return new LineaCalculada(cantidad, precioUnitario, subtotalConIva.setScale(DECIMALES, REDONDEO),
                 desglose.base(), desglose.iva());
+    }
+
+    /**
+     * Totales del comprobante (HU-04.04, Architecture.md §7.1). Las sumas se hacen con los 6 decimales de cada línea
+     * y solo el resultado final se redondea a 2:
+     *
+     * <ul>
+     *   <li>TOTAL = suma de los subtotales con IVA (crit. 4).</li>
+     *   <li>IVA = suma del IVA de las líneas (crit. 3).</li>
+     *   <li>Subtotal = TOTAL − IVA, para que Subtotal + IVA = TOTAL siempre (crit. 5). Coincide con la suma de las
+     *       bases redondeada (crit. 2) salvo, en raros casos, por un centavo; la decisión D3 de Architecture.md §12.1
+     *       acepta esa diferencia en la primera entrega.</li>
+     * </ul>
+     *
+     * <p>Sin líneas, los tres totales son {@code 0.00}.
+     */
+    public static Totales totales(List<LineaCalculada> lineas) {
+        Objects.requireNonNull(lineas, "Las líneas son obligatorias.");
+        BigDecimal total = suma(lineas, LineaCalculada::subtotalConIva).setScale(DECIMALES_TOTALES, REDONDEO);
+        BigDecimal iva = suma(lineas, LineaCalculada::iva).setScale(DECIMALES_TOTALES, REDONDEO);
+        return new Totales(total.subtract(iva), iva, total);
+    }
+
+    private static BigDecimal suma(List<LineaCalculada> lineas, Function<LineaCalculada, BigDecimal> monto) {
+        return lineas.stream().map(monto).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
