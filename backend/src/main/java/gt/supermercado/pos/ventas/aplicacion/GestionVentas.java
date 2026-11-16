@@ -19,6 +19,7 @@ import gt.supermercado.pos.ventas.dominio.Venta;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.RoundingMode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -171,6 +172,47 @@ public class GestionVentas {
                     CalculadoraIva.linea(producto.precio(), cantidad, tasa));
         }
         return ventas.buscarPorId(ventaId).orElseThrow();
+    }
+
+    /**
+     * HU-06.07: quita una línea de la venta en curso del turno.
+     * <ul>
+     *   <li>Crit. 1: se elige la línea por su id; solo las de la venta en curso propia (404 si no).</li>
+     *   <li>Crit. 2: no requiere autorización de un supervisor; basta el permiso del cajero.</li>
+     *   <li>Crit. 3: la línea queda en la bitácora con el producto, la cantidad y el usuario; también el intento
+     *       rechazado (HU-11.01 crit. 3). No se borra: se marca como eliminada (regla de V1, migración V17).</li>
+     *   <li>Crit. 4: devuelve la venta con los totales recalculados (HU-04.04 crit. 6).</li>
+     * </ul>
+     */
+    @Transactional
+    public Venta eliminarLinea(long lineaId, SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        Venta venta = ventas.enCursoDelTurno(turno.id()).orElseThrow(() -> rechazarEliminacion(sesion, lineaId,
+                new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso.")));
+        if (!ventas.bloquearEnCurso(venta.id())) {
+            throw rechazarEliminacion(sesion, lineaId,
+                    new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso."));
+        }
+        LineaVenta linea = ventas.lineaDeVenta(venta.id(), lineaId).orElseThrow(() -> rechazarEliminacion(sesion,
+                lineaId, new RecursoNoEncontradoException("LINEA_NO_ENCONTRADA",
+                        "La línea no está en la venta en curso.")));
+        ventas.eliminarLinea(linea.id(), sesion.usuarioId());
+        Map<String, Object> cambios = producto(linea);
+        cambios.put("venta", venta.numero());
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.LINEA_VENTA_ELIMINADA, true, "Línea eliminada de la venta N.º %d: %d x %s (Q%s)"
+                .formatted(venta.numero(), linea.cantidad(), linea.descripcion(),
+                        linea.subtotalConIva().setScale(2, RoundingMode.HALF_UP)),
+                "venta_linea", linea.id(), cambios));
+        return ventas.buscarPorId(venta.id()).orElseThrow();
+    }
+
+    /** El intento de eliminar una línea que se rechazó también queda en la bitácora (HU-11.01 crit. 3). */
+    private NegocioException rechazarEliminacion(SesionActiva sesion, long lineaId, NegocioException error) {
+        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.LINEA_VENTA_ELIMINADA, false, "Eliminación de línea rechazada: " + error.getMessage(),
+                "venta_linea", lineaId, null));
+        return error;
     }
 
     /**

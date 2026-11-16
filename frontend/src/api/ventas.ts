@@ -63,3 +63,10 @@ export const cambiarCantidad = (lineaId: number, cantidad: number, confirmada?: 
 
 /** HU-06.14: cancela la venta en curso. Sin autorización de un supervisor. */
 export const cancelarVenta = () => pedir<Venta>('/api/ventas/actual/cancelar', { method: 'POST' })
+
+/**
+ * HU-06.07: quita la línea de la venta en curso, sin autorización de un supervisor, y devuelve la venta con los
+ * totales recalculados. La línea no se borra: queda marcada como eliminada y registrada en la bitácora.
+ */
+export const eliminarLinea = (lineaId: number) =>
+  pedir<Venta>(`/api/ventas/actual/lineas/${lineaId}`, { method: 'DELETE' })

@@ -1,14 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_TURNO_ACTUAL, type Turno } from '../../api/turnos'
-import { CLAVE_VENTA_EN_CURSO, type Venta as DatosVenta } from '../../api/ventas'
+import { CLAVE_VENTA_EN_CURSO, eliminarLinea, type Venta as DatosVenta } from '../../api/ventas'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { confirmacionCancelarVenta, formatoDesglose } from './textos'
+import { confirmacionCancelarVenta, confirmacionQuitarLinea, formatoDesglose } from './textos'
 import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
 
 const CAJERO = {
@@ -191,6 +191,39 @@ describe('cambiar la cantidad de una línea (HU-06.04 crit. 2)', () => {
 
   it('el campo del código explica el multiplicador (crit. 1)', () => {
     expect(renderizar(CAJERO, TURNO)).toContain('6* antes para 6 unidades')
+  })
+})
+
+describe('eliminar una línea (HU-06.07)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+
+  it('cada línea de la venta se puede quitar (crit. 1)', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz)
+
+    expect(html).toContain('<th>Acciones</th>')
+    expect(html).toMatch(/<button[^>]*aria-label="Quitar Arroz 1 lb"[^>]*>Quitar<\/button>/)
+  })
+
+  it('el detalle de solo lectura no ofrece quitar líneas', () => {
+    const html = renderToString(<DetalleVenta venta={conArroz} />)
+
+    expect(html).not.toContain('Quitar')
+    expect(html).not.toContain('Acciones')
+  })
+
+  it('pide confirmación con la cantidad, el producto y el subtotal', () => {
+    expect(confirmacionQuitarLinea(ARROZ)).toBe('¿Quitar 3 x Arroz 1 lb (Q15.00) de la venta?')
+  })
+
+  it('quitar es un DELETE de la línea en la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(VENTA_VACIA), { status: 200 })))
+
+    await expect(eliminarLinea(9)).resolves.toMatchObject({ total: 0 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/lineas/9')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
+    vi.unstubAllGlobals()
   })
 })
 

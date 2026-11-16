@@ -725,7 +725,121 @@ class VentasIntegracionTest {
         assertThat(respuesta.body()).contains("CAJA_CERRADA");
     }
 
+    // HU-06.07 Modificar o eliminar una línea
+
+    @Test
+    void alEliminarUnaLineaLosTotalesSeRecalculanDeInmediato() throws Exception {   // crit. 1, 2 y 4
+        Cajero cajero = cajeroConTurnoAbierto();   // un cajero, sin supervisor (crit. 2)
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        Producto agua = nuevoProducto("Agua 600 ml", "11.20");
+        escanear(arroz.codigo(), 3, cajero);
+        escanear(agua.codigo(), cajero);
+
+        HttpResponse<String> respuesta = eliminar(lineaDe(cajero, arroz), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).doesNotContain("Arroz 1 lb")
+                .contains("Agua 600 ml", "\"articulos\":1", "\"subtotal\":10.00", "\"iva\":1.20", "\"total\":11.20");
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body())
+                .doesNotContain("Arroz 1 lb").contains("\"total\":11.20");
+    }
+
+    @Test
+    void laLineaEliminadaNoSeBorraYQuedaEnLaBitacora() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        long linea = lineaDe(cajero, arroz);
+
+        eliminar(linea, cajero);
+
+        Map<String, Object> fila = jdbc.queryForMap(
+                "SELECT cantidad, eliminada_en IS NOT NULL AS eliminada, eliminada_por FROM venta_linea WHERE id = ?",
+                linea);
+        assertThat(fila).containsEntry("cantidad", 3).containsEntry("eliminada", true)
+                .containsEntry("eliminada_por", cajero.usuarioId());
+        Map<String, Object> registro = jdbc.queryForMap("""
+                SELECT usuario_id, exitoso, descripcion, cambios::text AS cambios FROM bitacora
+                WHERE accion = 'LINEA_VENTA_ELIMINADA' AND entidad = 'venta_linea' AND entidad_id = ?""", linea);
+        assertThat(registro).containsEntry("usuario_id", cajero.usuarioId()).containsEntry("exitoso", true);
+        assertThat((String) registro.get("descripcion")).contains("3 x Arroz 1 lb", "Q15.00");
+        assertThat((String) registro.get("cambios")).contains(arroz.codigo(), "\"cantidad\": 3", "Arroz 1 lb");
+    }
+
+    @Test
+    void volverAEscanearUnProductoEliminadoCreaUnaLineaNueva() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        long eliminada = lineaDe(cajero, arroz);
+        eliminar(eliminada, cajero);
+
+        HttpResponse<String> respuesta = escanear(arroz.codigo(), cajero);
+
+        assertThat(respuesta.body()).contains("\"cantidad\":1", "\"articulos\":1", "\"total\":5.00");
+        assertThat(lineaDe(cajero, arroz)).isNotEqualTo(eliminada);
+        assertThat(jdbc.queryForObject("SELECT cantidad FROM venta_linea WHERE id = ?", Integer.class, eliminada))
+                .isEqualTo(3);
+    }
+
+    @Test
+    void unaLineaEliminadaNoSeVuelveAEliminarNiSeModifica() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        long linea = lineaDe(cajero, arroz);
+        eliminar(linea, cajero);
+
+        HttpResponse<String> otraVez = eliminar(linea, cajero);
+        assertThat(otraVez.statusCode()).isEqualTo(404);
+        assertThat(otraVez.body()).contains("LINEA_NO_ENCONTRADA");
+        assertThat(cambiarCantidad(linea, 5, cajero).statusCode()).isEqualTo(404);
+        // La base lo impide aunque se intente directamente (trigger de V17).
+        assertThatThrownBy(() -> jdbc.update("UPDATE venta_linea SET cantidad = 9 WHERE id = ?", linea))
+                .hasMessageContaining("fue eliminada");
+        assertThatThrownBy(() -> jdbc.update("UPDATE venta_linea SET eliminada_en = NULL, eliminada_por = NULL WHERE id = ?",
+                linea)).hasMessageContaining("fue eliminada");
+    }
+
+    @Test
+    void noSePuedeEliminarUnaLineaDeOtraVenta() throws Exception {   // crit. 1: solo la venta en curso propia
+        Cajero ana = cajeroConTurnoAbierto();
+        Cajero beto = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), ana);
+        escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), beto);
+
+        HttpResponse<String> respuesta = eliminar(lineaDe(ana, arroz), beto);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        assertThat(enviar("/api/ventas/actual", "GET", null, ana.sesion()).body()).contains("Arroz 1 lb");
+    }
+
+    @Test
+    void sinLineasVigentesLaVentaNoImpideCerrarSesion() throws Exception {   // HU-01.16 crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(409);
+
+        eliminar(lineaDe(cajero, arroz), cajero);
+
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
+    }
+
+    @Test
+    void sinTurnoAbiertoNoSeEliminaUnaLinea() throws Exception {
+        HttpResponse<String> respuesta = eliminar(1, cajeroEnCaja());
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("CAJA_CERRADA");
+    }
+
     // Apoyo
+
+    private HttpResponse<String> eliminar(long linea, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas/" + linea, "DELETE", null, cajero.sesion());
+    }
 
     private HttpResponse<String> escanear(String codigo, int cantidad, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/lineas", "POST",
@@ -740,7 +854,7 @@ class VentasIntegracionTest {
     private long lineaDe(Cajero cajero, Producto producto) {
         return jdbc.queryForObject("""
                 SELECT l.id FROM venta_linea l JOIN venta v ON v.id = l.venta_id
-                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.producto_id = ?""",
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.producto_id = ? AND l.eliminada_en IS NULL""",
                 Long.class, cajero.usuarioId(), producto.id());
     }
 
@@ -773,7 +887,8 @@ class VentasIntegracionTest {
     private int lineasEnCurso(Cajero cajero) {
         return jdbc.queryForObject("""
                 SELECT count(*) FROM venta_linea l JOIN venta v ON v.id = l.venta_id
-                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'""", Integer.class, cajero.usuarioId());
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.eliminada_en IS NULL""", Integer.class,
+                cajero.usuarioId());
     }
 
     record Producto(long id, String codigo, String descripcion, BigDecimal precio) {}

@@ -24,11 +24,16 @@ class RepositorioVentasJdbc implements RepositorioVentas {
             JOIN caja c ON c.id = v.caja_id
             """;
 
+    /**
+     * Solo las líneas vigentes: una línea eliminada (HU-06.07) ya no es parte de la venta ni de sus totales. Cada
+     * consulta agrega sus condiciones con {@code AND}.
+     */
     private static final String SELECT_LINEA = """
             SELECT l.id, l.producto_id, p.codigo_barras, l.descripcion, l.cantidad, l.precio_unitario,
                    l.subtotal_con_iva, l.base_imponible, l.iva
             FROM venta_linea l
             JOIN producto p ON p.id = l.producto_id
+            WHERE l.eliminada_en IS NULL
             """;
 
     private static final RowMapper<LineaVenta> LINEA = (rs, fila) -> new LineaVenta(
@@ -88,7 +93,7 @@ class RepositorioVentasJdbc implements RepositorioVentas {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM venta v
                                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'
-                                 AND EXISTS (SELECT 1 FROM venta_linea l WHERE l.venta_id = v.id))""",
+                                 AND EXISTS (SELECT 1 FROM venta_linea l WHERE l.venta_id = v.id AND l.eliminada_en IS NULL))""",
                 Boolean.class, usuarioId));
     }
 
@@ -100,13 +105,13 @@ class RepositorioVentasJdbc implements RepositorioVentas {
 
     @Override
     public Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId, BigDecimal precioUnitario) {
-        return jdbc.query(SELECT_LINEA + "WHERE l.venta_id = ? AND l.producto_id = ? AND l.precio_unitario = ?", LINEA,
+        return jdbc.query(SELECT_LINEA + "AND l.venta_id = ? AND l.producto_id = ? AND l.precio_unitario = ?", LINEA,
                 ventaId, productoId, precioUnitario).stream().findFirst();
     }
 
     @Override
     public Optional<LineaVenta> lineaDeVenta(long ventaId, long lineaId) {
-        return jdbc.query(SELECT_LINEA + "WHERE l.venta_id = ? AND l.id = ?", LINEA, ventaId, lineaId).stream()
+        return jdbc.query(SELECT_LINEA + "AND l.venta_id = ? AND l.id = ?", LINEA, ventaId, lineaId).stream()
                 .findFirst();
     }
 
@@ -123,7 +128,15 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     public void actualizarLinea(long lineaId, LineaCalculada linea) {
         jdbc.update("""
                 UPDATE venta_linea SET cantidad = ?, subtotal_con_iva = ?, base_imponible = ?, iva = ?
-                WHERE id = ?""", linea.cantidad(), linea.subtotalConIva(), linea.base(), linea.iva(), lineaId);
+                WHERE id = ? AND eliminada_en IS NULL""", linea.cantidad(), linea.subtotalConIva(), linea.base(),
+                linea.iva(), lineaId);
+    }
+
+    @Override
+    public boolean eliminarLinea(long lineaId, long usuarioId) {
+        return jdbc.update("""
+                UPDATE venta_linea SET eliminada_en = now(), eliminada_por = ?
+                WHERE id = ? AND eliminada_en IS NULL""", usuarioId, lineaId) == 1;
     }
 
     private Optional<Venta> unaVenta(String sql, Object... parametros) {
@@ -144,6 +157,6 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     private List<LineaVenta> lineas(long ventaId) {
-        return jdbc.query(SELECT_LINEA + "WHERE l.venta_id = ? ORDER BY l.id", LINEA, ventaId);
+        return jdbc.query(SELECT_LINEA + "AND l.venta_id = ? ORDER BY l.id", LINEA, ventaId);
     }
 }
