@@ -274,8 +274,10 @@ class ProductosIntegracionTest {
 
         assertThat(enviar("/api/productos/" + id, "GET", null, cookieAdmin).body())
                 .contains("\"codigoBarras\":\"%s\"".formatted(codigo), "\"activo\":false");
-        assertThat(enviar("/api/productos/" + id, "DELETE", null, cookieAdmin).statusCode())
-                .as("no existe un endpoint para borrar productos").isGreaterThanOrEqualTo(400);
+        // No existe un endpoint para borrar: la ruta solo admite GET y PUT, así que responde 405 (#151).
+        HttpResponse<String> borrado = enviar("/api/productos/" + id, "DELETE", null, cookieAdmin);
+        assertThat(borrado.statusCode()).as("no existe un endpoint para borrar productos").isEqualTo(405);
+        assertThat(borrado.body()).contains("METODO_NO_PERMITIDO");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM producto WHERE id = ?", Integer.class, id)).isEqualTo(1);
     }
 
