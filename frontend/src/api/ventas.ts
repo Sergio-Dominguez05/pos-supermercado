@@ -40,5 +40,9 @@ export const iniciarVenta = () => pedir<Venta>('/api/ventas', { method: 'POST' }
 export const agregarPorCodigo = (codigo: string) =>
   pedir<Venta>('/api/ventas/actual/lineas', { method: 'POST', body: JSON.stringify({ codigo }) })
 
+/** HU-06.03 crit. 2: agrega el producto elegido en la búsqueda por descripción (o suma 1 a su línea). */
+export const agregarProducto = (productoId: number) =>
+  pedir<Venta>('/api/ventas/actual/lineas', { method: 'POST', body: JSON.stringify({ productoId }) })
+
 /** HU-06.14: cancela la venta en curso. Sin autorización de un supervisor. */
 export const cancelarVenta = () => pedir<Venta>('/api/ventas/actual/cancelar', { method: 'POST' })

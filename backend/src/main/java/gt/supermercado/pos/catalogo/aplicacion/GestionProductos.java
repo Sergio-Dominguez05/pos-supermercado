@@ -94,7 +94,20 @@ public class GestionProductos {
      */
     @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
     public Producto paraVender(String codigo, SesionActiva sesion) {
-        Producto producto = buscarPorCodigo(codigo, sesion);
+        return disponibleParaVender(buscarPorCodigo(codigo, sesion));
+    }
+
+    /**
+     * HU-06.03 crit. 2: el producto elegido en la búsqueda por descripción, para agregarlo a la venta. La búsqueda
+     * solo muestra activos (HU-03.07), pero el producto pudo desactivarse entre la búsqueda y la elección, así que se
+     * vuelve a comprobar aquí (HU-03.09).
+     */
+    @Transactional(readOnly = true)
+    public Producto paraVender(long id) {
+        return disponibleParaVender(obtener(id));
+    }
+
+    private static Producto disponibleParaVender(Producto producto) {
         if (!producto.activo()) {
             throw new NegocioException("PRODUCTO_INACTIVO",
                     "%s (%s) no está disponible para la venta.".formatted(producto.descripcion(), producto.codigoBarras()));

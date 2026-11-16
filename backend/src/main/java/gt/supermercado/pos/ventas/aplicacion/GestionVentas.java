@@ -79,6 +79,17 @@ public class GestionVentas {
         return agregar(turno, producto, sesion);
     }
 
+    /**
+     * HU-06.03 crit. 2: agrega el producto elegido en la búsqueda por descripción. Si ya está en la venta, suma 1 a
+     * su línea igual que al escanearlo (crit. 3). Un producto desactivado después de la búsqueda se rechaza
+     * (HU-03.09).
+     */
+    @Transactional
+    public Venta agregarProducto(long productoId, SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        return agregar(turno, productos.paraVender(productoId), sesion);
+    }
+
     private Venta agregar(Turno turno, Producto producto, SesionActiva sesion) {
         long ventaId = ventas.iniciar(turno.id(), turno.cajaId(), sesion.usuarioId(), TasaIva.VIGENTE.valor());
         if (!ventas.bloquearEnCurso(ventaId)) {

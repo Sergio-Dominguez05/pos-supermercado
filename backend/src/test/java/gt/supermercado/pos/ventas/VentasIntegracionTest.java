@@ -31,7 +31,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * EP-06 Ventas contra PostgreSQL real con las migraciones: HU-06.01 Iniciar una venta, HU-06.02 Agregar producto con
- * lector de código de barras y HU-06.14 Cancelar una venta en curso.
+ * lector de código de barras, HU-06.03 Agregar producto por búsqueda o código manual y HU-06.14 Cancelar una venta en
+ * curso.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -354,6 +355,63 @@ class VentasIntegracionTest {
         assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
     }
 
+    // HU-06.03 Agregar producto por búsqueda o código manual
+
+    @Test
+    void elProductoElegidoEnLaBusquedaSeAgregaALaVenta() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto cafe = nuevoProducto("Café molido 400 g", "32.50");
+
+        HttpResponse<String> respuesta = elegir(cafe.id(), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("Café molido 400 g", "\"cantidad\":1", "\"total\":32.50");
+    }
+
+    @Test
+    void elegirUnProductoQueYaEstaSumaASuLineaIgualQueEscanearlo() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto cafe = nuevoProducto("Café molido 400 g", "32.50");
+        escanear(cafe.codigo(), cajero);
+
+        HttpResponse<String> respuesta = elegir(cafe.id(), cajero);
+
+        assertThat(respuesta.body()).contains("\"cantidad\":2", "\"articulos\":2");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+    }
+
+    @Test
+    void unProductoDesactivadoDespuesDeLaBusquedaNoSeAgrega() throws Exception {   // HU-03.09
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto galleta = nuevoProducto("Galleta de temporada", "3.00");
+        enviar("/api/productos/" + galleta.id() + "/desactivar", "POST", null, cookieAdmin);
+
+        HttpResponse<String> respuesta = elegir(galleta.id(), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("PRODUCTO_INACTIVO");
+        assertThat(lineasEnCurso(cajero)).isZero();
+    }
+
+    @Test
+    void unProductoQueNoExisteDa404() throws Exception {
+        assertThat(elegir(999_999_999L, cajeroConTurnoAbierto()).statusCode()).isEqualTo(404);
+    }
+
+    @Test
+    void seIndicaElCodigoOElProductoPeroNoAmbosNiNinguno() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto producto = nuevoProducto("Té 20 sobres", "9.00");
+
+        HttpResponse<String> ninguno = enviar("/api/ventas/actual/lineas", "POST", "{}", cajero.sesion());
+        HttpResponse<String> ambos = enviar("/api/ventas/actual/lineas", "POST",
+                "{\"codigo\":\"%s\",\"productoId\":%d}".formatted(producto.codigo(), producto.id()), cajero.sesion());
+
+        assertThat(ninguno.statusCode()).isEqualTo(400);
+        assertThat(ambos.statusCode()).isEqualTo(400);
+        assertThat(lineasEnCurso(cajero)).isZero();
+    }
+
     // HU-06.14 Cancelar una venta en curso
 
     @Test
@@ -447,6 +505,10 @@ class VentasIntegracionTest {
 
     private HttpResponse<String> escanear(String codigo, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), cajero.sesion());
+    }
+
+    private HttpResponse<String> elegir(long productoId, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas", "POST", "{\"productoId\":%d}".formatted(productoId), cajero.sesion());
     }
 
     private long numeroDe(long venta) {
