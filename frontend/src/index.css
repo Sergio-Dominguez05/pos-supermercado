@@ -429,12 +429,18 @@ kbd {
 }
 
 /* Totales de la venta: Subtotal, IVA y TOTAL en ese orden (HU-04.04); el TOTAL en letra grande (HU-06.08). */
+/* HU-06.08 crit. 1: los totales quedan fijos al pie de la pantalla aunque la lista de productos sea larga. */
 .totales {
   display: grid;
   grid-template-columns: auto auto;
   justify-content: end;
   gap: 4px 24px;
   margin: 0;
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0;
+  background: var(--superficie);
+  border-top: 1px solid var(--borde);
 }
 
 .totales dt {
@@ -447,6 +453,7 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* HU-06.08 crit. 2: el TOTAL en letra grande. */
 .totales dd.total {
   font-size: 2rem;
   font-weight: 700;

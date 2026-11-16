@@ -116,7 +116,8 @@ export function DetalleVenta({ venta }: { venta: DatosVenta }) {
         </div>
       )}
       {venta.lineas.length > 0 && <DesgloseIva venta={venta} />}
-      {/* HU-04.04 crit. 1: Subtotal, IVA y TOTAL, en ese orden. */}
+      {/* HU-04.04 crit. 1 y HU-06.08: artículos, Subtotal, IVA y TOTAL, en ese orden, siempre visibles (también con la
+          venta vacía) y actualizados con cada producto, porque cada respuesta del servidor trae la venta completa. */}
       <dl className="totales" aria-label="Totales">
         <dt>Artículos</dt>
         <dd>{venta.articulos}</dd>
