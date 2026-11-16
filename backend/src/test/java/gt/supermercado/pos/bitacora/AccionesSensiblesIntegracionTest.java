@@ -215,6 +215,91 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(CAJA_ACTIVADA, true, adminId));
     }
 
+    // Catálogo
+
+    @Test
+    void altaDeProductoExitosaYRechazada() throws Exception {
+        String codigo = "AUD-" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        String producto = "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":9.99}".formatted(codigo);
+
+        assertThat(registrosDe(() -> enviar("/api/productos", "POST", producto, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_CREADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos", "POST", producto, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_CREADO, false, adminId));   // código repetido
+    }
+
+    @Test
+    void edicionDeDescripcionYPrecioExitosaYRechazada() throws Exception {
+        String codigo = "AUD-E" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long id = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Antes\",\"precio\":1.00}".formatted(codigo), cookieAdmin));
+
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Después\",\"precio\":1.00}", cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_EDITADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Después\",\"precio\":2.50}", cookieAdmin)))
+                .containsExactly(new Registro(PRECIO_CAMBIADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"  \",\"precio\":2.50}", cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_EDITADO, false, adminId));   // descripción vacía
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id, "PUT", "{\"descripcion\":\"Después\",\"precio\":0}", cookieAdmin)))
+                .containsExactly(new Registro(PRECIO_CAMBIADO, false, adminId));   // precio en cero
+    }
+
+    @Test
+    void desactivacionYActivacionDeProductos() throws Exception {
+        String codigo = "AUD-A" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long id = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Estado\",\"precio\":1.00}".formatted(codigo), cookieAdmin));
+
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id + "/desactivar", "POST", null, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_DESACTIVADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/productos/" + id + "/activar", "POST", null, cookieAdmin)))
+                .containsExactly(new Registro(PRODUCTO_ACTIVADO, true, adminId));
+    }
+
+    // Caja
+
+    @Test
+    void aperturaDeTurnoExitosaYRechazada() throws Exception {
+        String nombre = "Caja turno " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+
+        assertThat(registrosDe(() -> enviar("/api/turnos", "POST", null, sesion)))
+                .containsExactly(new Registro(TURNO_ABIERTO, true, id));
+        assertThat(registrosDe(() -> enviar("/api/turnos", "POST", null, sesion)))
+                .containsExactly(new Registro(TURNO_ABIERTO, false, id));   // ya tiene el turno abierto
+    }
+
+    // Ventas
+
+    @Test
+    void cancelacionDeVentaExitosaYRechazada() throws Exception {
+        String nombre = "Caja venta " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        enviar("/api/turnos", "POST", null, sesion);
+        long venta = idDe(enviar("/api/ventas", "POST", null, sesion));
+        String codigo = "AS" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        long producto = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":11.20}".formatted(codigo),
+                cookieAdmin));
+        jdbc.update("""
+                INSERT INTO venta_linea (venta_id, producto_id, descripcion, cantidad, precio_unitario, subtotal_con_iva,
+                                         base_imponible, iva)
+                VALUES (?, ?, 'Producto auditado', 1, 11.20, 11.20, 10.00, 1.20)""", venta, producto);
+
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/cancelar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_CANCELADA, true, id));
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/cancelar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_CANCELADA, false, id));   // ya no hay venta en curso
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

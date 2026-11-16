@@ -116,15 +116,22 @@ class InicioSesionPinIntegracionTest {
         long id = jdbc.queryForObject("SELECT id FROM usuario WHERE username = 'cajera.pin'", Long.class);
         int exitososAntes = eventos(id, true);
         int fallidosAntes = eventos(id, false);
+        long desde = ultimaSecuencia();
 
         loginPin("cajera.pin", PIN);
         loginPin("cajera.pin", "9999");
 
         assertThat(eventos(id, true)).isEqualTo(exitososAntes + 1);
         assertThat(eventos(id, false)).isEqualTo(fallidosAntes + 1);
+        // Solo los registros de esta prueba: las demás generan códigos con dígitos al azar que pueden contener el PIN.
         assertThat(jdbc.queryForObject("""
-                SELECT count(*) FROM bitacora WHERE descripcion LIKE '%4821%' OR descripcion LIKE '%9999%'""",
-                Integer.class)).isZero();
+                SELECT count(*) FROM bitacora
+                WHERE secuencia > ? AND (descripcion LIKE '%4821%' OR descripcion LIKE '%9999%')""",
+                Integer.class, desde)).isZero();
+    }
+
+    private long ultimaSecuencia() {
+        return jdbc.queryForObject("SELECT coalesce(max(secuencia), 0) FROM bitacora", Long.class);
     }
 
     private int eventos(long usuarioId, boolean exitoso) {

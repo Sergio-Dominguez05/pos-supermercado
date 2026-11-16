@@ -38,6 +38,12 @@ describe('opciones del menú por rol', () => {
     ])
   })
 
+  it('la opción Catálogo lleva a la lista de productos (HU-03.04)', () => {
+    expect(opcionesPara(['PRODUCTO_CONSULTAR'])).toEqual([
+      expect.objectContaining({ etiqueta: 'Catálogo', ruta: '/catalogo' }),
+    ])
+  })
+
   it('sin permisos no hay opciones', () => {
     expect(opcionesPara([])).toEqual([])
   })

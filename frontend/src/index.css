@@ -304,6 +304,15 @@ kbd {
   cursor: not-allowed;
 }
 
+/* Agrupa campos que se deshabilitan juntos, como la venta sin turno abierto (HU-09.02). */
+.formulario fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .aviso {
   margin: 0;
   padding: 8px 12px;
@@ -360,4 +369,95 @@ kbd {
 .barra-sesion a {
   color: var(--ok);
   font-weight: 600;
+}
+
+/* Resultados de la búsqueda por descripción (HU-03.07): se recorren con el teclado. */
+.resultados {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.resultado {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr auto;
+  gap: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.resultado + .resultado {
+  border-top: 1px solid var(--borde);
+}
+
+.resultado.marcado {
+  background: var(--fondo);
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+
+.resultado-codigo {
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.resultado-precio {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Aviso que no se puede pasar por alto, como un código que no existe (HU-03.08 crit. 1). */
+.aviso-alerta {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, var(--superficie));
+  border: 2px solid var(--error);
+  border-radius: 6px;
+}
+
+.aviso-alerta p {
+  margin: 0;
+}
+
+.aviso-alerta button {
+  justify-self: start;
+}
+
+/* Totales de la venta: Subtotal, IVA y TOTAL en ese orden (HU-04.04); el TOTAL en letra grande (HU-06.08). */
+.totales {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: end;
+  gap: 4px 24px;
+  margin: 0;
+}
+
+.totales dt {
+  color: var(--texto-suave);
+}
+
+.totales dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totales dd.total {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+/* Desglose de IVA por línea de la venta (HU-04.03 crit. 3). */
+.desglose summary {
+  cursor: pointer;
+  color: var(--texto-suave);
+}
+
+.desglose[open] summary {
+  margin-bottom: 8px;
 }

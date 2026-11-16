@@ -1,0 +1,274 @@
+package gt.supermercado.pos.catalogo.aplicacion;
+
+import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
+import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
+import gt.supermercado.pos.catalogo.dominio.CodigoNoEncontrado;
+import gt.supermercado.pos.catalogo.dominio.FiltroProductos;
+import gt.supermercado.pos.catalogo.dominio.PaginaProductos;
+import gt.supermercado.pos.catalogo.dominio.Producto;
+import gt.supermercado.pos.catalogo.dominio.ReglasProducto;
+import gt.supermercado.pos.catalogo.dominio.RepositorioCodigosNoEncontrados;
+import gt.supermercado.pos.catalogo.dominio.RepositorioProductos;
+import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
+import gt.supermercado.pos.seguridad.dominio.SesionActiva;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Catálogo de productos. HU-03.01: registrar un producto. HU-03.02: editar su descripción y precio. HU-03.03:
+ * activarlo y desactivarlo. Consultar (HU-03.04 a 03.07) se agrega aquí.
+ */
+@Service
+public class GestionProductos {
+
+    private static final String MENSAJE_DESCRIPCION = "La descripción es obligatoria y tiene como máximo %d caracteres."
+            .formatted(ReglasProducto.LARGO_MAXIMO_DESCRIPCION);
+    private static final String MENSAJE_PRECIO = "El precio debe ser mayor que cero y tener como máximo 2 decimales.";
+
+    private final RepositorioProductos productos;
+    private final RepositorioCodigosNoEncontrados codigosNoEncontrados;
+    private final Bitacora bitacora;
+
+    public GestionProductos(RepositorioProductos productos, RepositorioCodigosNoEncontrados codigosNoEncontrados,
+                            Bitacora bitacora) {
+        this.productos = productos;
+        this.codigosNoEncontrados = codigosNoEncontrados;
+        this.bitacora = bitacora;
+    }
+
+    /** HU-03.04: lista del catálogo con búsqueda, filtro por estado, orden y paginación. */
+    @Transactional(readOnly = true)
+    public PaginaProductos listar(FiltroProductos filtro) {
+        return productos.buscar(filtro);
+    }
+
+    @Transactional(readOnly = true)
+    public Producto obtener(long id) {
+        return productos.buscarPorId(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO", "El producto no existe."));
+    }
+
+    /**
+     * HU-03.06: busca un producto por su código exacto (crit. 4), tal como lo envía el lector de código de barras o
+     * como lo escribe el cajero cuando el código está dañado (crit. 2 y 3). Se ignoran los espacios, el salto de
+     * línea del lector y las mayúsculas, igual que al registrarlo. Usa el índice único de {@code codigo_barras}, así
+     * que responde de inmediato aunque el catálogo tenga miles de productos (crit. 1).
+     *
+     * <p>Devuelve también los productos inactivos, con su estado: la venta decide qué hacer con ellos (HU-03.09).
+     *
+     * <p>HU-03.08 crit. 4: si el código no existe, la búsqueda queda registrada con la caja y el usuario para que un
+     * administrador registre el producto. El registro se guarda aunque la respuesta sea 404 ({@code noRollbackFor}).
+     */
+    @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
+    public Producto buscarPorCodigo(String codigo, SesionActiva sesion) {
+        String normalizado = ReglasProducto.normalizarCodigo(codigo);
+        Optional<Producto> producto = normalizado.isEmpty() ? Optional.empty() : productos.buscarPorCodigo(normalizado);
+        if (producto.isEmpty() && ReglasProducto.esCodigoValido(normalizado)) {
+            codigosNoEncontrados.registrar(normalizado, sesion.cajaId(), sesion.usuarioId());
+        }
+        return producto.orElseThrow(() -> new RecursoNoEncontradoException("PRODUCTO_NO_ENCONTRADO",
+                "No hay ningún producto con el código %s.".formatted(normalizado)));
+    }
+
+    /** HU-03.08 crit. 4: códigos buscados que no existen, para que el administrador registre esos productos. */
+    @Transactional(readOnly = true)
+    public List<CodigoNoEncontrado> codigosNoEncontrados() {
+        return codigosNoEncontrados.pendientes();
+    }
+
+    /**
+     * HU-03.09 crit. 2: el producto que se puede agregar a una venta a partir del código escaneado. Si existe pero
+     * está desactivado (HU-03.03), se rechaza con un mensaje claro y no se agrega. Si no existe, se comporta igual que
+     * {@link #buscarPorCodigo} (404 y registro del código, HU-03.08).
+     *
+     * <p>La venta (HU-06.01) debe usar este método, no {@code buscarPorCodigo}: así la regla se cumple en el servidor
+     * aunque la pantalla no la aplique.
+     */
+    @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
+    public Producto paraVender(String codigo, SesionActiva sesion) {
+        return disponibleParaVender(buscarPorCodigo(codigo, sesion));
+    }
+
+    /**
+     * HU-06.03 crit. 2: el producto elegido en la búsqueda por descripción, para agregarlo a la venta. La búsqueda
+     * solo muestra activos (HU-03.07), pero el producto pudo desactivarse entre la búsqueda y la elección, así que se
+     * vuelve a comprobar aquí (HU-03.09).
+     */
+    @Transactional(readOnly = true)
+    public Producto paraVender(long id) {
+        return disponibleParaVender(obtener(id));
+    }
+
+    private static Producto disponibleParaVender(Producto producto) {
+        if (!producto.activo()) {
+            throw new NegocioException("PRODUCTO_INACTIVO",
+                    "%s (%s) no está disponible para la venta.".formatted(producto.descripcion(), producto.codigoBarras()));
+        }
+        return producto;
+    }
+
+    /** Caracteres mínimos para buscar por descripción (HU-03.07 crit. 1). */
+    public static final int MINIMO_BUSQUEDA = 3;
+
+    /** Resultados que se muestran como máximo al buscar por descripción: el cajero sigue escribiendo para afinar. */
+    public static final int MAXIMO_RESULTADOS = 20;
+
+    /**
+     * HU-03.07: productos activos cuya descripción contiene el texto (crit. 1), sin distinguir mayúsculas, minúsculas
+     * ni tildes (crit. 2). Con menos de 3 caracteres se rechaza, para no devolver medio catálogo.
+     */
+    @Transactional(readOnly = true)
+    public List<Producto> buscarPorDescripcion(String texto) {
+        String limpio = ReglasProducto.normalizarDescripcion(texto);
+        if (limpio.length() < MINIMO_BUSQUEDA) {
+            throw new NegocioException("BUSQUEDA_MUY_CORTA",
+                    "Escriba al menos %d caracteres para buscar por descripción.".formatted(MINIMO_BUSQUEDA));
+        }
+        return productos.buscarActivosPorDescripcion(limpio, MAXIMO_RESULTADOS);
+    }
+
+    /**
+     * Registra un producto activo y disponible para la venta de inmediato (HU-03.01 crit. 6). El alta y cada intento
+     * rechazado quedan en la bitácora con el usuario que lo hizo (crit. 7, HU-11.01 crit. 3).
+     */
+    @Transactional
+    public Producto crear(String codigoBarras, String descripcion, BigDecimal precio, SesionActiva actor) {
+        String codigo = ReglasProducto.normalizarCodigo(codigoBarras);
+        String descripcionNormal = ReglasProducto.normalizarDescripcion(descripcion);
+
+        if (!ReglasProducto.esCodigoValido(codigo)) {
+            throw rechazarAlta(actor, "CODIGO_INVALIDO",
+                    "El código de barras es obligatorio: de 1 a %d letras, números o guiones."
+                            .formatted(ReglasProducto.LARGO_MAXIMO_CODIGO));
+        }
+        if (!ReglasProducto.esDescripcionValida(descripcionNormal)) {
+            throw rechazarAlta(actor, "DESCRIPCION_INVALIDA", MENSAJE_DESCRIPCION);
+        }
+        if (!ReglasProducto.esPrecioValido(precio)) {
+            throw rechazarAlta(actor, "PRECIO_INVALIDO", MENSAJE_PRECIO);
+        }
+        productos.buscarPorCodigo(codigo).ifPresent(otro -> {
+            throw codigoDuplicado(actor, otro.descripcion());
+        });
+
+        BigDecimal precioNormal = ReglasProducto.normalizarPrecio(precio);
+        long id;
+        try {
+            id = productos.crear(codigo, descripcionNormal, precioNormal);
+        } catch (DuplicateKeyException e) {
+            // Otro usuario registró el mismo código al mismo tiempo.
+            throw codigoDuplicado(actor, null);
+        }
+        // HU-03.08 crit. 4: si alguien había buscado este código sin encontrarlo, deja de estar pendiente.
+        codigosNoEncontrados.resolver(codigo);
+        bitacora.registrar(evento(actor, AccionSensible.PRODUCTO_CREADO, true,
+                "Producto '%s' (%s) creado con precio Q%s".formatted(descripcionNormal, codigo, precioNormal), id, null));
+        return obtener(id);
+    }
+
+    /**
+     * Cambia la descripción y el precio (HU-03.02 crit. 1). El código no se recibe: no se puede modificar
+     * (crit. 2, y la base de datos también lo impide). Cada cambio queda en la bitácora con el valor anterior y el
+     * nuevo (crit. 6): {@code PRODUCTO_EDITADO} para la descripción y {@code PRECIO_CAMBIADO} para el precio, que es
+     * la base del historial de precios (HU-03.11). Si no cambia nada, no se registra nada.
+     *
+     * <p>Las ventas guardan una copia del precio en cada línea (HU-06.09), así que el precio nuevo solo se aplica a lo
+     * que se agregue desde ahora (crit. 3) y no altera ventas en curso ni facturas emitidas (crit. 4 y 5).
+     */
+    @Transactional
+    public Producto editar(long id, String descripcion, BigDecimal precio, SesionActiva actor) {
+        Producto actual = obtener(id);
+        String descripcionNormal = ReglasProducto.normalizarDescripcion(descripcion);
+
+        if (!ReglasProducto.esDescripcionValida(descripcionNormal)) {
+            throw rechazarEdicion(actor, AccionSensible.PRODUCTO_EDITADO, actual, "DESCRIPCION_INVALIDA",
+                    MENSAJE_DESCRIPCION);
+        }
+        if (!ReglasProducto.esPrecioValido(precio)) {
+            throw rechazarEdicion(actor, AccionSensible.PRECIO_CAMBIADO, actual, "PRECIO_INVALIDO", MENSAJE_PRECIO);
+        }
+        BigDecimal precioNormal = ReglasProducto.normalizarPrecio(precio);
+        boolean cambiaDescripcion = !descripcionNormal.equals(actual.descripcion());
+        boolean cambiaPrecio = precioNormal.compareTo(actual.precio()) != 0;
+        if (!cambiaDescripcion && !cambiaPrecio) {
+            return actual;
+        }
+
+        productos.actualizar(id, descripcionNormal, precioNormal);
+        if (cambiaDescripcion) {
+            bitacora.registrar(evento(actor, AccionSensible.PRODUCTO_EDITADO, true,
+                    "Producto %s: descripción cambiada de '%s' a '%s'"
+                            .formatted(actual.codigoBarras(), actual.descripcion(), descripcionNormal),
+                    id, Map.of("descripcion", EventoBitacora.cambio(actual.descripcion(), descripcionNormal))));
+        }
+        if (cambiaPrecio) {
+            bitacora.registrar(evento(actor, AccionSensible.PRECIO_CAMBIADO, true,
+                    "Producto '%s' (%s): precio cambiado de Q%s a Q%s"
+                            .formatted(descripcionNormal, actual.codigoBarras(), actual.precio(), precioNormal),
+                    id, Map.of("precio", EventoBitacora.cambio(actual.precio(), precioNormal))));
+        }
+        return obtener(id);
+    }
+
+    /**
+     * Desactiva un producto que ya no se vende (HU-03.03 crit. 1): deja de poder agregarse a nuevas ventas
+     * (HU-03.09), pero no se borra, para conservar las ventas y facturas en las que aparece (crit. 2). Queda en la
+     * bitácora (crit. 4). Si ya estaba inactivo, no se hace ni se registra nada.
+     */
+    @Transactional
+    public Producto desactivar(long id, SesionActiva actor) {
+        Producto producto = obtener(id);
+        return producto.activo() ? cambiarActivo(producto, false, actor) : producto;
+    }
+
+    /** Reactiva un producto desactivado (HU-03.03 crit. 3); queda en la bitácora (crit. 4). */
+    @Transactional
+    public Producto activar(long id, SesionActiva actor) {
+        Producto producto = obtener(id);
+        return producto.activo() ? producto : cambiarActivo(producto, true, actor);
+    }
+
+    private Producto cambiarActivo(Producto producto, boolean activo, SesionActiva actor) {
+        productos.cambiarActivo(producto.id(), activo);
+        bitacora.registrar(evento(actor, activo ? AccionSensible.PRODUCTO_ACTIVADO : AccionSensible.PRODUCTO_DESACTIVADO,
+                true, "Producto '%s' (%s) %s".formatted(producto.descripcion(), producto.codigoBarras(),
+                        activo ? "activado" : "desactivado"),
+                producto.id(), Map.of("activo", EventoBitacora.cambio(!activo, activo))));
+        return obtener(producto.id());
+    }
+
+    /** HU-03.01 crit. 2: el mensaje dice a qué producto está asignado el código. */
+    private NegocioException codigoDuplicado(SesionActiva actor, String descripcionDelOtro) {
+        return rechazarAlta(actor, "CODIGO_DUPLICADO", descripcionDelOtro == null
+                ? "El código de barras ya está asignado a otro producto."
+                : "El código de barras ya está asignado al producto '%s'.".formatted(descripcionDelOtro));
+    }
+
+    private static EventoBitacora evento(SesionActiva actor, AccionSensible accion, boolean exitoso, String descripcion,
+                                         Long productoId, Map<String, Object> cambios) {
+        return new EventoBitacora(actor.usuarioId(), actor.rol().name(), accion, exitoso, descripcion,
+                productoId == null ? null : "producto", productoId, cambios);
+    }
+
+    /** El intento rechazado también queda en la bitácora (HU-11.01 crit. 3). */
+    private NegocioException rechazarAlta(SesionActiva actor, String codigo, String mensaje) {
+        bitacora.registrarIntentoFallido(evento(actor, AccionSensible.PRODUCTO_CREADO, false,
+                "Registro de producto rechazado: " + mensaje, null, null));
+        return new NegocioException(codigo, mensaje);
+    }
+
+    private NegocioException rechazarEdicion(SesionActiva actor, AccionSensible accion, Producto producto, String codigo,
+                                             String mensaje) {
+        bitacora.registrarIntentoFallido(evento(actor, accion, false,
+                "Edición del producto %s rechazada: %s".formatted(producto.codigoBarras(), mensaje), producto.id(), null));
+        return new NegocioException(codigo, mensaje);
+    }
+}

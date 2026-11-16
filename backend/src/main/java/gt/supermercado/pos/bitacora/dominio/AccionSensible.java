@@ -48,7 +48,6 @@ public enum AccionSensible {
     PAGO_TARJETA_ELIMINADO(Categoria.PAGOS, "pagos"),
 
     // Caja
-    /** Pendiente: HU-09.01. */
     TURNO_ABIERTO(Categoria.CAJA, "caja"),
     /** Pendiente: HU-09.08. */
     TURNO_CERRADO(Categoria.CAJA, "caja"),
@@ -65,15 +64,12 @@ public enum AccionSensible {
     PARAMETRO_MODIFICADO(Categoria.CONFIGURACION, "configuracion"),
 
     // Catálogo
-    /** Pendiente: HU-03.01. */
     PRODUCTO_CREADO(Categoria.CATALOGO, "catalogo"),
-    /** Cambio de descripción. Pendiente: HU-03.02. */
+    /** Cambio de descripción (HU-03.02). */
     PRODUCTO_EDITADO(Categoria.CATALOGO, "catalogo"),
-    /** Base del historial de precios (HU-03.11). Pendiente: HU-03.02. */
+    /** Cambio de precio (HU-03.02); base del historial de precios (HU-03.11). */
     PRECIO_CAMBIADO(Categoria.CATALOGO, "catalogo"),
-    /** Pendiente: HU-03.03. */
     PRODUCTO_ACTIVADO(Categoria.CATALOGO, "catalogo"),
-    /** Pendiente: HU-03.03. */
     PRODUCTO_DESACTIVADO(Categoria.CATALOGO, "catalogo"),
     /** Carga del catálogo desde un archivo. Pendiente: HU-03.05. */
     CATALOGO_CARGADO(Categoria.CATALOGO, "catalogo");

@@ -9,11 +9,13 @@ export interface OpcionMenu {
 }
 
 export const OPCIONES: OpcionMenu[] = [
-  { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR' },
+  // HU-06.01: la pantalla de venta (también es el destino del Cajero al iniciar sesión).
+  { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR', ruta: '/venta' },
   { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA' },
   { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR' },
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR' },
-  { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR' },
+  // HU-03.04: la lista del catálogo; desde ahí, quien tiene permiso crea y edita productos.
+  { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR', ruta: '/catalogo' },
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
