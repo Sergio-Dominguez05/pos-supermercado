@@ -8,8 +8,8 @@ import { CLAVE_VENTA_EN_CURSO, type Venta as DatosVenta } from '../../api/ventas
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { confirmacionCancelarVenta } from './textos'
-import { CancelarVenta, DetalleVenta, Venta } from './Venta'
+import { confirmacionCancelarVenta, formatoDesglose } from './textos'
+import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
 
 const CAJERO = {
   rol: 'CAJERO',
@@ -140,6 +140,39 @@ describe('iniciar una venta (HU-06.01)', () => {
     expect(html).toContain('<dd class="total">Q15.00</dd>')
     expect(html).toContain('<dd>Q13.39</dd>')
     expect(html).toContain('<dd>Q1.61</dd>')
+  })
+})
+
+describe('IVA por línea en el detalle de la venta (HU-04.03)', () => {
+  const ARROZ = {
+    id: 1,
+    productoId: 5,
+    codigoBarras: '7401',
+    descripcion: 'Arroz 1 lb',
+    cantidad: 3,
+    precioUnitario: 5,
+    subtotalConIva: 15,
+    baseImponible: 13.392857,
+    iva: 1.607143,
+  }
+
+  it('el desglose de cada línea se puede consultar con 6 decimales, sin redondear a 2 (crit. 2 y 3)', () => {
+    const html = renderToString(<DesgloseIva venta={{ ...VENTA_VACIA, lineas: [ARROZ] }} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<summary>Desglose de IVA por línea</summary>')
+    expect(html).toContain('Q15.000000')
+    expect(html).toContain('Q13.392857')
+    expect(html).toContain('Q1.607143')
+  })
+
+  it('el detalle de la venta incluye el desglose solo cuando hay productos', () => {
+    expect(renderToString(<DetalleVenta venta={{ ...VENTA_VACIA, lineas: [ARROZ] }} />)).toContain('Desglose de IVA')
+    expect(renderToString(<DetalleVenta venta={VENTA_VACIA} />)).not.toContain('Desglose de IVA')
+  })
+
+  it('formatea los montos del desglose con 6 decimales', () => {
+    expect(formatoDesglose(4.464286)).toBe('Q4.464286')
+    expect(formatoDesglose(0.5357140000000001)).toBe('Q0.535714')
   })
 })
 

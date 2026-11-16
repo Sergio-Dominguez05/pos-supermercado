@@ -7,7 +7,7 @@ import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
 import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { EscanerVenta } from './EscanerVenta'
-import { confirmacionCancelarVenta } from './textos'
+import { confirmacionCancelarVenta, formatoDesglose } from './textos'
 
 /** Lleva el foco a un campo de la pantalla de venta por su nombre (`codigo` o `descripcion`). */
 const enfocar = (campo: 'codigo' | 'descripcion') =>
@@ -115,6 +115,7 @@ export function DetalleVenta({ venta }: { venta: DatosVenta }) {
           </table>
         </div>
       )}
+      {venta.lineas.length > 0 && <DesgloseIva venta={venta} />}
       {/* HU-04.04 crit. 1: Subtotal, IVA y TOTAL, en ese orden. */}
       <dl className="totales" aria-label="Totales">
         <dt>Artículos</dt>
@@ -127,6 +128,45 @@ export function DetalleVenta({ venta }: { venta: DatosVenta }) {
         <dd className="total">{formatoQuetzales(venta.total)}</dd>
       </dl>
     </>
+  )
+}
+
+/**
+ * HU-04.03 crit. 3: el desglose de cada línea (subtotal con IVA, base imponible e IVA) con los 6 decimales que guarda
+ * la venta, sin redondear (crit. 2). Queda plegado para no distraer al cajero; se abre con el teclado (Enter sobre
+ * el resumen) o con el ratón.
+ */
+export function DesgloseIva({ venta }: { venta: DatosVenta }) {
+  return (
+    <details className="desglose">
+      <summary>Desglose de IVA por línea</summary>
+      <div className="tabla-contenedor">
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th>Cantidad</th>
+              <th>Precio unitario</th>
+              <th>Subtotal con IVA</th>
+              <th>Base imponible</th>
+              <th>IVA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {venta.lineas.map((linea) => (
+              <tr key={linea.id}>
+                <td>{linea.descripcion}</td>
+                <td>{linea.cantidad}</td>
+                <td>{formatoQuetzales(linea.precioUnitario)}</td>
+                <td>{formatoDesglose(linea.subtotalConIva)}</td>
+                <td>{formatoDesglose(linea.baseImponible)}</td>
+                <td>{formatoDesglose(linea.iva)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   )
 }
 

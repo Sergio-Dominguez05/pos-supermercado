@@ -451,3 +451,13 @@ kbd {
   font-size: 2rem;
   font-weight: 700;
 }
+
+/* Desglose de IVA por línea de la venta (HU-04.03 crit. 3). */
+.desglose summary {
+  cursor: pointer;
+  color: var(--texto-suave);
+}
+
+.desglose[open] summary {
+  margin-bottom: 8px;
+}
