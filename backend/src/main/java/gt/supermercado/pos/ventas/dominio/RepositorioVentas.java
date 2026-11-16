@@ -25,6 +25,15 @@ public interface RepositorioVentas {
     boolean cancelar(long ventaId);
 
     /**
+     * Pasa la venta de {@code EN_CURSO} a {@code SUSPENDIDA} con la hora del servidor (HU-06.12), con todas sus líneas.
+     * Devuelve {@code false} si ya no estaba en curso.
+     */
+    boolean suspender(long ventaId);
+
+    /** Cuántas ventas suspendidas tiene el turno (HU-06.12 crit. 4). */
+    int suspendidasDelTurno(long turnoId);
+
+    /**
      * Bloquea la venta hasta el final de la transacción, para que dos productos escaneados al mismo tiempo no
      * calculen la misma línea a la vez. Devuelve {@code false} si ya no está en curso.
      */

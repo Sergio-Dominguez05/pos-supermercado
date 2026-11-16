@@ -89,6 +89,19 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
+    public boolean suspender(long ventaId) {
+        return jdbc.update("""
+                UPDATE venta SET estado = 'SUSPENDIDA', suspendida_en = now()
+                WHERE id = ? AND estado = 'EN_CURSO'""", ventaId) == 1;
+    }
+
+    @Override
+    public int suspendidasDelTurno(long turnoId) {
+        return jdbc.queryForObject("SELECT count(*) FROM venta WHERE turno_id = ? AND estado = 'SUSPENDIDA'",
+                Integer.class, turnoId);
+    }
+
+    @Override
     public boolean tieneVentaConProductos(long usuarioId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM venta v

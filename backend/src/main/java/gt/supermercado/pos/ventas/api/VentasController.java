@@ -132,6 +132,16 @@ public class VentasController {
         return RespuestaVenta.de(gestionVentas.eliminarLinea(lineaId, sesion));
     }
 
+    /**
+     * HU-06.12: deja en espera la venta en curso y devuelve la venta suspendida, con todas sus líneas. La pantalla
+     * inicia después la siguiente venta (crit. 1). 422 {@code VENTA_VACIA} si no tiene productos.
+     */
+    @PostMapping("/actual/suspender")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public RespuestaVenta suspender(@AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.suspender(sesion));
+    }
+
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */
     @PostMapping("/actual/cancelar")
     @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")

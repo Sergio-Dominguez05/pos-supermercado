@@ -70,3 +70,9 @@ export const cancelarVenta = () => pedir<Venta>('/api/ventas/actual/cancelar', {
  */
 export const eliminarLinea = (lineaId: number) =>
   pedir<Venta>(`/api/ventas/actual/lineas/${lineaId}`, { method: 'DELETE' })
+
+/**
+ * HU-06.12: deja en espera la venta en curso, con todas sus líneas, y devuelve la venta suspendida. Después hay que
+ * iniciar la siguiente venta. Responde 422 `VENTA_VACIA` si no tiene productos.
+ */
+export const suspenderVenta = () => pedir<Venta>('/api/ventas/actual/suspender', { method: 'POST' })

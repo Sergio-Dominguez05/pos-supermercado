@@ -216,6 +216,31 @@ public class GestionVentas {
     }
 
     /**
+     * HU-06.12: deja la venta en curso en espera para atender a otro cliente.
+     * <ul>
+     *   <li>Crit. 1: la venta queda {@code SUSPENDIDA} con todas sus líneas, y la caja queda lista para una venta
+     *       nueva: la siguiente que se inicie en el turno es otra.</li>
+     *   <li>Crit. 2: una caja puede tener varias ventas suspendidas; solo la venta en curso es única por turno.</li>
+     *   <li>Crit. 3: una venta suspendida no se factura ni cuenta para la caja: solo una {@code FINALIZADA} lo hace.</li>
+     *   <li>Crit. 4: la caja no se cierra con ventas suspendidas ({@link GestionTurnos#exigirSinVentasSuspendidas}).</li>
+     * </ul>
+     * Una venta sin productos no tiene nada que dejar en espera.
+     */
+    @Transactional
+    public Venta suspender(SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        Venta venta = ventas.enCursoDelTurno(turno.id())
+                .orElseThrow(() -> new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso."));
+        if (venta.lineas().isEmpty()) {
+            throw new NegocioException("VENTA_VACIA", "La venta no tiene productos: no hay nada que dejar en espera.");
+        }
+        if (!ventas.bloquearEnCurso(venta.id()) || !ventas.suspender(venta.id())) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        return ventas.buscarPorId(venta.id()).orElseThrow();
+    }
+
+    /**
      * HU-06.14: cancela la venta en curso del turno. No requiere autorización de un supervisor (crit. 2): basta el
      * permiso del cajero. La venta queda {@code CANCELADA}, así que no genera factura ni cuenta para la caja
      * (crit. 3), y la cancelación queda en la bitácora con el detalle de los productos (crit. 4). La confirmación la
