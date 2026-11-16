@@ -1,5 +1,7 @@
 package gt.supermercado.pos.ventas.dominio;
 
+import gt.supermercado.pos.impuestos.dominio.LineaCalculada;
+
 import java.math.BigDecimal;
 import java.util.Optional;
 
@@ -21,6 +23,21 @@ public interface RepositorioVentas {
      * curso, por ejemplo porque otra petición la canceló al mismo tiempo.
      */
     boolean cancelar(long ventaId);
+
+    /**
+     * Bloquea la venta hasta el final de la transacción, para que dos productos escaneados al mismo tiempo no
+     * calculen la misma línea a la vez. Devuelve {@code false} si ya no está en curso.
+     */
+    boolean bloquearEnCurso(long ventaId);
+
+    /** La línea de ese producto en la venta, si ya se agregó (HU-06.02 crit. 2). */
+    Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId);
+
+    /** Agrega una línea nueva con la copia de la descripción y del precio vigente (HU-06.09). */
+    void agregarLinea(long ventaId, long productoId, String descripcion, LineaCalculada linea);
+
+    /** Cambia la cantidad de una línea y su desglose, conservando su precio unitario (HU-06.09). */
+    void actualizarLinea(long lineaId, LineaCalculada linea);
 
     /** Si el usuario tiene una venta en curso con al menos un producto (HU-01.16 crit. 2). */
     boolean tieneVentaConProductos(long usuarioId);}

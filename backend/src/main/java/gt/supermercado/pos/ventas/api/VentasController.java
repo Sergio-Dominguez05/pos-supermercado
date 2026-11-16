@@ -5,11 +5,15 @@ import gt.supermercado.pos.ventas.aplicacion.GestionVentas;
 import gt.supermercado.pos.ventas.dominio.EstadoVenta;
 import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.Venta;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -56,6 +60,19 @@ public class VentasController {
     @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
     public RespuestaVenta iniciar(@AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaVenta.de(gestionVentas.iniciar(sesion));
+    }
+
+    /** El código tal como lo envía el lector o lo escribe el cajero; el servidor lo normaliza (HU-03.06). */
+    public record SolicitudLinea(@NotBlank @Size(max = 100) String codigo) {}
+
+    /**
+     * HU-06.02: agrega el producto escaneado a la venta en curso (la inicia si hace falta) y devuelve la venta con
+     * los totales recalculados. 404 si el código no existe (HU-03.08), 422 si el producto está inactivo (HU-03.09).
+     */
+    @PostMapping("/actual/lineas")
+    @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
+    public RespuestaVenta agregar(@Valid @RequestBody SolicitudLinea solicitud, @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.agregarPorCodigo(solicitud.codigo(), sesion));
     }
 
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */

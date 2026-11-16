@@ -5,7 +5,11 @@ import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.caja.aplicacion.GestionTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
+import gt.supermercado.pos.catalogo.aplicacion.GestionProductos;
+import gt.supermercado.pos.catalogo.dominio.Producto;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
+import gt.supermercado.pos.impuestos.dominio.CalculadoraIva;
 import gt.supermercado.pos.impuestos.dominio.TasaIva;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.ventas.dominio.LineaVenta;
@@ -28,11 +32,13 @@ public class GestionVentas {
 
     private final RepositorioVentas ventas;
     private final GestionTurnos turnos;
+    private final GestionProductos productos;
     private final Bitacora bitacora;
 
-    public GestionVentas(RepositorioVentas ventas, GestionTurnos turnos, Bitacora bitacora) {
+    public GestionVentas(RepositorioVentas ventas, GestionTurnos turnos, GestionProductos productos, Bitacora bitacora) {
         this.ventas = ventas;
         this.turnos = turnos;
+        this.productos = productos;
         this.bitacora = bitacora;
     }
 
@@ -51,6 +57,41 @@ public class GestionVentas {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
         long id = ventas.iniciar(turno.id(), turno.cajaId(), sesion.usuarioId(), TasaIva.VIGENTE.valor());
         return ventas.buscarPorId(id).orElseThrow();
+    }
+
+    /**
+     * HU-06.02: agrega a la venta en curso el producto escaneado (o escrito, HU-06.03 crit. 1). Si el turno todavía
+     * no tiene venta, la inicia.
+     * <ul>
+     *   <li>Crit. 1: un producto activo se agrega con cantidad 1 y su precio vigente.</li>
+     *   <li>Crit. 2: si ya está en la venta, se suma 1 a la cantidad de su línea, que conserva el precio con el que se
+     *       agregó (HU-06.09); no se crea otra línea.</li>
+     *   <li>Crit. 4: si el código no existe o el producto está inactivo, se aplica lo de EP-03 con
+     *       {@link GestionProductos#paraVender}: 404 con el código anotado (HU-03.08) o 422 {@code PRODUCTO_INACTIVO}
+     *       (HU-03.09), y no se agrega nada.</li>
+     * </ul>
+     * El código anotado por HU-03.08 se guarda aunque la respuesta sea 404 ({@code noRollbackFor}).
+     */
+    @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
+    public Venta agregarPorCodigo(String codigo, SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        Producto producto = productos.paraVender(codigo, sesion);
+        return agregar(turno, producto, sesion);
+    }
+
+    private Venta agregar(Turno turno, Producto producto, SesionActiva sesion) {
+        long ventaId = ventas.iniciar(turno.id(), turno.cajaId(), sesion.usuarioId(), TasaIva.VIGENTE.valor());
+        if (!ventas.bloquearEnCurso(ventaId)) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        Venta venta = ventas.buscarPorId(ventaId).orElseThrow();
+        TasaIva tasa = TasaIva.de(venta.tasaIva());
+        ventas.lineaDelProducto(ventaId, producto.id()).ifPresentOrElse(
+                linea -> ventas.actualizarLinea(linea.id(),
+                        CalculadoraIva.linea(linea.precioUnitario(), linea.cantidad() + 1, tasa)),
+                () -> ventas.agregarLinea(ventaId, producto.id(), producto.descripcion(),
+                        CalculadoraIva.linea(producto.precio(), 1, tasa)));
+        return ventas.buscarPorId(ventaId).orElseThrow();
     }
 
     /**
