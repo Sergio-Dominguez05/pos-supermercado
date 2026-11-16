@@ -165,6 +165,7 @@ class CreacionUsuariosIntegracionTest {
     @Test
     void laCreacionQuedaEnLaBitacoraConElAdministradorQueLaHizo() throws Exception {
         long admin = jdbc.queryForObject("SELECT id FROM usuario WHERE username = 'admin'", Long.class);
+        long desde = jdbc.queryForObject("SELECT coalesce(max(secuencia), 0) FROM bitacora", Long.class);
 
         crear("Iris", "iris.bitacora", "CAJERO", "9142");
         crear("Iris", "iris.bitacora", "CAJERO", "9142");
@@ -178,8 +179,10 @@ class CreacionUsuariosIntegracionTest {
                 SELECT count(*) FROM bitacora
                 WHERE accion = 'USUARIO_CREADO' AND NOT exitoso AND usuario_id = ?
                   AND descripcion LIKE '%iris.bitacora%ya existe%'""", Integer.class, admin)).isEqualTo(1);
+        // Solo los registros de esta prueba: las demás generan códigos con dígitos al azar que pueden contener el PIN.
         assertThat(jdbc.queryForObject(
-                "SELECT count(*) FROM bitacora WHERE descripcion LIKE '%9142%'", Integer.class)).isZero();
+                "SELECT count(*) FROM bitacora WHERE secuencia > ? AND descripcion LIKE '%9142%'", Integer.class, desde))
+                .isZero();
     }
 
     // Permisos validados en el servidor
