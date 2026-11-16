@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { obtenerInfoSistema } from '../../api/sistema'
-import { ATAJOS } from '../../atajos/atajos'
+import { ATAJOS, rotuloDeTecla } from '../../atajos/atajos'
 
 /** Pantalla del Sprint 0: confirma que frontend, backend y PostgreSQL están conectados. */
 export function EstadoSistema() {
@@ -38,7 +38,7 @@ export function EstadoSistema() {
         <ul className="atajos">
           {ATAJOS.map((atajo) => (
             <li key={atajo.tecla}>
-              <kbd>{atajo.tecla === 'Delete' ? 'Supr' : atajo.tecla}</kbd> {atajo.descripcion}
+              <kbd>{rotuloDeTecla(atajo.tecla)}</kbd> {atajo.descripcion}
             </li>
           ))}
         </ul>

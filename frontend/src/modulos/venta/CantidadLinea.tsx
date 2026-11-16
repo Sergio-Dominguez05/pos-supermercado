@@ -6,8 +6,8 @@ import { CANTIDAD_NO_VALIDA, cantidadValida, conConfirmacion } from './cantidad'
 
 /**
  * HU-06.04 crit. 2: la cantidad de una línea ya agregada se puede cambiar escribiendo la nueva y presionando Enter.
- * Escape deshace lo escrito. La línea y los totales se recalculan en el servidor y la pantalla los actualiza al
- * instante (HU-04.04 crit. 6). Se aplican las mismas reglas que al agregar: entero mayor que cero (crit. 3) y
+ * Escape deshace lo escrito y vuelve al código. La línea y los totales se recalculan en el servidor y la pantalla
+ * los actualiza al instante (HU-04.04 crit. 6). Se aplican las mismas reglas que al agregar: entero mayor que cero (crit. 3) y
  * confirmación por encima del límite (crit. 4). Al terminar, `onTerminado` devuelve el foco al campo del código.
  */
 export function CantidadLinea({ linea, onTerminado }: { linea: LineaVenta; onTerminado?: () => void }) {
@@ -44,6 +44,7 @@ export function CantidadLinea({ linea, onTerminado }: { linea: LineaVenta; onTer
     >
       <input
         name="cantidad"
+        data-control="cantidad"
         inputMode="numeric"
         autoComplete="off"
         size={4}
@@ -55,6 +56,7 @@ export function CantidadLinea({ linea, onTerminado }: { linea: LineaVenta; onTer
           if (evento.key === 'Escape') {
             setTexto(String(linea.cantidad))
             setAviso(undefined)
+            onTerminado?.()   // HU-06.17: después de F4, Escape vuelve al campo del código.
           }
         }}
       />

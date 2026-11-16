@@ -24,6 +24,7 @@ export function QuitarLinea({ linea, onTerminado }: { linea: LineaVenta; onTermi
     <>
       <button
         type="button"
+        data-control="quitar"
         aria-label={`Quitar ${linea.descripcion}`}
         disabled={quitar.isPending}
         onClick={() => {
