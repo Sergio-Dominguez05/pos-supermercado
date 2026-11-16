@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** Sprint 1 completado (`v0.2.0`) — acceso con contraseña o PIN, usuarios y roles, permisos validados en el servidor, registro de cajas y bitácora protegida. Aún no incluye catálogo, ventas ni certificación FEL real.
+> **Estado:** Sprint 2 completado (`v0.3.0`) — catálogo de productos, cálculo de IVA, apertura de turno de caja y, como adelanto del Sprint 3, la pantalla de venta (agregar productos, totales y cancelar). Aún no incluye clientes, cobro ni certificación FEL real.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -22,17 +22,19 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 
 ## ✅ Funcionalidades disponibles
 
-Entregadas en el **Sprint 1** (`v0.2.0`), con 15 historias de usuario aceptadas:
+| Área | Qué se puede hacer | Historias | Versión |
+|---|---|---|---|
+| Acceso | Iniciar sesión con contraseña (Administrador, Supervisor) o con PIN (Cajero); cerrar sesión (no con una venta en curso); cambiar la contraseña o el PIN propio | HU-01.01, 01.02, 01.13, 01.16 | `v0.2.0` |
+| Usuarios | Crear, consultar con búsqueda y filtros, editar, asignar rol, activar y desactivar; el Administrador restablece contraseñas y PIN (cierra las sesiones abiertas del usuario) | HU-01.05 a 01.09, 01.14 | `v0.2.0` |
+| Permisos | Matriz de permisos por rol; cada endpoint exige su permiso en el servidor y los accesos denegados quedan registrados | HU-01.11 | `v0.2.0` |
+| Configuración | Registrar cajas con su serie de facturación y vincular el equipo (navegador) de cada caja | HU-12.05 | `v0.2.0` |
+| Bitácora | Registro automático de las acciones sensibles, con usuario, rol, caja y valores anteriores y nuevos; inmutable, encadenada con hashes y con verificación de integridad | HU-11.01, 11.02, 11.05 | `v0.2.0` |
+| Catálogo | Registrar, editar (el código no cambia), activar y desactivar productos; lista con búsqueda, filtros y paginación; buscar por código o por descripción (sin tildes ni mayúsculas); códigos no encontrados para registrar después | HU-03.01 a 03.04, 03.06 a 03.09 | `v0.3.0` |
+| IVA | IVA del 12 % incluido en el precio; base e IVA con 6 decimales por línea y redondeo HALF_UP solo en los totales ([reglas](docs/arquitectura/calculo-iva.md)) | HU-04.01 a 04.05 | `v0.3.0` |
+| Caja | Abrir el turno en la caja del equipo (uno por caja y por cajero); sin turno abierto no se vende | HU-09.01 a 09.03 | `v0.3.0` |
+| Venta | Pantalla de venta con número interno; agregar con lector, código escrito o búsqueda por descripción (F2); el precio de cada línea se mantiene aunque cambie en el catálogo; totales y desglose de IVA calculados por el servidor; cancelar con confirmación | HU-06.01 a 06.03, 06.09, 06.14 | `v0.3.0` (adelanto del Sprint 3) |
 
-| Área | Qué se puede hacer | Historias |
-|---|---|---|
-| Acceso | Iniciar sesión con contraseña (Administrador, Supervisor) o con PIN (Cajero); cerrar sesión; cambiar la contraseña o el PIN propio | HU-01.01, 01.02, 01.13, 01.16 |
-| Usuarios | Crear, consultar con búsqueda y filtros, editar, asignar rol, activar y desactivar; el Administrador restablece contraseñas y PIN (cierra las sesiones abiertas del usuario) | HU-01.05 a 01.09, 01.14 |
-| Permisos | Matriz de permisos por rol; cada endpoint exige su permiso en el servidor y los accesos denegados quedan registrados | HU-01.11 |
-| Configuración | Registrar cajas con su serie de facturación y vincular el equipo (navegador) de cada caja | HU-12.05 |
-| Bitácora | Registro automático de las acciones sensibles, con usuario, rol, caja y valores anteriores y nuevos; inmutable, encadenada con hashes y con verificación de integridad | HU-11.01, 11.02, 11.05 |
-
-Las reglas que dependen de módulos futuros (caja abierta, venta en curso, turnos) ya están implementadas con puertos e implementaciones provisionales y se completan en su sprint.
+Las reglas que dependen de módulos futuros (clientes, cobro, facturación, cierre de caja) quedan anotadas en sus Issues y se completan en su sprint.
 
 ## 🧩 Arquitectura C4
 
@@ -128,7 +130,7 @@ pos-supermercado/
 └── README.md
 ```
 
-Los módulos Java (`seguridad`, `configuracion`, `bitacora` y los demás, aún vacíos) y React siguen [la propuesta original](docs/original/Architecture.md); las reglas de dependencias entre módulos se verifican con ArchUnit.
+Los módulos Java (`seguridad`, `configuracion`, `bitacora`, `catalogo`, `impuestos`, `caja` y `ventas`; los demás, aún vacíos) y React siguen [la propuesta original](docs/original/Architecture.md); las reglas de dependencias entre módulos se verifican con ArchUnit.
 
 ## 🌿 Flujo de trabajo
 
@@ -157,12 +159,12 @@ El esquema se lee **de arriba hacia abajo por etapas** y **de izquierda a derech
 flowchart TB
     subgraph BASE["Etapa 1 · Fundamentos"]
         direction LR
-        S0["Sprint 0<br/>Preparación del entorno<br/>Base · sin HU"] --> S1["✅ Sprint 1 · v0.2.0<br/>Acceso, usuarios y bitácora<br/>15 HU · Alta"] --> S2["Sprint 2<br/>Catálogo, IVA y apertura de caja<br/>17 HU · Alta"]
+        S0["Sprint 0<br/>Preparación del entorno<br/>Base · sin HU"] --> S1["✅ Sprint 1 · v0.2.0<br/>Acceso, usuarios y bitácora<br/>15 HU · Alta"] --> S2["✅ Sprint 2 · v0.3.0<br/>Catálogo, IVA y apertura de caja<br/>17 HU · Alta"]
     end
 
     subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
         direction LR
-        S3["Sprint 3<br/>Pantalla de venta y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+        S3["🔄 Sprint 3<br/>Pantalla de venta y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
     end
 
     subgraph MEJORAS["Etapa 3 · Reportes y operación"]
@@ -230,4 +232,4 @@ Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](
 
 ---
 
-**Proyecto académico · Guatemala · Entrega del Sprint 1 (`v0.2.0`)**
+**Proyecto académico · Guatemala · Entrega del Sprint 2 (`v0.3.0`)**
