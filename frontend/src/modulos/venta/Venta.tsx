@@ -1,11 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { cancelarVenta, CLAVE_VENTA_EN_CURSO, iniciarVenta, type Venta as DatosVenta } from '../../api/ventas'
 import { EstadoTurno } from '../caja/EstadoTurno'
 import { puedeVender, useTurnoActual } from '../caja/turno'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
+import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { EscanerVenta } from './EscanerVenta'
 import { confirmacionCancelarVenta } from './textos'
+
+/** Lleva el foco a un campo de la pantalla de venta por su nombre (`codigo` o `descripcion`). */
+const enfocar = (campo: 'codigo' | 'descripcion') =>
+  document.querySelector<HTMLInputElement>(`main input[name="${campo}"]`)?.focus()
 
 /** Destino del Cajero al iniciar sesión (HU-01.02) y pantalla de venta (EP-06). */
 export function Venta() {
@@ -19,6 +25,19 @@ export function Venta() {
     queryFn: iniciarVenta,
     enabled: habilitada,
   })
+
+  // HU-06.03 crit. 4: todo con el teclado. F2 abre la búsqueda por descripción (Architecture.md §7.6); Escape en la
+  // búsqueda y elegir un producto devuelven el foco al campo del código, listo para el siguiente escaneo.
+  useEffect(() => {
+    const alPresionar = (evento: KeyboardEvent) => {
+      if (evento.key === 'F2') {
+        evento.preventDefault()
+        enfocar('descripcion')
+      }
+    }
+    window.addEventListener('keydown', alPresionar)
+    return () => window.removeEventListener('keydown', alPresionar)
+  }, [])
   if (!usuario) return null
 
   return (
@@ -37,7 +56,19 @@ export function Venta() {
         <fieldset disabled={!habilitada || !venta}>
           {/* HU-06.02: el lector de código de barras (o el código escrito a mano) agrega el producto. */}
           {/* Se reinicia con cada venta, para que no quede el aviso del último escaneo de la anterior. */}
-          <EscanerVenta key={venta?.id} />
+          <EscanerVenta key={venta?.id} onBuscarPorDescripcion={() => enfocar('descripcion')} />
+          {/* HU-06.03 crit. 2: buscar por descripción, elegir y agregar. */}
+          <section
+            aria-label="Buscar por descripción"
+            onKeyDown={(evento) => {
+              if (evento.key === 'Escape') enfocar('codigo')
+            }}
+          >
+            <h3>
+              Buscar por descripción <kbd>F2</kbd>
+            </h3>
+            <BusquedaEnVenta key={venta?.id} onTerminado={() => enfocar('codigo')} />
+          </section>
         </fieldset>
         {!habilitada && <p className="pendiente">La venta está deshabilitada: abra su turno en una caja para vender.</p>}
         {habilitada && error && (

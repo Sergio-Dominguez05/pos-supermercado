@@ -6,7 +6,7 @@ import gt.supermercado.pos.ventas.dominio.EstadoVenta;
 import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.Venta;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,17 +62,30 @@ public class VentasController {
         return RespuestaVenta.de(gestionVentas.iniciar(sesion));
     }
 
-    /** El código tal como lo envía el lector o lo escribe el cajero; el servidor lo normaliza (HU-03.06). */
-    public record SolicitudLinea(@NotBlank @Size(max = 100) String codigo) {}
+    /**
+     * El producto a agregar: o el código tal como lo envía el lector o lo escribe el cajero (HU-06.02, HU-06.03
+     * crit. 1; el servidor lo normaliza), o el id del producto elegido en la búsqueda por descripción (HU-06.03
+     * crit. 2). Exactamente uno de los dos.
+     */
+    public record SolicitudLinea(@Size(max = 100) String codigo, Long productoId) {
+
+        @AssertTrue(message = "indique el código o el producto, pero no ambos")
+        public boolean isUnaReferencia() {
+            return (codigo != null && !codigo.isBlank()) != (productoId != null);
+        }
+    }
 
     /**
-     * HU-06.02: agrega el producto escaneado a la venta en curso (la inicia si hace falta) y devuelve la venta con
-     * los totales recalculados. 404 si el código no existe (HU-03.08), 422 si el producto está inactivo (HU-03.09).
+     * HU-06.02 y HU-06.03: agrega el producto a la venta en curso (la inicia si hace falta) y devuelve la venta con
+     * los totales recalculados. 404 si el código o el producto no existen (HU-03.08), 422 si el producto está
+     * inactivo (HU-03.09).
      */
     @PostMapping("/actual/lineas")
     @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
     public RespuestaVenta agregar(@Valid @RequestBody SolicitudLinea solicitud, @AuthenticationPrincipal SesionActiva sesion) {
-        return RespuestaVenta.de(gestionVentas.agregarPorCodigo(solicitud.codigo(), sesion));
+        return RespuestaVenta.de(solicitud.productoId() != null
+                ? gestionVentas.agregarProducto(solicitud.productoId(), sesion)
+                : gestionVentas.agregarPorCodigo(solicitud.codigo(), sesion));
     }
 
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */
