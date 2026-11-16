@@ -427,3 +427,27 @@ kbd {
 .aviso-alerta button {
   justify-self: start;
 }
+
+/* Totales de la venta: Subtotal, IVA y TOTAL en ese orden (HU-04.04); el TOTAL en letra grande (HU-06.08). */
+.totales {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: end;
+  gap: 4px 24px;
+  margin: 0;
+}
+
+.totales dt {
+  color: var(--texto-suave);
+}
+
+.totales dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totales dd.total {
+  font-size: 2rem;
+  font-weight: 700;
+}
