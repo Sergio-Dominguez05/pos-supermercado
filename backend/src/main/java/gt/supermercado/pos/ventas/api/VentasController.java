@@ -7,12 +7,15 @@ import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.Venta;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -67,25 +70,55 @@ public class VentasController {
      * crit. 1; el servidor lo normaliza), o el id del producto elegido en la búsqueda por descripción (HU-06.03
      * crit. 2). Exactamente uno de los dos.
      */
-    public record SolicitudLinea(@Size(max = 100) String codigo, Long productoId) {
+    public record SolicitudLinea(@Size(max = 100) String codigo, Long productoId, Integer cantidad,
+                                 Boolean confirmada) {
 
         @AssertTrue(message = "indique el código o el producto, pero no ambos")
         public boolean isUnaReferencia() {
             return (codigo != null && !codigo.isBlank()) != (productoId != null);
         }
+
+        /** HU-06.04: sin cantidad se agrega una unidad (HU-06.02 crit. 1); sin {@code confirmada}, no se confirmó. */
+        int unidades() {
+            return cantidad == null ? 1 : cantidad;
+        }
+
+        boolean confirmo() {
+            return Boolean.TRUE.equals(confirmada);
+        }
     }
 
     /**
-     * HU-06.02 y HU-06.03: agrega el producto a la venta en curso (la inicia si hace falta) y devuelve la venta con
-     * los totales recalculados. 404 si el código o el producto no existen (HU-03.08), 422 si el producto está
-     * inactivo (HU-03.09).
+     * HU-06.02, HU-06.03 y HU-06.04: agrega el producto a la venta en curso (la inicia si hace falta) y devuelve la
+     * venta con los totales recalculados. 404 si el código o el producto no existen (HU-03.08), 422 si el producto
+     * está inactivo (HU-03.09), si la cantidad no es válida ({@code CANTIDAD_INVALIDA}) o si hay que confirmarla
+     * ({@code CANTIDAD_POR_CONFIRMAR}: se reenvía con {@code confirmada}).
      */
     @PostMapping("/actual/lineas")
     @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
     public RespuestaVenta agregar(@Valid @RequestBody SolicitudLinea solicitud, @AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaVenta.de(solicitud.productoId() != null
-                ? gestionVentas.agregarProducto(solicitud.productoId(), sesion)
-                : gestionVentas.agregarPorCodigo(solicitud.codigo(), sesion));
+                ? gestionVentas.agregarProducto(solicitud.productoId(), solicitud.unidades(), solicitud.confirmo(), sesion)
+                : gestionVentas.agregarPorCodigo(solicitud.codigo(), solicitud.unidades(), solicitud.confirmo(), sesion));
+    }
+
+    /** La cantidad nueva de la línea (HU-06.04 crit. 2) y si el cajero ya confirmó una cantidad alta (crit. 4). */
+    public record SolicitudCantidad(@NotNull Integer cantidad, Boolean confirmada) {
+
+        boolean confirmo() {
+            return Boolean.TRUE.equals(confirmada);
+        }
+    }
+
+    /**
+     * HU-06.04 crit. 2: cambia la cantidad de una línea de la venta en curso y devuelve la venta recalculada. 404 si
+     * la línea no es de la venta en curso del turno; 422 si la cantidad no es válida o hay que confirmarla.
+     */
+    @PutMapping("/actual/lineas/{lineaId}/cantidad")
+    @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
+    public RespuestaVenta cambiarCantidad(@PathVariable long lineaId, @Valid @RequestBody SolicitudCantidad solicitud,
+                                          @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.cambiarCantidad(lineaId, solicitud.cantidad(), solicitud.confirmo(), sesion));
     }
 
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */

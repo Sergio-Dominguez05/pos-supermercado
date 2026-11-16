@@ -36,6 +36,9 @@ public interface RepositorioVentas {
      */
     Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId, BigDecimal precioUnitario);
 
+    /** La línea, solo si pertenece a esa venta: nadie cambia líneas de otra venta con su id (HU-06.04 crit. 2). */
+    Optional<LineaVenta> lineaDeVenta(long ventaId, long lineaId);
+
     /** Agrega una línea nueva con la copia de la descripción y del precio vigente (HU-06.09). */
     void agregarLinea(long ventaId, long productoId, String descripcion, LineaCalculada linea);
 

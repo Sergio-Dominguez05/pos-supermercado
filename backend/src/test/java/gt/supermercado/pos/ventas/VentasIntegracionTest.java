@@ -578,7 +578,171 @@ class VentasIntegracionTest {
         assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
     }
 
+    // HU-06.04 Indicar la cantidad de un producto
+
+    @Test
+    void conElMultiplicadorSeAgreganVariasUnidadesDeUnaVez() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        HttpResponse<String> respuesta = escanear(arroz.codigo(), 6, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"cantidad\":6", "\"articulos\":6", "\"total\":30.00");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+        // Sin multiplicador vuelve a ser una unidad, que se suma a la misma línea (HU-06.02 crit. 2).
+        assertThat(escanear(arroz.codigo(), cajero).body()).contains("\"cantidad\":7", "\"total\":35.00");
+    }
+
+    @Test
+    void elMultiplicadorSeSumaALaLineaYTambienValeEnLaBusqueda() throws Exception {   // crit. 1 y HU-06.03
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto agua = nuevoProducto("Agua 600 ml", "11.20");
+        escanear(agua.codigo(), cajero);
+
+        HttpResponse<String> respuesta = enviar("/api/ventas/actual/lineas", "POST",
+                "{\"productoId\":%d,\"cantidad\":3}".formatted(agua.id()), cajero.sesion());
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"cantidad\":4", "\"articulos\":4", "\"total\":44.80");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+    }
+
+    @Test
+    void laCantidadDebeSerUnEnteroMayorQueCero() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        for (String cantidad : List.of("0", "-2", "10000")) {
+            HttpResponse<String> respuesta = enviar("/api/ventas/actual/lineas", "POST",
+                    "{\"codigo\":\"%s\",\"cantidad\":%s,\"confirmada\":true}".formatted(arroz.codigo(), cantidad),
+                    cajero.sesion());
+            assertThat(respuesta.statusCode()).as("cantidad " + cantidad).isEqualTo(422);
+            assertThat(respuesta.body()).contains("CANTIDAD_INVALIDA");
+        }
+        for (String cantidad : List.of("2.5", "\"seis\"")) {
+            HttpResponse<String> respuesta = enviar("/api/ventas/actual/lineas", "POST",
+                    "{\"codigo\":\"%s\",\"cantidad\":%s}".formatted(arroz.codigo(), cantidad), cajero.sesion());
+            assertThat(respuesta.statusCode()).as("cantidad " + cantidad).isBetween(400, 422);
+        }
+        assertThat(lineasEnCurso(cajero)).isZero();
+    }
+
+    @Test
+    void unaCantidadMayorAlLimiteSePideConfirmarAntesDeAgregarla() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        HttpResponse<String> sinConfirmar = escanear(arroz.codigo(), 51, cajero);
+
+        assertThat(sinConfirmar.statusCode()).isEqualTo(422);
+        assertThat(sinConfirmar.body()).contains("CANTIDAD_POR_CONFIRMAR", "51", "50");
+        assertThat(lineasEnCurso(cajero)).isZero();
+
+        HttpResponse<String> confirmada = enviar("/api/ventas/actual/lineas", "POST",
+                "{\"codigo\":\"%s\",\"cantidad\":51,\"confirmada\":true}".formatted(arroz.codigo()), cajero.sesion());
+        assertThat(confirmada.statusCode()).isEqualTo(200);
+        assertThat(confirmada.body()).contains("\"cantidad\":51", "\"total\":255.00");
+    }
+
+    @Test
+    void elLimiteEsElConfiguradoYHastaElNoSePideConfirmacion() throws Exception {   // crit. 4 y HU-12.13
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        assertThat(escanear(arroz.codigo(), 50, cajero).statusCode()).isEqualTo(200);
+
+        String anterior = jdbc.queryForObject("SELECT valor::text FROM parametro WHERE clave = 'cantidad_max_linea'",
+                String.class);
+        jdbc.update("UPDATE parametro SET valor = '10' WHERE clave = 'cantidad_max_linea'");
+        try {
+            assertThat(escanear(arroz.codigo(), 10, cajero).statusCode()).isEqualTo(200);
+            assertThat(escanear(arroz.codigo(), 11, cajero).body()).contains("CANTIDAD_POR_CONFIRMAR");
+        } finally {
+            jdbc.update("UPDATE parametro SET valor = ?::jsonb WHERE clave = 'cantidad_max_linea'", anterior);
+        }
+    }
+
+    @Test
+    void sePuedeCambiarLaCantidadDeUnaLineaConSuPropioPrecio() throws Exception {   // crit. 2 y HU-04.04 crit. 6
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        cambiarPrecio(arroz, "6.00");   // la línea conserva Q5.00 (HU-06.09)
+
+        HttpResponse<String> respuesta = cambiarCantidad(lineaDe(cajero, arroz), 5, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        // 5 x Q5.00 = Q25.00: IVA = 25.00 - 25.00 / 1.12 = 2.678571, que da Q2.68.
+        assertThat(respuesta.body()).contains("\"cantidad\":5", "\"precioUnitario\":5.00", "\"articulos\":5",
+                "\"subtotal\":22.32", "\"iva\":2.68", "\"total\":25.00");
+        // También se puede bajar la cantidad.
+        assertThat(cambiarCantidad(lineaDe(cajero, arroz), 2, cajero).body())
+                .contains("\"cantidad\":2", "\"total\":10.00");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+    }
+
+    @Test
+    void alCambiarLaCantidadSeAplicanLasMismasReglas() throws Exception {   // crit. 2, 3 y 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        long linea = lineaDe(cajero, arroz);
+
+        assertThat(cambiarCantidad(linea, 0, cajero).body()).contains("CANTIDAD_INVALIDA");
+        assertThat(cambiarCantidad(linea, 80, cajero).body()).contains("CANTIDAD_POR_CONFIRMAR");
+        assertThat(enviar("/api/ventas/actual/lineas/" + linea + "/cantidad", "PUT", "{}", cajero.sesion()).statusCode())
+                .isEqualTo(400);
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body()).contains("\"cantidad\":1");
+
+        HttpResponse<String> confirmada = enviar("/api/ventas/actual/lineas/" + linea + "/cantidad", "PUT",
+                "{\"cantidad\":80,\"confirmada\":true}", cajero.sesion());
+        assertThat(confirmada.statusCode()).isEqualTo(200);
+        assertThat(confirmada.body()).contains("\"cantidad\":80");
+    }
+
+    @Test
+    void noSePuedeCambiarUnaLineaDeOtraVenta() throws Exception {   // crit. 2: solo la venta en curso propia
+        Cajero ana = cajeroConTurnoAbierto();
+        Cajero beto = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), ana);
+        escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), beto);
+
+        HttpResponse<String> respuesta = cambiarCantidad(lineaDe(ana, arroz), 9, beto);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        assertThat(respuesta.body()).contains("LINEA_NO_ENCONTRADA");
+        assertThat(enviar("/api/ventas/actual", "GET", null, ana.sesion()).body()).contains("\"cantidad\":1");
+    }
+
+    @Test
+    void sinTurnoAbiertoNoSeCambiaLaCantidad() throws Exception {
+        Cajero cajero = cajeroEnCaja();
+
+        HttpResponse<String> respuesta = cambiarCantidad(1, 2, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("CAJA_CERRADA");
+    }
+
     // Apoyo
+
+    private HttpResponse<String> escanear(String codigo, int cantidad, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas", "POST",
+                "{\"codigo\":\"%s\",\"cantidad\":%d}".formatted(codigo, cantidad), cajero.sesion());
+    }
+
+    private HttpResponse<String> cambiarCantidad(long linea, int cantidad, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas/" + linea + "/cantidad", "PUT",
+                "{\"cantidad\":%d}".formatted(cantidad), cajero.sesion());
+    }
+
+    private long lineaDe(Cajero cajero, Producto producto) {
+        return jdbc.queryForObject("""
+                SELECT l.id FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.producto_id = ?""",
+                Long.class, cajero.usuarioId(), producto.id());
+    }
 
     private HttpResponse<String> escanear(String codigo, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), cajero.sesion());

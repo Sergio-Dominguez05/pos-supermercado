@@ -171,6 +171,29 @@ describe('ver totales en tiempo real (HU-06.08)', () => {
   })
 })
 
+describe('cambiar la cantidad de una línea (HU-06.04 crit. 2)', () => {
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [
+    { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+      subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 },
+  ] }
+
+  it('en la pantalla de venta cada línea tiene su cantidad editable', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz)
+
+    expect(html).toMatch(/<input[^>]*name="cantidad"/)
+    expect(html).toContain('aria-label="Cantidad de Arroz 1 lb"')
+    expect(html).toContain('value="3"')
+  })
+
+  it('el detalle de solo lectura muestra la cantidad sin campo', () => {
+    expect(renderToString(<DetalleVenta venta={conArroz} />)).not.toContain('name="cantidad"')
+  })
+
+  it('el campo del código explica el multiplicador (crit. 1)', () => {
+    expect(renderizar(CAJERO, TURNO)).toContain('6* antes para 6 unidades')
+  })
+})
+
 describe('IVA por línea en el detalle de la venta (HU-04.03)', () => {
   const ARROZ = {
     id: 1,
