@@ -6,6 +6,7 @@ import { puedeVender, useTurnoActual } from '../caja/turno'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
 import { BusquedaEnVenta } from './BusquedaEnVenta'
+import { CantidadLinea } from './CantidadLinea'
 import { EscanerVenta } from './EscanerVenta'
 import { confirmacionCancelarVenta, formatoDesglose } from './textos'
 
@@ -76,15 +77,26 @@ export function Venta() {
             {error.message}
           </p>
         )}
-        {habilitada && venta && <DetalleVenta venta={venta} />}
+        {habilitada && venta && <DetalleVenta venta={venta} editable onTerminado={() => enfocar('codigo')} />}
         {habilitada && venta && <CancelarVenta venta={venta} />}
       </section>
     </main>
   )
 }
 
-/** Líneas de la venta y sus totales, tal como los calcula el servidor (HU-04.04, HU-06.08). */
-export function DetalleVenta({ venta }: { venta: DatosVenta }) {
+/**
+ * Líneas de la venta y sus totales, tal como los calcula el servidor (HU-04.04, HU-06.08). Con `editable`, la
+ * cantidad de cada línea se puede cambiar (HU-06.04 crit. 2).
+ */
+export function DetalleVenta({
+  venta,
+  editable = false,
+  onTerminado,
+}: {
+  venta: DatosVenta
+  editable?: boolean
+  onTerminado?: () => void
+}) {
   return (
     <>
       {venta.lineas.length === 0 ? (
@@ -106,7 +118,14 @@ export function DetalleVenta({ venta }: { venta: DatosVenta }) {
                 <tr key={linea.id}>
                   <td>{linea.codigoBarras}</td>
                   <td>{linea.descripcion}</td>
-                  <td>{linea.cantidad}</td>
+                  <td>
+                    {editable ? (
+                      // La clave incluye la cantidad: si cambia (otro escaneo), el campo muestra la nueva.
+                      <CantidadLinea key={`${linea.id}-${linea.cantidad}`} linea={linea} onTerminado={onTerminado} />
+                    ) : (
+                      linea.cantidad
+                    )}
+                  </td>
                   <td>{formatoQuetzales(linea.precioUnitario)}</td>
                   <td>{formatoQuetzales(linea.subtotalConIva)}</td>
                 </tr>

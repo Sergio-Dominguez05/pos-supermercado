@@ -105,6 +105,12 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
+    public Optional<LineaVenta> lineaDeVenta(long ventaId, long lineaId) {
+        return jdbc.query(SELECT_LINEA + "WHERE l.venta_id = ? AND l.id = ?", LINEA, ventaId, lineaId).stream()
+                .findFirst();
+    }
+
+    @Override
     public void agregarLinea(long ventaId, long productoId, String descripcion, LineaCalculada linea) {
         jdbc.update("""
                 INSERT INTO venta_linea (venta_id, producto_id, descripcion, cantidad, precio_unitario, subtotal_con_iva,

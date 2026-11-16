@@ -9,6 +9,7 @@ import gt.supermercado.pos.catalogo.aplicacion.GestionProductos;
 import gt.supermercado.pos.catalogo.dominio.Producto;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
+import gt.supermercado.pos.configuracion.aplicacion.Parametros;
 import gt.supermercado.pos.impuestos.dominio.CalculadoraIva;
 import gt.supermercado.pos.impuestos.dominio.TasaIva;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -30,15 +31,24 @@ import java.util.Optional;
 @Service
 public class GestionVentas {
 
+    /**
+     * Tope técnico de unidades por línea (HU-06.04 crit. 3). Por encima de la cantidad máxima configurada ya se pide
+     * confirmación (crit. 4); este tope evita, además, cantidades absurdas aunque se confirmen.
+     */
+    public static final int CANTIDAD_MAXIMA = 9999;
+
     private final RepositorioVentas ventas;
     private final GestionTurnos turnos;
     private final GestionProductos productos;
+    private final Parametros parametros;
     private final Bitacora bitacora;
 
-    public GestionVentas(RepositorioVentas ventas, GestionTurnos turnos, GestionProductos productos, Bitacora bitacora) {
+    public GestionVentas(RepositorioVentas ventas, GestionTurnos turnos, GestionProductos productos,
+                         Parametros parametros, Bitacora bitacora) {
         this.ventas = ventas;
         this.turnos = turnos;
         this.productos = productos;
+        this.parametros = parametros;
         this.bitacora = bitacora;
     }
 
@@ -70,44 +80,96 @@ public class GestionVentas {
      *       {@link GestionProductos#paraVender}: 404 con el código anotado (HU-03.08) o 422 {@code PRODUCTO_INACTIVO}
      *       (HU-03.09), y no se agrega nada.</li>
      * </ul>
-     * El código anotado por HU-03.08 se guarda aunque la respuesta sea 404 ({@code noRollbackFor}).
+     * HU-06.04 crit. 1: con el prefijo {@code 6*} del lector se agregan (o suman) {@code cantidad} unidades; la
+     * cantidad se valida antes de buscar el producto (crit. 3 y 4). El código anotado por HU-03.08 se guarda aunque
+     * la respuesta sea 404 ({@code noRollbackFor}).
      */
     @Transactional(noRollbackFor = RecursoNoEncontradoException.class)
-    public Venta agregarPorCodigo(String codigo, SesionActiva sesion) {
+    public Venta agregarPorCodigo(String codigo, int cantidad, boolean confirmada, SesionActiva sesion) {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
+        validarCantidad(cantidad, confirmada);
         Producto producto = productos.paraVender(codigo, sesion);
-        return agregar(turno, producto, sesion);
+        return agregar(turno, producto, cantidad, sesion);
     }
 
     /**
-     * HU-06.03 crit. 2: agrega el producto elegido en la búsqueda por descripción. Si ya está en la venta, suma 1 a
+     * HU-06.03 crit. 2: agrega el producto elegido en la búsqueda por descripción. Si ya está en la venta, suma a
      * su línea igual que al escanearlo (crit. 3). Un producto desactivado después de la búsqueda se rechaza
-     * (HU-03.09).
+     * (HU-03.09). El prefijo de cantidad también vale aquí (HU-06.04 crit. 1).
      */
     @Transactional
-    public Venta agregarProducto(long productoId, SesionActiva sesion) {
+    public Venta agregarProducto(long productoId, int cantidad, boolean confirmada, SesionActiva sesion) {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
-        return agregar(turno, productos.paraVender(productoId), sesion);
+        validarCantidad(cantidad, confirmada);
+        return agregar(turno, productos.paraVender(productoId), cantidad, sesion);
     }
 
     /**
-     * Agrega una unidad del producto con su precio vigente. HU-06.09: cada línea guarda el precio con el que se agregó
-     * (crit. 1) y nunca cambia (crit. 2); si el precio cambió desde que el producto entró a la venta, la unidad nueva
-     * va en otra línea con el precio nuevo (crit. 3). Si ya hay una línea del producto con el precio vigente, se le
-     * suma 1 (HU-06.02 crit. 2).
+     * HU-06.04 crit. 2: cambia la cantidad de una línea ya agregada de la venta en curso. La línea se recalcula con
+     * su propio precio unitario (HU-06.09) y la tasa guardada en la venta, y los totales se devuelven recalculados
+     * (HU-04.04 crit. 6). Quitar la línea es HU-06.07: aquí la cantidad debe ser mayor que cero (crit. 3).
      */
-    private Venta agregar(Turno turno, Producto producto, SesionActiva sesion) {
+    @Transactional
+    public Venta cambiarCantidad(long lineaId, int cantidad, boolean confirmada, SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        validarCantidad(cantidad, confirmada);
+        Venta venta = ventas.enCursoDelTurno(turno.id())
+                .orElseThrow(() -> new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso."));
+        if (!ventas.bloquearEnCurso(venta.id())) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        LineaVenta linea = ventas.lineaDeVenta(venta.id(), lineaId).orElseThrow(
+                () -> new RecursoNoEncontradoException("LINEA_NO_ENCONTRADA", "La línea no está en la venta en curso."));
+        ventas.actualizarLinea(linea.id(),
+                CalculadoraIva.linea(linea.precioUnitario(), cantidad, TasaIva.de(venta.tasaIva())));
+        return ventas.buscarPorId(venta.id()).orElseThrow();
+    }
+
+    /**
+     * HU-06.04 crit. 3: la cantidad es un entero mayor que cero, hasta {@link #CANTIDAD_MAXIMA}. Crit. 4: si supera
+     * la cantidad máxima por línea configurada, el cajero debe confirmarla para evitar errores de digitación.
+     */
+    private void validarCantidad(int cantidad, boolean confirmada) {
+        if (cantidad < 1 || cantidad > CANTIDAD_MAXIMA) {
+            throw cantidadInvalida();
+        }
+        int limite = parametros.cantidadMaximaPorLinea();
+        if (cantidad > limite && !confirmada) {
+            throw new NegocioException("CANTIDAD_POR_CONFIRMAR",
+                    "La cantidad %d es mayor que %d. Confírmela para continuar.".formatted(cantidad, limite));
+        }
+    }
+
+    private static NegocioException cantidadInvalida() {
+        return new NegocioException("CANTIDAD_INVALIDA",
+                "La cantidad debe ser un número entero entre 1 y %d.".formatted(CANTIDAD_MAXIMA));
+    }
+
+    /**
+     * Agrega unidades del producto con su precio vigente. HU-06.09: cada línea guarda el precio con el que se agregó
+     * (crit. 1) y nunca cambia (crit. 2); si el precio cambió desde que el producto entró a la venta, las unidades
+     * nuevas van en otra línea con el precio nuevo (crit. 3). Si ya hay una línea del producto con el precio vigente,
+     * se le suman (HU-06.02 crit. 2).
+     */
+    private Venta agregar(Turno turno, Producto producto, int cantidad, SesionActiva sesion) {
         long ventaId = ventas.iniciar(turno.id(), turno.cajaId(), sesion.usuarioId(), TasaIva.VIGENTE.valor());
         if (!ventas.bloquearEnCurso(ventaId)) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }
         Venta venta = ventas.buscarPorId(ventaId).orElseThrow();
         TasaIva tasa = TasaIva.de(venta.tasaIva());
-        ventas.lineaDelProducto(ventaId, producto.id(), producto.precio()).ifPresentOrElse(
-                linea -> ventas.actualizarLinea(linea.id(),
-                        CalculadoraIva.linea(linea.precioUnitario(), linea.cantidad() + 1, tasa)),
-                () -> ventas.agregarLinea(ventaId, producto.id(), producto.descripcion(),
-                        CalculadoraIva.linea(producto.precio(), 1, tasa)));
+        Optional<LineaVenta> existente = ventas.lineaDelProducto(ventaId, producto.id(), producto.precio());
+        if (existente.isPresent()) {
+            LineaVenta linea = existente.get();
+            if (linea.cantidad() + cantidad > CANTIDAD_MAXIMA) {
+                throw cantidadInvalida();
+            }
+            ventas.actualizarLinea(linea.id(),
+                    CalculadoraIva.linea(linea.precioUnitario(), linea.cantidad() + cantidad, tasa));
+        } else {
+            ventas.agregarLinea(ventaId, producto.id(), producto.descripcion(),
+                    CalculadoraIva.linea(producto.precio(), cantidad, tasa));
+        }
         return ventas.buscarPorId(ventaId).orElseThrow();
     }
 

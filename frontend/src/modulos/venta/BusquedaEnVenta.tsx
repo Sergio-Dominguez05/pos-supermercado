@@ -15,7 +15,8 @@ export function BusquedaEnVenta({ onTerminado }: { onTerminado?: () => void }) {
   const [agregada, setAgregada] = useState<LineaVenta>()
   const clienteConsultas = useQueryClient()
   const eleccion = useMutation({
-    mutationFn: agregarProducto,
+    // Solo el id: React Query pasa un segundo argumento (su contexto) que no debe llegar como cantidad (HU-06.04).
+    mutationFn: (productoId: number) => agregarProducto(productoId),
     onSuccess: (venta) => {
       setAgregada(lineaAgregada(clienteConsultas.getQueryData<Venta>(CLAVE_VENTA_EN_CURSO), venta))
       clienteConsultas.setQueryData(CLAVE_VENTA_EN_CURSO, venta)

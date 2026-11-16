@@ -459,6 +459,19 @@ kbd {
   font-weight: 700;
 }
 
+/* Cantidad editable de cada línea de la venta (HU-06.04 crit. 2). */
+.cantidad-linea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.cantidad-linea input {
+  width: 5em;
+  text-align: right;
+}
+
 /* Desglose de IVA por línea de la venta (HU-04.03 crit. 3). */
 .desglose summary {
   cursor: pointer;

@@ -19,6 +19,9 @@ spring:
     locations: classpath:db/migration
   jackson:
     time-zone: America/Guatemala
+    deserialization:
+      # Un decimal en un campo entero es un error, no se trunca: "2.5" unidades no son 2 (HU-06.04 crit. 3).
+      accept-float-as-int: false
 
 server:
   port: ${POS_BACKEND_PORT:8080}
