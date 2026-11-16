@@ -248,6 +248,9 @@ class VentasIntegracionTest {
         assertThat(linea.get("iva").toString()).isEqualTo("1.607143");
         // 3 x Q5.00 + Q11.20: IVA = 1.607143 + 1.200000 = 2.807143, que da Q2.81; Subtotal = TOTAL - IVA.
         assertThat(respuesta.body()).contains("\"articulos\":4", "\"subtotal\":23.39", "\"iva\":2.81", "\"total\":26.20");
+        // HU-04.03 crit. 3: la venta entrega el desglose de cada línea, con sus 6 decimales, para mostrarlo.
+        assertThat(respuesta.body()).contains("\"subtotalConIva\":15.000000", "\"baseImponible\":13.392857",
+                "\"iva\":1.607143");
     }
 
     @Test
