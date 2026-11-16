@@ -29,7 +29,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** HU-06.01 Iniciar una venta y HU-06.14 Cancelar una venta en curso, contra PostgreSQL real con las migraciones. */
+/**
+ * EP-06 Ventas contra PostgreSQL real con las migraciones: HU-06.01 Iniciar una venta, HU-06.02 Agregar producto con
+ * lector de código de barras y HU-06.14 Cancelar una venta en curso.
+ */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "pos.seguridad.admin-inicial.contrasena=" + VentasIntegracionTest.CONTRASENA_ADMIN)
@@ -175,6 +178,10 @@ class VentasIntegracionTest {
         assertThat(ids).containsOnly(ids.getFirst());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM venta WHERE usuario_id = ?", Integer.class, cajero.usuarioId()))
                 .isEqualTo(1);
+        // Ninguna de las peticiones que encontró la venta ya creada consumió un número (HU-06.01 crit. 4).
+        enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion());
+        long siguiente = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        assertThat(numeroDe(siguiente)).isEqualTo(numeroDe(ids.getFirst()) + 1);
     }
 
     @Test
@@ -187,6 +194,164 @@ class VentasIntegracionTest {
                 INSERT INTO venta (turno_id, caja_id, usuario_id, tasa_iva) VALUES (?, ?, ?, 0.12)""",
                 fila.get("turno_id"), fila.get("caja_id"), fila.get("usuario_id")))
                 .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    // HU-06.02 Agregar producto con lector de código de barras
+
+    @Test
+    void unProductoEscaneadoSeAgregaConCantidadUnoYSuPrecioVigente() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        HttpResponse<String> respuesta = escanear(arroz.codigo(), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"descripcion\":\"Arroz 1 lb\"", "\"cantidad\":1",
+                "\"precioUnitario\":5.00", "\"codigoBarras\":\"%s\"".formatted(arroz.codigo()), "\"articulos\":1",
+                "\"total\":5.00");
+        Map<String, Object> linea = jdbc.queryForMap("""
+                SELECT l.cantidad, l.precio_unitario, l.descripcion FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'""", cajero.usuarioId());
+        assertThat(linea).containsEntry("cantidad", 1).containsEntry("descripcion", "Arroz 1 lb");
+        assertThat((BigDecimal) linea.get("precio_unitario")).isEqualByComparingTo("5.00");
+    }
+
+    @Test
+    void escanearElMismoProductoSumaUnoASuLineaSinCrearOtra() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        escanear(arroz.codigo(), cajero);
+        escanear(arroz.codigo(), cajero);
+        HttpResponse<String> respuesta = escanear(arroz.codigo(), cajero);
+
+        assertThat(respuesta.body()).contains("\"cantidad\":3", "\"articulos\":3");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+    }
+
+    @Test
+    void cadaLineaGuardaSuDesgloseYLosTotalesSeRedondeanAlFinal() throws Exception {   // HU-04.03 y HU-04.04
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        for (int i = 0; i < 3; i++) {
+            escanear(arroz.codigo(), cajero);
+        }
+
+        HttpResponse<String> respuesta = escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+
+        Map<String, Object> linea = jdbc.queryForMap("""
+                SELECT l.subtotal_con_iva, l.base_imponible, l.iva FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND l.producto_id = ?""", cajero.usuarioId(), arroz.id());
+        assertThat(linea.get("subtotal_con_iva").toString()).isEqualTo("15.000000");
+        assertThat(linea.get("base_imponible").toString()).isEqualTo("13.392857");
+        assertThat(linea.get("iva").toString()).isEqualTo("1.607143");
+        // 3 x Q5.00 + Q11.20: IVA = 1.607143 + 1.200000 = 2.807143, que da Q2.81; Subtotal = TOTAL - IVA.
+        assertThat(respuesta.body()).contains("\"articulos\":4", "\"subtotal\":23.39", "\"iva\":2.81", "\"total\":26.20");
+    }
+
+    @Test
+    void elCodigoEscritoAManoSeNormalizaComoElDelLector() throws Exception {   // HU-03.06 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto producto = nuevoProducto("Café 400 g", "32.50");
+
+        HttpResponse<String> respuesta = escanear("  " + producto.codigo().toLowerCase() + " ", cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("Café 400 g");
+    }
+
+    @Test
+    void sinVentaIniciadaElPrimerProductoLaInicia() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+
+        assertThat(escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), cajero).statusCode()).isEqualTo(200);
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body()).contains("Sal 1 lb");
+    }
+
+    @Test
+    void unCodigoQueNoExisteNoAgregaNadaYQuedaAnotado() throws Exception {   // crit. 4, HU-03.08
+        Cajero cajero = cajeroConTurnoAbierto();
+        String codigo = "NOEXISTE" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+
+        HttpResponse<String> respuesta = escanear(codigo, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        assertThat(respuesta.body()).contains("PRODUCTO_NO_ENCONTRADO");
+        assertThat(lineasEnCurso(cajero)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM codigo_no_encontrado WHERE codigo = ? AND usuario_id = ?",
+                Integer.class, codigo, cajero.usuarioId())).isEqualTo(1);
+    }
+
+    @Test
+    void unProductoInactivoNoSeAgrega() throws Exception {   // crit. 4, HU-03.09
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto galleta = nuevoProducto("Galleta descontinuada", "2.50");
+        enviar("/api/productos/" + galleta.id() + "/desactivar", "POST", null, cookieAdmin);
+
+        HttpResponse<String> respuesta = escanear(galleta.codigo(), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("PRODUCTO_INACTIVO", "no está disponible para la venta");
+        assertThat(lineasEnCurso(cajero)).isZero();
+    }
+
+    @Test
+    void conLaCajaCerradaNoSeAgreganProductos() throws Exception {
+        Cajero cajero = cajeroEnCaja();
+
+        HttpResponse<String> respuesta = escanear(nuevoProducto("Leche 1 l", "12.00").codigo(), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("CAJA_CERRADA");
+    }
+
+    @Test
+    void escaneosSimultaneosDelMismoProductoSumanTodosEnUnaLinea() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto producto = nuevoProducto("Jabón", "7.00");
+        List<Callable<Integer>> tareas = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            tareas.add(() -> escanear(producto.codigo(), cajero).statusCode());
+        }
+
+        List<Integer> estados = new ArrayList<>();
+        try (ExecutorService hilos = Executors.newFixedThreadPool(10)) {
+            for (Future<Integer> estado : hilos.invokeAll(tareas)) {
+                estados.add(estado.get());
+            }
+        }
+
+        assertThat(estados).containsOnly(200);
+        assertThat(jdbc.queryForObject("""
+                SELECT l.cantidad FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'""", Integer.class, cajero.usuarioId())).isEqualTo(10);
+    }
+
+    @Test
+    void escanearYConsultarLaVentaNoConsumeNumerosDeVenta() throws Exception {   // HU-06.01 crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto producto = nuevoProducto("Fideo", "4.00");
+        long primera = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        for (int i = 0; i < 5; i++) {
+            escanear(producto.codigo(), cajero);
+            enviar("/api/ventas", "POST", null, cajero.sesion());
+        }
+        enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion());
+
+        long segunda = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+
+        // Las pruebas corren una tras otra: nadie más toma números de la secuencia entre las dos ventas.
+        assertThat(numeroDe(segunda)).isEqualTo(numeroDe(primera) + 1);
+    }
+
+    @Test
+    void elFlujoCompletoEscanearCancelarYCerrarSesion() throws Exception {   // HU-06.14 y HU-01.16 con productos reales
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Pan dulce", "1.50").codigo(), cajero);
+
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(409);
+        assertThat(enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion()).statusCode()).isEqualTo(200);
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
     }
 
     // HU-06.14 Cancelar una venta en curso
@@ -279,6 +444,20 @@ class VentasIntegracionTest {
     }
 
     // Apoyo
+
+    private HttpResponse<String> escanear(String codigo, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), cajero.sesion());
+    }
+
+    private long numeroDe(long venta) {
+        return jdbc.queryForObject("SELECT numero FROM venta WHERE id = ?", Long.class, venta);
+    }
+
+    private int lineasEnCurso(Cajero cajero) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'""", Integer.class, cajero.usuarioId());
+    }
 
     record Producto(long id, String codigo, String descripcion, BigDecimal precio) {}
 

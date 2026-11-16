@@ -4,6 +4,7 @@ import { EstadoTurno } from '../caja/EstadoTurno'
 import { puedeVender, useTurnoActual } from '../caja/turno'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
+import { EscanerVenta } from './EscanerVenta'
 import { confirmacionCancelarVenta } from './textos'
 
 /** Destino del Cajero al iniciar sesión (HU-01.02) y pantalla de venta (EP-06). */
@@ -34,10 +35,9 @@ export function Venta() {
       <section className="tarjeta formulario" aria-label="Venta">
         {habilitada && venta && <h2>Venta N.º {venta.numero}</h2>}
         <fieldset disabled={!habilitada || !venta}>
-          <label>
-            Código de producto
-            <input name="codigo" autoComplete="off" placeholder="Escanee o escriba el código" />
-          </label>
+          {/* HU-06.02: el lector de código de barras (o el código escrito a mano) agrega el producto. */}
+          {/* Se reinicia con cada venta, para que no quede el aviso del último escaneo de la anterior. */}
+          <EscanerVenta key={venta?.id} />
         </fieldset>
         {!habilitada && <p className="pendiente">La venta está deshabilitada: abra su turno en una caja para vender.</p>}
         {habilitada && error && (
