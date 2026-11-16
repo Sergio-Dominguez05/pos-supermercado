@@ -481,3 +481,17 @@ kbd {
 .desglose[open] summary {
   margin-bottom: 8px;
 }
+
+/* HU-06.17: la línea sobre la que actúan F4 y Supr. */
+.tabla tr.seleccionada td {
+  background: color-mix(in srgb, var(--texto) 10%, transparent);
+}
+
+.tabla tr.seleccionada td:first-child {
+  box-shadow: inset 3px 0 0 var(--texto);
+}
+
+/* HU-06.17 crit. 2: ayuda rápida de atajos (F1). */
+.ayuda-atajos .atajos li.pendiente {
+  color: var(--texto-suave);
+}

@@ -5,10 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_TURNO_ACTUAL, type Turno } from '../../api/turnos'
 import { CLAVE_VENTA_EN_CURSO, eliminarLinea, type Venta as DatosVenta } from '../../api/ventas'
+import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
 import { confirmacionCancelarVenta, confirmacionQuitarLinea, formatoDesglose } from './textos'
+import { AyudaAtajos } from './AyudaAtajos'
 import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
 
 const CAJERO = {
@@ -224,6 +226,46 @@ describe('eliminar una línea (HU-06.07)', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/lineas/9')
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
     vi.unstubAllGlobals()
+  })
+})
+
+describe('operar con atajos de teclado (HU-06.17)', () => {
+  const linea = (id: number) => ({ id, productoId: id, codigoBarras: `74${id}`, descripcion: `Producto ${id}`,
+    cantidad: 1, precioUnitario: 5, subtotalConIva: 5, baseImponible: 4.464286, iva: 0.535714 })
+  const conDos: DatosVenta = { ...VENTA_VACIA, articulos: 2, total: 10, lineas: [linea(1), linea(2)] }
+
+  it('la pantalla indica que F1 abre los atajos (crit. 2)', () => {
+    expect(renderizar(CAJERO, TURNO)).toContain('<kbd>F1</kbd> Atajos de teclado')
+  })
+
+  it('la ayuda rápida lista todo el mapa y marca lo que llega con otras historias (crit. 1 y 2)', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    for (const atajo of ATAJOS) expect(html).toContain(atajo.descripcion)
+    expect(html).toContain('<kbd>Supr</kbd> Eliminar línea')
+    expect(html).toContain('<kbd>6*</kbd> antes del código')
+    expect(html).toContain('Cobrar<small> (llega con HU-06.15 (#58))</small>')
+    expect(html).not.toContain('Cancelar venta<small>')
+  })
+
+  it('la última línea agregada queda seleccionada para F4 y Supr', () => {
+    const html = renderizar(CAJERO, TURNO, conDos)
+
+    expect(html).toMatch(/<tr data-linea="2" class="seleccionada" aria-selected="true">/)
+    expect(html).toMatch(/<tr data-linea="1" aria-selected="false">/)
+    expect(html).toContain('data-control="cantidad"')
+    expect(html).toContain('data-control="quitar"')
+  })
+
+  it('el botón de cancelar muestra su atajo F10', () => {
+    const html = renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <CancelarVenta venta={conDos} />
+      </QueryClientProvider>,
+    ).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('data-control="cancelar-venta"')
+    expect(html).toContain('Cancelar venta <kbd>F10</kbd>')
   })
 })
 
