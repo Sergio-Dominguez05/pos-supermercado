@@ -8,7 +8,8 @@ import { CLAVE_VENTA_EN_CURSO, type Venta as DatosVenta } from '../../api/ventas
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { DetalleVenta, Venta } from './Venta'
+import { confirmacionCancelarVenta } from './textos'
+import { CancelarVenta, DetalleVenta, Venta } from './Venta'
 
 const CAJERO = {
   rol: 'CAJERO',
@@ -139,5 +140,33 @@ describe('iniciar una venta (HU-06.01)', () => {
     expect(html).toContain('<dd class="total">Q15.00</dd>')
     expect(html).toContain('<dd>Q13.39</dd>')
     expect(html).toContain('<dd>Q1.61</dd>')
+  })
+})
+
+describe('cancelar una venta en curso (HU-06.14)', () => {
+  const conProductos: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [
+    { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+      subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 },
+  ] }
+  const renderizarCancelar = (venta: DatosVenta) =>
+    renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <CancelarVenta venta={venta} />
+      </QueryClientProvider>,
+    )
+
+  it('con productos ofrece cancelar la venta', () => {
+    expect(renderizarCancelar(conProductos)).toContain('Cancelar venta')
+  })
+
+  it('una venta sin productos no tiene nada que cancelar', () => {
+    expect(renderizarCancelar(VENTA_VACIA)).toBe('')
+  })
+
+  it('pide confirmación con el número, los artículos y el total (crit. 1)', () => {
+    expect(confirmacionCancelarVenta(conProductos)).toBe(
+      '¿Cancelar la venta N.º 1042? Se quitarán 3 artículos (Q15.00) y no se podrá recuperar.',
+    )
+    expect(confirmacionCancelarVenta({ ...conProductos, articulos: 1, total: 5 })).toContain('1 artículo (Q5.00)')
   })
 })

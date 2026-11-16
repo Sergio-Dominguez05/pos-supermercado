@@ -273,6 +273,33 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(TURNO_ABIERTO, false, id));   // ya tiene el turno abierto
     }
 
+    // Ventas
+
+    @Test
+    void cancelacionDeVentaExitosaYRechazada() throws Exception {
+        String nombre = "Caja venta " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        enviar("/api/turnos", "POST", null, sesion);
+        long venta = idDe(enviar("/api/ventas", "POST", null, sesion));
+        String codigo = "AS" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        long producto = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":11.20}".formatted(codigo),
+                cookieAdmin));
+        jdbc.update("""
+                INSERT INTO venta_linea (venta_id, producto_id, descripcion, cantidad, precio_unitario, subtotal_con_iva,
+                                         base_imponible, iva)
+                VALUES (?, ?, 'Producto auditado', 1, 11.20, 11.20, 10.00, 1.20)""", venta, producto);
+
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/cancelar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_CANCELADA, true, id));
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/cancelar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_CANCELADA, false, id));   // ya no hay venta en curso
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

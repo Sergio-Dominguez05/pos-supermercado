@@ -59,6 +59,20 @@ class RepositorioVentasJdbc implements RepositorioVentas {
         return jdbc.queryForObject("SELECT id FROM venta WHERE turno_id = ? AND estado = 'EN_CURSO'", Long.class, turnoId);
     }
 
+    @Override
+    public boolean cancelar(long ventaId) {
+        return jdbc.update("UPDATE venta SET estado = 'CANCELADA' WHERE id = ? AND estado = 'EN_CURSO'", ventaId) == 1;
+    }
+
+    @Override
+    public boolean tieneVentaConProductos(long usuarioId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM venta v
+                               WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'
+                                 AND EXISTS (SELECT 1 FROM venta_linea l WHERE l.venta_id = v.id))""",
+                Boolean.class, usuarioId));
+    }
+
     private Optional<Venta> unaVenta(String sql, Object... parametros) {
         return jdbc.query(sql, (rs, fila) -> {
             long id = rs.getLong("id");

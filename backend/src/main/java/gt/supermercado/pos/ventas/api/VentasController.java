@@ -57,4 +57,11 @@ public class VentasController {
     public RespuestaVenta iniciar(@AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaVenta.de(gestionVentas.iniciar(sesion));
     }
+
+    /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */
+    @PostMapping("/actual/cancelar")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public RespuestaVenta cancelar(@AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.cancelar(sesion));
+    }
 }

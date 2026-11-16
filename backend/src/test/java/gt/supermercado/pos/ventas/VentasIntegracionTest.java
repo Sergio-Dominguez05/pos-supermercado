@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** HU-06.01 Iniciar una venta, contra PostgreSQL real con las migraciones aplicadas. */
+/** HU-06.01 Iniciar una venta y HU-06.14 Cancelar una venta en curso, contra PostgreSQL real con las migraciones. */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "pos.seguridad.admin-inicial.contrasena=" + VentasIntegracionTest.CONTRASENA_ADMIN)
@@ -189,7 +189,117 @@ class VentasIntegracionTest {
                 .isInstanceOf(DuplicateKeyException.class);
     }
 
+    // HU-06.14 Cancelar una venta en curso
+
+    @Test
+    void cancelarDejaLaVentaCanceladaYLaCajaListaParaLaSiguiente() throws Exception {   // crit. 3 y HU-06.01 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        long venta = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        agregarLinea(venta, nuevoProducto("Arroz 1 lb", "5.00"), 3);
+
+        HttpResponse<String> respuesta = enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion());
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"estado\":\"CANCELADA\"");
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, venta)).isEqualTo("CANCELADA");
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).statusCode()).isEqualTo(204);
+        long siguiente = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        assertThat(siguiente).isNotEqualTo(venta);
+    }
+
+    @Test
+    void elCajeroCancelaSinAutorizacionDeUnSupervisor() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();   // rol Cajero
+        long venta = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        agregarLinea(venta, nuevoProducto("Frijol 1 lb", "8.50"), 1);
+
+        assertThat(enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion()).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void laCancelacionQuedaEnLaBitacoraConElDetalleDeLosProductos() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        long venta = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        agregarLinea(venta, arroz, 3);
+
+        enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion());
+
+        Map<String, Object> registro = jdbc.queryForMap("""
+                SELECT usuario_id, exitoso, entidad, entidad_id, descripcion, cambios::text AS cambios FROM bitacora
+                WHERE accion = 'VENTA_CANCELADA' AND entidad_id = ?""", venta);
+        assertThat(registro).containsEntry("usuario_id", cajero.usuarioId()).containsEntry("exitoso", true)
+                .containsEntry("entidad", "venta");
+        assertThat((String) registro.get("descripcion")).contains("cancelada", "3 artículos", "Q15.00");
+        assertThat((String) registro.get("cambios")).contains(arroz.codigo(), "Arroz 1 lb", "\"cantidad\": 3");
+    }
+
+    @Test
+    void sinVentaEnCursoNoHayNadaQueCancelar() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+
+        HttpResponse<String> respuesta = enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion());
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("SIN_VENTA_EN_CURSO");
+    }
+
+    @Test
+    void conLaCajaCerradaNoSeCancela() throws Exception {
+        HttpResponse<String> respuesta = enviar("/api/ventas/actual/cancelar", "POST", null, cajeroEnCaja().sesion());
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("CAJA_CERRADA");
+    }
+
+    // HU-01.16 crit. 2: no se cierra sesión con una venta en curso (reemplaza a SinVentasEnCurso)
+
+    @Test
+    void conUnaVentaConProductosNoSeCierraSesionHastaCancelarla() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        long venta = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+        agregarLinea(venta, nuevoProducto("Azúcar 1 lb", "6.25"), 2);
+
+        HttpResponse<String> rechazado = enviar("/api/auth/logout", "POST", null, cajero.sesion());
+
+        assertThat(rechazado.statusCode()).isEqualTo(409);
+        assertThat(rechazado.body()).contains("VENTA_EN_CURSO");
+        assertThat(enviar("/api/auth/sesion", "GET", null, cajero.sesion()).statusCode()).isEqualTo(200);
+
+        enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion());
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
+    }
+
+    @Test
+    void unaVentaVaciaNoImpideCerrarSesion() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        enviar("/api/ventas", "POST", null, cajero.sesion());
+
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
+    }
+
     // Apoyo
+
+    record Producto(long id, String codigo, String descripcion, BigDecimal precio) {}
+
+    private Producto nuevoProducto(String descripcion, String precio) throws Exception {
+        String codigo = "VT" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        HttpResponse<String> creado = enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"%s\",\"precio\":%s}".formatted(codigo, descripcion, precio),
+                cookieAdmin);
+        assertThat(creado.statusCode()).isEqualTo(201);
+        return new Producto(idDe(creado), codigo, descripcion, new BigDecimal(precio));
+    }
+
+    /** Agregar productos llega con HU-06.02; mientras tanto la línea se escribe como la guardará la venta. */
+    private void agregarLinea(long venta, Producto producto, int cantidad) {
+        var linea = gt.supermercado.pos.impuestos.dominio.CalculadoraIva.linea(producto.precio(), cantidad);
+        jdbc.update("""
+                INSERT INTO venta_linea (venta_id, producto_id, descripcion, cantidad, precio_unitario, subtotal_con_iva,
+                                         base_imponible, iva)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", venta, producto.id(), producto.descripcion(), cantidad,
+                producto.precio(), linea.subtotalConIva(), linea.base(), linea.iva());
+    }
 
     record Cajero(long usuarioId, String caja, String equipo, String sesion) {}
 
