@@ -1,0 +1,88 @@
+package gt.supermercado.pos.ventas.infraestructura;
+
+import gt.supermercado.pos.ventas.dominio.EstadoVenta;
+import gt.supermercado.pos.ventas.dominio.LineaVenta;
+import gt.supermercado.pos.ventas.dominio.RepositorioVentas;
+import gt.supermercado.pos.ventas.dominio.Venta;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+class RepositorioVentasJdbc implements RepositorioVentas {
+
+    private static final String SELECT_VENTA = """
+            SELECT v.id, v.numero, v.turno_id, v.caja_id, c.nombre AS caja_nombre, v.usuario_id, v.estado, v.tasa_iva,
+                   v.creada_en
+            FROM venta v
+            JOIN caja c ON c.id = v.caja_id
+            """;
+
+    private static final RowMapper<LineaVenta> LINEA = (rs, fila) -> new LineaVenta(
+            rs.getLong("id"),
+            rs.getLong("producto_id"),
+            rs.getString("codigo_barras"),
+            rs.getString("descripcion"),
+            rs.getInt("cantidad"),
+            rs.getBigDecimal("precio_unitario"),
+            rs.getBigDecimal("subtotal_con_iva"),
+            rs.getBigDecimal("base_imponible"),
+            rs.getBigDecimal("iva"));
+
+    private final JdbcTemplate jdbc;
+
+    RepositorioVentasJdbc(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    @Override
+    public Optional<Venta> enCursoDelTurno(long turnoId) {
+        return unaVenta(SELECT_VENTA + "WHERE v.turno_id = ? AND v.estado = 'EN_CURSO'", turnoId);
+    }
+
+    @Override
+    public Optional<Venta> buscarPorId(long id) {
+        return unaVenta(SELECT_VENTA + "WHERE v.id = ?", id);
+    }
+
+    @Override
+    public long iniciar(long turnoId, long cajaId, long usuarioId, BigDecimal tasaIva) {
+        // ON CONFLICT con el índice parcial: si otra petición del mismo turno la creó al mismo tiempo, no falla.
+        jdbc.update("""
+                INSERT INTO venta (turno_id, caja_id, usuario_id, tasa_iva) VALUES (?, ?, ?, ?)
+                ON CONFLICT (turno_id) WHERE estado = 'EN_CURSO' DO NOTHING""", turnoId, cajaId, usuarioId, tasaIva);
+        return jdbc.queryForObject("SELECT id FROM venta WHERE turno_id = ? AND estado = 'EN_CURSO'", Long.class, turnoId);
+    }
+
+    private Optional<Venta> unaVenta(String sql, Object... parametros) {
+        return jdbc.query(sql, (rs, fila) -> {
+            long id = rs.getLong("id");
+            return new Venta(
+                    id,
+                    rs.getLong("numero"),
+                    rs.getLong("turno_id"),
+                    rs.getLong("caja_id"),
+                    rs.getString("caja_nombre"),
+                    rs.getLong("usuario_id"),
+                    EstadoVenta.valueOf(rs.getString("estado")),
+                    rs.getBigDecimal("tasa_iva"),
+                    rs.getObject("creada_en", OffsetDateTime.class),
+                    lineas(id));
+        }, parametros).stream().findFirst();
+    }
+
+    private List<LineaVenta> lineas(long ventaId) {
+        return jdbc.query("""
+                SELECT l.id, l.producto_id, p.codigo_barras, l.descripcion, l.cantidad, l.precio_unitario,
+                       l.subtotal_con_iva, l.base_imponible, l.iva
+                FROM venta_linea l
+                JOIN producto p ON p.id = l.producto_id
+                WHERE l.venta_id = ?
+                ORDER BY l.id""", LINEA, ventaId);
+    }
+}
