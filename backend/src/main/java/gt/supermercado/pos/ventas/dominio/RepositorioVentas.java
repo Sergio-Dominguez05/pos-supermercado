@@ -45,5 +45,11 @@ public interface RepositorioVentas {
     /** Cambia la cantidad de una línea y su desglose, conservando su precio unitario (HU-06.09). */
     void actualizarLinea(long lineaId, LineaCalculada linea);
 
+    /**
+     * HU-06.07: marca la línea como eliminada por el usuario; deja de contar en la venta y en sus totales, pero no se
+     * borra. Devuelve {@code false} si ya estaba eliminada.
+     */
+    boolean eliminarLinea(long lineaId, long usuarioId);
+
     /** Si el usuario tiene una venta en curso con al menos un producto (HU-01.16 crit. 2). */
     boolean tieneVentaConProductos(long usuarioId);}

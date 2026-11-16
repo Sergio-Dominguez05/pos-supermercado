@@ -7,6 +7,7 @@ import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
 import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { CantidadLinea } from './CantidadLinea'
+import { QuitarLinea } from './QuitarLinea'
 import { EscanerVenta } from './EscanerVenta'
 import { confirmacionCancelarVenta, formatoDesglose } from './textos'
 
@@ -86,7 +87,7 @@ export function Venta() {
 
 /**
  * Líneas de la venta y sus totales, tal como los calcula el servidor (HU-04.04, HU-06.08). Con `editable`, la
- * cantidad de cada línea se puede cambiar (HU-06.04 crit. 2).
+ * cantidad de cada línea se puede cambiar (HU-06.04 crit. 2) y la línea se puede quitar (HU-06.07).
  */
 export function DetalleVenta({
   venta,
@@ -111,6 +112,7 @@ export function DetalleVenta({
                 <th>Cantidad</th>
                 <th>Precio</th>
                 <th>Subtotal</th>
+                {editable && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -128,6 +130,11 @@ export function DetalleVenta({
                   </td>
                   <td>{formatoQuetzales(linea.precioUnitario)}</td>
                   <td>{formatoQuetzales(linea.subtotalConIva)}</td>
+                  {editable && (
+                    <td>
+                      <QuitarLinea linea={linea} onTerminado={onTerminado} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

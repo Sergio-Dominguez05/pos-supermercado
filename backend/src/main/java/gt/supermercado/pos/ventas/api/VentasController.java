@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -119,6 +120,16 @@ public class VentasController {
     public RespuestaVenta cambiarCantidad(@PathVariable long lineaId, @Valid @RequestBody SolicitudCantidad solicitud,
                                           @AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaVenta.de(gestionVentas.cambiarCantidad(lineaId, solicitud.cantidad(), solicitud.confirmo(), sesion));
+    }
+
+    /**
+     * HU-06.07: quita la línea de la venta en curso y devuelve la venta con los totales recalculados (crit. 4). Sin
+     * autorización de un supervisor (crit. 2). 404 si la línea no es de la venta en curso del turno.
+     */
+    @DeleteMapping("/actual/lineas/{lineaId}")
+    @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
+    public RespuestaVenta eliminarLinea(@PathVariable long lineaId, @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.eliminarLinea(lineaId, sesion));
     }
 
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */
