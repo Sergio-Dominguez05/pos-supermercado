@@ -412,6 +412,62 @@ class VentasIntegracionTest {
         assertThat(lineasEnCurso(cajero)).isZero();
     }
 
+    // HU-06.09 Mantener el precio durante la venta
+
+    @Test
+    void cadaLineaGuardaElPrecioVigenteAlAgregarla() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+
+        assertThat(precioDeLineas(cajero, arroz)).containsExactly("5.00");
+    }
+
+    @Test
+    void unCambioDePrecioDuranteLaVentaNoCambiaLasLineasYaAgregadas() throws Exception {   // crit. 2, HU-03.02 crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        escanear(arroz.codigo(), cajero);
+
+        cambiarPrecio(arroz, "5.50");
+        HttpResponse<String> venta = enviar("/api/ventas/actual", "GET", null, cajero.sesion());
+
+        assertThat(precioDeLineas(cajero, arroz)).containsExactly("5.00");
+        assertThat(venta.body()).contains("\"cantidad\":2", "\"precioUnitario\":5.00", "\"total\":10.00");
+    }
+
+    @Test
+    void loQueSeAgregaDespuesDelCambioUsaElPrecioNuevoEnOtraLinea() throws Exception {   // crit. 3, HU-03.02 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        escanear(arroz.codigo(), cajero);
+
+        cambiarPrecio(arroz, "5.50");
+        escanear(arroz.codigo(), cajero);
+        HttpResponse<String> respuesta = elegir(arroz.id(), cajero);   // también por búsqueda (HU-06.03)
+
+        // 2 × Q5.00 en su línea original y 2 × Q5.50 en una línea nueva.
+        assertThat(precioDeLineas(cajero, arroz)).containsExactly("5.00", "5.50");
+        assertThat(jdbc.queryForList("""
+                SELECT l.cantidad FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' ORDER BY l.id""", Integer.class, cajero.usuarioId()))
+                .containsExactly(2, 2);
+        assertThat(respuesta.body()).contains("\"articulos\":4", "\"total\":21.00");
+    }
+
+    @Test
+    void unProductoQueEntraALaVentaDespuesDelCambioUsaElPrecioNuevo() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto azucar = nuevoProducto("Azúcar 1 lb", "6.00");
+        cambiarPrecio(azucar, "6.75");
+
+        escanear(azucar.codigo(), cajero);
+
+        assertThat(precioDeLineas(cajero, azucar)).containsExactly("6.75");
+    }
+
     // HU-06.14 Cancelar una venta en curso
 
     @Test
@@ -509,6 +565,20 @@ class VentasIntegracionTest {
 
     private HttpResponse<String> elegir(long productoId, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/lineas", "POST", "{\"productoId\":%d}".formatted(productoId), cajero.sesion());
+    }
+
+    /** El administrador cambia el precio (HU-03.02). */
+    private void cambiarPrecio(Producto producto, String precio) throws Exception {
+        HttpResponse<String> editado = enviar("/api/productos/" + producto.id(), "PUT",
+                "{\"descripcion\":\"%s\",\"precio\":%s}".formatted(producto.descripcion(), precio), cookieAdmin);
+        assertThat(editado.statusCode()).isEqualTo(200);
+    }
+
+    private List<String> precioDeLineas(Cajero cajero, Producto producto) {
+        return jdbc.queryForList("""
+                SELECT l.precio_unitario::text FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.producto_id = ? ORDER BY l.id""",
+                String.class, cajero.usuarioId(), producto.id());
     }
 
     private long numeroDe(long venta) {

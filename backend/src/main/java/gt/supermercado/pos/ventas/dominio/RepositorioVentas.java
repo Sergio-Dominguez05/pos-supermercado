@@ -30,8 +30,11 @@ public interface RepositorioVentas {
      */
     boolean bloquearEnCurso(long ventaId);
 
-    /** La línea de ese producto en la venta, si ya se agregó (HU-06.02 crit. 2). */
-    Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId);
+    /**
+     * La línea de ese producto con ese precio unitario, si ya se agregó (HU-06.02 crit. 2). Con otro precio es otra
+     * línea (HU-06.09 crit. 3).
+     */
+    Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId, BigDecimal precioUnitario);
 
     /** Agrega una línea nueva con la copia de la descripción y del precio vigente (HU-06.09). */
     void agregarLinea(long ventaId, long productoId, String descripcion, LineaCalculada linea);
