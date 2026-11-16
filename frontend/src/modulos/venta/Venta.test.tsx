@@ -4,12 +4,13 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_TURNO_ACTUAL, type Turno } from '../../api/turnos'
-import { CLAVE_VENTA_EN_CURSO, eliminarLinea, type Venta as DatosVenta } from '../../api/ventas'
+import { CLAVE_VENTA_EN_CURSO, eliminarLinea, suspenderVenta, type Venta as DatosVenta } from '../../api/ventas'
 import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { confirmacionCancelarVenta, confirmacionQuitarLinea, formatoDesglose } from './textos'
+import { SuspenderVenta } from './SuspenderVenta'
+import { avisoVentaSuspendida, confirmacionCancelarVenta, confirmacionQuitarLinea, formatoDesglose } from './textos'
 import { AyudaAtajos } from './AyudaAtajos'
 import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
 
@@ -266,6 +267,59 @@ describe('operar con atajos de teclado (HU-06.17)', () => {
 
     expect(html).toContain('data-control="cancelar-venta"')
     expect(html).toContain('Cancelar venta <kbd>F10</kbd>')
+  })
+})
+
+describe('suspender una venta (HU-06.12)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const renderizarSuspender = (venta: DatosVenta) =>
+    renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <SuspenderVenta venta={venta} />
+      </QueryClientProvider>,
+    ).replaceAll('<!-- -->', '')
+
+  it('con productos ofrece suspender la venta con su atajo F7 (crit. 1 y HU-06.17)', () => {
+    const html = renderizarSuspender(conArroz)
+
+    expect(html).toContain('data-control="suspender-venta"')
+    expect(html).toContain('Suspender venta <kbd>F7</kbd>')
+  })
+
+  it('una venta sin productos no tiene nada que suspender', () => {
+    expect(renderizarSuspender(VENTA_VACIA)).toBe('')
+    expect(renderizar(CAJERO, TURNO)).not.toContain('Suspender venta')
+  })
+
+  it('la pantalla de venta muestra suspender junto a cancelar', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz)
+
+    expect(html.indexOf('Suspender venta')).toBeGreaterThan(-1)
+    expect(html.indexOf('Suspender venta')).toBeLessThan(html.indexOf('Cancelar venta'))
+  })
+
+  it('avisa qué venta quedó en espera (crit. 1)', () => {
+    expect(avisoVentaSuspendida({ ...conArroz, numero: 1042 })).toBe(
+      'Venta N.º 1042 en espera: 3 artículos (Q15.00). Ya puede atender al siguiente cliente.',
+    )
+    expect(avisoVentaSuspendida({ ...conArroz, articulos: 1, total: 5 })).toContain('1 artículo (Q5.00)')
+  })
+
+  it('suspender es un POST sobre la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(conArroz), { status: 200 })))
+
+    await expect(suspenderVenta()).resolves.toMatchObject({ total: 15 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/suspender')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('F7 ya no figura como pendiente en la ayuda', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<kbd>F7</kbd> Suspender venta</li>')
   })
 })
 

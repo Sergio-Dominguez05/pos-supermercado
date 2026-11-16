@@ -12,3 +12,8 @@ export const confirmacionCancelarVenta = (venta: Venta) =>
 /** HU-06.07: se confirma antes de quitar una línea, para no perder un producto por un clic equivocado. */
 export const confirmacionQuitarLinea = (linea: LineaVenta) =>
   `¿Quitar ${linea.cantidad} x ${linea.descripcion} (${formatoQuetzales(linea.subtotalConIva)}) de la venta?`
+
+/** HU-06.12 crit. 1: qué venta quedó en espera; la pantalla ya está lista para la siguiente. */
+export const avisoVentaSuspendida = (venta: Venta) =>
+  `Venta N.º ${venta.numero} en espera: ${venta.articulos} ${venta.articulos === 1 ? 'artículo' : 'artículos'} ` +
+  `(${formatoQuetzales(venta.total)}). Ya puede atender al siguiente cliente.`

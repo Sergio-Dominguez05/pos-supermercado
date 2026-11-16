@@ -1,6 +1,7 @@
 package gt.supermercado.pos.ventas;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.caja.dominio.VerificadorVentasSuspendidas;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +52,10 @@ class VentasIntegracionTest {
 
     @Autowired
     PasswordEncoder codificador;
+
+    /** El puerto de {@code caja} que implementa ventas (HU-06.12 crit. 4). */
+    @Autowired
+    VerificadorVentasSuspendidas verificadorSuspendidas;
 
     @Value("${local.server.port}")
     int puerto;
@@ -835,7 +840,110 @@ class VentasIntegracionTest {
         assertThat(respuesta.body()).contains("CAJA_CERRADA");
     }
 
+    // HU-06.12 Suspender una venta
+
+    @Test
+    void alSuspenderLaVentaSeGuardaConSusLineasYLaCajaQuedaListaParaOtra() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long suspendida = ventaEnCurso(cajero);
+
+        HttpResponse<String> respuesta = suspender(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"estado\":\"SUSPENDIDA\"", "Arroz 1 lb", "Agua 600 ml",
+                "\"articulos\":4", "\"total\":26.20");
+        Map<String, Object> fila = jdbc.queryForMap(
+                "SELECT estado, suspendida_en IS NOT NULL AS con_hora FROM venta WHERE id = ?", suspendida);
+        assertThat(fila).containsEntry("estado", "SUSPENDIDA").containsEntry("con_hora", true);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM venta_linea WHERE venta_id = ? AND eliminada_en IS NULL",
+                Integer.class, suspendida)).isEqualTo(2);
+        // Lista para una venta nueva: no hay venta en curso, y la siguiente es otra, vacía, con otro número.
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).statusCode()).isEqualTo(204);
+        HttpResponse<String> nueva = enviar("/api/ventas", "POST", null, cajero.sesion());
+        assertThat(idDe(nueva)).isNotEqualTo(suspendida);
+        assertThat(nueva.body()).contains("\"estado\":\"EN_CURSO\"", "\"lineas\":[]");
+        assertThat(numeroDe(idDe(nueva))).isEqualTo(numeroDe(suspendida) + 1);
+    }
+
+    @Test
+    void unaCajaPuedeTenerVariasVentasSuspendidas() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        for (int i = 0; i < 3; i++) {
+            escanear(arroz.codigo(), cajero);
+            assertThat(suspender(cajero).statusCode()).isEqualTo(200);
+        }
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM venta WHERE usuario_id = ? AND estado = 'SUSPENDIDA'",
+                Integer.class, cajero.usuarioId())).isEqualTo(3);
+    }
+
+    @Test
+    void unaVentaSuspendidaNoSeModificaNiSeCancelaComoEnCurso() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        long linea = lineaDe(cajero, arroz);
+        long suspendida = ventaEnCurso(cajero);
+        suspender(cajero);
+
+        assertThat(cambiarCantidad(linea, 4, cajero).statusCode()).isGreaterThanOrEqualTo(400);
+        assertThat(eliminar(linea, cajero).statusCode()).isGreaterThanOrEqualTo(400);
+        assertThat(enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion()).statusCode()).isEqualTo(422);
+        // Escanear empieza otra venta; la suspendida no cambia.
+        escanear(arroz.codigo(), cajero);
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, suspendida))
+                .isEqualTo("SUSPENDIDA");
+        assertThat(jdbc.queryForObject("SELECT cantidad FROM venta_linea WHERE id = ?", Integer.class, linea))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void sinProductosNoHayNadaQueSuspender() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        enviar("/api/ventas", "POST", null, cajero.sesion());
+
+        HttpResponse<String> respuesta = suspender(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("VENTA_VACIA");
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body()).contains("\"estado\":\"EN_CURSO\"");
+    }
+
+    @Test
+    void sinVentaEnCursoOSinTurnoNoSeSuspende() throws Exception {
+        assertThat(suspender(cajeroConTurnoAbierto()).body()).contains("SIN_VENTA_EN_CURSO");
+        assertThat(suspender(cajeroEnCaja()).body()).contains("CAJA_CERRADA");
+    }
+
+    @Test
+    void lasVentasSuspendidasImpidenCerrarLaCaja() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        long turno = jdbc.queryForObject("SELECT id FROM turno WHERE usuario_id = ? AND estado = 'ABIERTO'",
+                Long.class, cajero.usuarioId());
+        assertThat(verificadorSuspendidas.suspendidasDelTurno(turno)).isZero();
+
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), cajero);
+        suspender(cajero);
+        escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), cajero);
+        suspender(cajero);
+
+        assertThat(verificadorSuspendidas.suspendidasDelTurno(turno)).isEqualTo(2);
+    }
+
     // Apoyo
+
+    private HttpResponse<String> suspender(Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/suspender", "POST", null, cajero.sesion());
+    }
+
+    private long ventaEnCurso(Cajero cajero) {
+        return jdbc.queryForObject("SELECT id FROM venta WHERE usuario_id = ? AND estado = 'EN_CURSO'", Long.class,
+                cajero.usuarioId());
+    }
 
     private HttpResponse<String> eliminar(long linea, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/lineas/" + linea, "DELETE", null, cajero.sesion());

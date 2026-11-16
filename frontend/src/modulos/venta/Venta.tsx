@@ -11,9 +11,10 @@ import { AyudaAtajos } from './AyudaAtajos'
 import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { CantidadLinea } from './CantidadLinea'
 import { QuitarLinea } from './QuitarLinea'
+import { SuspenderVenta } from './SuspenderVenta'
 import { EscanerVenta } from './EscanerVenta'
 import { type AccionDeLaVenta, lineaSeleccionada, moverSeleccion, supresionEsParaLaLinea } from './teclado'
-import { confirmacionCancelarVenta, formatoDesglose } from './textos'
+import { avisoVentaSuspendida, confirmacionCancelarVenta, formatoDesglose } from './textos'
 
 /** Lleva el foco a un campo de la pantalla de venta por su nombre (`codigo` o `descripcion`). */
 const enfocar = (campo: 'codigo' | 'descripcion') =>
@@ -62,6 +63,7 @@ export function Venta() {
         if (!supresionEsParaLaLinea(evento.target)) return false
         if (seleccionada !== undefined) controlDeLinea(seleccionada, 'quitar')?.click()
       },
+      suspenderVenta: () => document.querySelector<HTMLElement>('main [data-control="suspender-venta"]')?.click(),
       cancelarVenta: () => document.querySelector<HTMLElement>('main [data-control="cancelar-venta"]')?.click(),
     }
     const pendientes: Manejadores = Object.fromEntries(
@@ -141,7 +143,13 @@ export function Venta() {
             onTerminado={() => enfocar('codigo')}
           />
         )}
-        {habilitada && venta && <CancelarVenta venta={venta} />}
+        {habilitada && venta && venta.lineas.length > 0 && (
+          <div className="acciones">
+            {/* HU-06.12: suspender avisa qué venta quedó en espera; el aviso queda aunque llegue la venta nueva. */}
+            <SuspenderVenta venta={venta} onSuspendida={(suspendida) => setAviso(avisoVentaSuspendida(suspendida))} />
+            <CancelarVenta venta={venta} />
+          </div>
+        )}
       </section>
     </main>
   )
@@ -284,7 +292,7 @@ export function CancelarVenta({ venta }: { venta: DatosVenta }) {
   if (venta.lineas.length === 0) return null
 
   return (
-    <div className="acciones">
+    <>
       <button
         type="button"
         data-control="cancelar-venta"
@@ -300,6 +308,6 @@ export function CancelarVenta({ venta }: { venta: DatosVenta }) {
           {cancelacion.error.message}
         </p>
       )}
-    </div>
+    </>
   )
 }

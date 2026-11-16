@@ -11,7 +11,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -28,8 +30,11 @@ class GestionTurnosTest {
     private static final long CAJERA = 20;
 
     private final TurnosEnMemoria turnos = new TurnosEnMemoria();
+    /** Ventas suspendidas por turno, como las cuenta el módulo de ventas (HU-06.12 crit. 4). */
+    private final Map<Long, Integer> suspendidas = new HashMap<>();
     // exigirTurnoAbierto no consulta las cajas ni escribe en la bitácora.
-    private final GestionTurnos gestion = new GestionTurnos(turnos, null, new Bitacora(evento -> {
+    private final GestionTurnos gestion = new GestionTurnos(turnos, null,
+            turnoId -> suspendidas.getOrDefault(turnoId, 0), new Bitacora(evento -> {
         throw new AssertionError("No debe registrar en la bitácora: " + evento);
     }));
 
@@ -63,6 +68,28 @@ class GestionTurnosTest {
                 .isInstanceOf(NegocioException.class)
                 .hasMessageContaining("Luis Pérez")
                 .extracting(e -> ((NegocioException) e).getCodigo()).isEqualTo("CAJA_CON_TURNO_DE_OTRO_USUARIO");
+    }
+
+    // HU-06.12 crit. 4: no se cierra la caja con ventas suspendidas
+
+    @Test
+    void sinVentasSuspendidasLaCajaSePuedeCerrar() {
+        Turno turno = turnos.agregar(CAJA, CAJERA, "Ana López");
+
+        gestion.exigirSinVentasSuspendidas(turno);
+    }
+
+    @Test
+    void conVentasSuspendidasPideRetomarlasOCancelarlasAntesDeCerrar() {
+        Turno turno = turnos.agregar(CAJA, CAJERA, "Ana López");
+        suspendidas.put(turno.id(), 2);
+
+        assertThatThrownBy(() -> gestion.exigirSinVentasSuspendidas(turno))
+                .isInstanceOf(NegocioException.class)
+                .hasMessage("Hay 2 ventas suspendidas: retómelas o cancélelas antes de cerrar la caja.")
+                .extracting(e -> ((NegocioException) e).getCodigo()).isEqualTo("VENTAS_SUSPENDIDAS");
+        suspendidas.put(turno.id(), 1);
+        assertThatThrownBy(() -> gestion.exigirSinVentasSuspendidas(turno)).hasMessageStartingWith("Hay 1 venta suspendida:");
     }
 
     private static SesionActiva sesion(long usuarioId, Long cajaId) {

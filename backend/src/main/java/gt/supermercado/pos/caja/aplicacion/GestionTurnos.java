@@ -5,6 +5,7 @@ import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
+import gt.supermercado.pos.caja.dominio.VerificadorVentasSuspendidas;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.configuracion.aplicacion.GestionCajas;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -23,12 +24,31 @@ public class GestionTurnos {
 
     private final RepositorioTurnos turnos;
     private final GestionCajas cajas;
+    private final VerificadorVentasSuspendidas suspendidas;
     private final Bitacora bitacora;
 
-    public GestionTurnos(RepositorioTurnos turnos, GestionCajas cajas, Bitacora bitacora) {
+    public GestionTurnos(RepositorioTurnos turnos, GestionCajas cajas, VerificadorVentasSuspendidas suspendidas,
+                         Bitacora bitacora) {
         this.turnos = turnos;
         this.cajas = cajas;
+        this.suspendidas = suspendidas;
         this.bitacora = bitacora;
+    }
+
+    /**
+     * HU-06.12 crit. 4: la caja no se cierra con ventas suspendidas; el cajero debe retomarlas (HU-06.13) o
+     * cancelarlas antes. El cierre de caja (HU-09.08, #82) y el cierre por un supervisor (HU-09.12, #86) deben
+     * llamarlo antes de cerrar el turno.
+     */
+    @Transactional(readOnly = true)
+    public void exigirSinVentasSuspendidas(Turno turno) {
+        int cantidad = suspendidas.suspendidasDelTurno(turno.id());
+        if (cantidad > 0) {
+            throw new NegocioException("VENTAS_SUSPENDIDAS", (cantidad == 1
+                    ? "Hay 1 venta suspendida"
+                    : "Hay %d ventas suspendidas".formatted(cantidad))
+                    + ": retómelas o cancélelas antes de cerrar la caja.");
+        }
     }
 
     /**
