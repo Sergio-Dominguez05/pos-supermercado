@@ -99,9 +99,9 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
-    public Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId) {
-        return jdbc.query(SELECT_LINEA + "WHERE l.venta_id = ? AND l.producto_id = ?", LINEA, ventaId, productoId)
-                .stream().findFirst();
+    public Optional<LineaVenta> lineaDelProducto(long ventaId, long productoId, BigDecimal precioUnitario) {
+        return jdbc.query(SELECT_LINEA + "WHERE l.venta_id = ? AND l.producto_id = ? AND l.precio_unitario = ?", LINEA,
+                ventaId, productoId, precioUnitario).stream().findFirst();
     }
 
     @Override

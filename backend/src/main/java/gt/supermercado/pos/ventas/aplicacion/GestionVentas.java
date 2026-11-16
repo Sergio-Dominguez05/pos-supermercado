@@ -90,6 +90,12 @@ public class GestionVentas {
         return agregar(turno, productos.paraVender(productoId), sesion);
     }
 
+    /**
+     * Agrega una unidad del producto con su precio vigente. HU-06.09: cada línea guarda el precio con el que se agregó
+     * (crit. 1) y nunca cambia (crit. 2); si el precio cambió desde que el producto entró a la venta, la unidad nueva
+     * va en otra línea con el precio nuevo (crit. 3). Si ya hay una línea del producto con el precio vigente, se le
+     * suma 1 (HU-06.02 crit. 2).
+     */
     private Venta agregar(Turno turno, Producto producto, SesionActiva sesion) {
         long ventaId = ventas.iniciar(turno.id(), turno.cajaId(), sesion.usuarioId(), TasaIva.VIGENTE.valor());
         if (!ventas.bloquearEnCurso(ventaId)) {
@@ -97,7 +103,7 @@ public class GestionVentas {
         }
         Venta venta = ventas.buscarPorId(ventaId).orElseThrow();
         TasaIva tasa = TasaIva.de(venta.tasaIva());
-        ventas.lineaDelProducto(ventaId, producto.id()).ifPresentOrElse(
+        ventas.lineaDelProducto(ventaId, producto.id(), producto.precio()).ifPresentOrElse(
                 linea -> ventas.actualizarLinea(linea.id(),
                         CalculadoraIva.linea(linea.precioUnitario(), linea.cantidad() + 1, tasa)),
                 () -> ventas.agregarLinea(ventaId, producto.id(), producto.descripcion(),
