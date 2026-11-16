@@ -32,3 +32,6 @@ export const CLAVE_VENTA_EN_CURSO = ['ventas', 'actual'] as const
 
 /** HU-06.01: inicia la venta del turno, o devuelve la que ya está en curso. */
 export const iniciarVenta = () => pedir<Venta>('/api/ventas', { method: 'POST' })
+
+/** HU-06.14: cancela la venta en curso. Sin autorización de un supervisor. */
+export const cancelarVenta = () => pedir<Venta>('/api/ventas/actual/cancelar', { method: 'POST' })

@@ -31,7 +31,6 @@ class CatalogoAccionesSensiblesTest {
     static final Map<AccionSensible, String> PENDIENTES = Map.ofEntries(
             entry(PERMISOS_MODIFICADOS, "HU-01.10"),
             entry(LINEA_VENTA_ELIMINADA, "HU-06.07"),
-            entry(VENTA_CANCELADA, "HU-06.14"),
             entry(FACTURA_ANULADA, "HU-08.10"),
             entry(FACTURA_REIMPRESA, "HU-08.12"),
             entry(FACTURA_RECHAZADA_CERTIFICADOR, "HU-08.06"),

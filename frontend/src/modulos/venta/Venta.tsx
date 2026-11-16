@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
-import { CLAVE_VENTA_EN_CURSO, iniciarVenta, type Venta as DatosVenta } from '../../api/ventas'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { cancelarVenta, CLAVE_VENTA_EN_CURSO, iniciarVenta, type Venta as DatosVenta } from '../../api/ventas'
 import { EstadoTurno } from '../caja/EstadoTurno'
 import { puedeVender, useTurnoActual } from '../caja/turno'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
+import { confirmacionCancelarVenta } from './textos'
 
 /** Destino del Cajero al iniciar sesión (HU-01.02) y pantalla de venta (EP-06). */
 export function Venta() {
@@ -45,6 +46,7 @@ export function Venta() {
           </p>
         )}
         {habilitada && venta && <DetalleVenta venta={venta} />}
+        {habilitada && venta && <CancelarVenta venta={venta} />}
       </section>
     </main>
   )
@@ -94,5 +96,38 @@ export function DetalleVenta({ venta }: { venta: DatosVenta }) {
         <dd className="total">{formatoQuetzales(venta.total)}</dd>
       </dl>
     </>
+  )
+}
+
+/**
+ * HU-06.14: cancelar la venta en curso, después de confirmarlo (crit. 1) y sin autorización de un supervisor
+ * (crit. 2). Al cancelarla, la pantalla inicia la siguiente venta (HU-06.01 crit. 3). Una venta sin productos no
+ * tiene nada que cancelar.
+ */
+export function CancelarVenta({ venta }: { venta: DatosVenta }) {
+  const clienteConsultas = useQueryClient()
+  const cancelacion = useMutation({
+    mutationFn: cancelarVenta,
+    onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: CLAVE_VENTA_EN_CURSO }),
+  })
+  if (venta.lineas.length === 0) return null
+
+  return (
+    <div className="acciones">
+      <button
+        type="button"
+        disabled={cancelacion.isPending}
+        onClick={() => {
+          if (window.confirm(confirmacionCancelarVenta(venta))) cancelacion.mutate()
+        }}
+      >
+        {cancelacion.isPending ? 'Cancelando…' : 'Cancelar venta'}
+      </button>
+      {cancelacion.error && (
+        <p className="error" role="alert">
+          {cancelacion.error.message}
+        </p>
+      )}
+    </div>
   )
 }
