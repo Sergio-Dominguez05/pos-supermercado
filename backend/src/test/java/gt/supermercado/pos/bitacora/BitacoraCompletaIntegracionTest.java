@@ -157,6 +157,7 @@ class BitacoraCompletaIntegracionTest {
         String contrasenaNueva = "OtroSecreto2027y";
         String pin = "713529";
         String pinRestablecido = "864213";
+        long desde = jdbc.queryForObject("SELECT coalesce(max(secuencia), 0) FROM bitacora", Long.class);
 
         enviar("/api/usuarios", "POST", ("{\"nombreCompleto\":\"Secreto\",\"username\":\"bc.secreto\",\"rol\":\"SUPERVISOR\","
                 + "\"credencialTemporal\":\"%s\"}").formatted(contrasena), cookieAdmin);
@@ -175,10 +176,12 @@ class BitacoraCompletaIntegracionTest {
         // Se revisan todas las columnas salvo hash y hash_anterior: son SHA-256 en hexadecimal (128 caracteres al azar
         // por fila) y, con miles de registros, contienen por casualidad los dígitos de un PIN de vez en cuando. No
         // pueden guardar un secreto: los calcula el trigger a partir de las demás columnas, que sí se revisan.
+        // Y solo los registros de esta prueba: otras generan códigos con dígitos al azar que pueden contener el PIN.
         for (String secreto : new String[] {contrasena, contrasenaNueva, pin, pinRestablecido}) {
             assertThat(jdbc.queryForObject("""
-                    SELECT count(*) FROM bitacora b WHERE (to_jsonb(b) - 'hash' - 'hash_anterior')::text LIKE ?""",
-                    Integer.class, "%" + secreto + "%")).as("la bitácora no debe contener '%s'", secreto).isZero();
+                    SELECT count(*) FROM bitacora b
+                    WHERE b.secuencia > ? AND (to_jsonb(b) - 'hash' - 'hash_anterior')::text LIKE ?""",
+                    Integer.class, desde, "%" + secreto + "%")).as("la bitácora no debe contener '%s'", secreto).isZero();
         }
     }
 
