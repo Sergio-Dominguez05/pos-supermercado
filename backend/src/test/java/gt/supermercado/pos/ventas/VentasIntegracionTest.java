@@ -254,6 +254,24 @@ class VentasIntegracionTest {
     }
 
     @Test
+    void cadaProductoAgregadoDevuelveLosTotalesActualizados() throws Exception {   // HU-06.08 crit. 1 y 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        Producto agua = nuevoProducto("Agua 600 ml", "11.20");
+
+        // Q5.00: IVA = 5.00 - 5.00 / 1.12 = 0.535714, que da Q0.54.
+        assertThat(escanear(arroz.codigo(), cajero).body())
+                .contains("\"articulos\":1", "\"subtotal\":4.46", "\"iva\":0.54", "\"total\":5.00");
+        assertThat(escanear(agua.codigo(), cajero).body())
+                .contains("\"articulos\":2", "\"subtotal\":14.46", "\"iva\":1.74", "\"total\":16.20");
+        assertThat(escanear(arroz.codigo(), cajero).body())
+                .contains("\"articulos\":3", "\"subtotal\":18.93", "\"iva\":2.27", "\"total\":21.20");
+        // Al volver a la pantalla (o recargarla) se ven los mismos totales.
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body())
+                .contains("\"articulos\":3", "\"subtotal\":18.93", "\"iva\":2.27", "\"total\":21.20");
+    }
+
+    @Test
     void elCodigoEscritoAManoSeNormalizaComoElDelLector() throws Exception {   // HU-03.06 crit. 3
         Cajero cajero = cajeroConTurnoAbierto();
         Producto producto = nuevoProducto("Café 400 g", "32.50");

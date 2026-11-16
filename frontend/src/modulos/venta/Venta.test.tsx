@@ -143,6 +143,34 @@ describe('iniciar una venta (HU-06.01)', () => {
   })
 })
 
+describe('ver totales en tiempo real (HU-06.08)', () => {
+  it('con la venta vacía ya se ven los artículos y los totales en cero (crit. 1)', () => {
+    const html = renderizar(CAJERO, TURNO)
+
+    const orden = ['Artículos', 'Subtotal', 'IVA', 'TOTAL'].map((rotulo) => html.indexOf(`<dt>${rotulo}</dt>`))
+    expect(orden.every((posicion) => posicion >= 0)).toBe(true)
+    expect(orden).toEqual([...orden].sort((a, b) => a - b))
+    expect(html).toContain('<dd class="total">Q0.00</dd>')
+  })
+
+  it('el TOTAL se distingue con su propia clase para la letra grande (crit. 2)', () => {
+    const html = renderToString(<DetalleVenta venta={{ ...VENTA_VACIA, articulos: 2, total: 26.2 }} />)
+
+    expect(html).toContain('<dd class="total">Q26.20</dd>')
+    expect(html.match(/class="total"/g)).toHaveLength(1)
+  })
+
+  it('muestra los montos tal como los redondea el servidor, sin recalcularlos (crit. 3)', () => {
+    const html = renderToString(
+      <DetalleVenta venta={{ ...VENTA_VACIA, articulos: 4, subtotal: 23.39, iva: 2.81, total: 26.2 }} />,
+    ).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<dd>4</dd>')
+    expect(html).toContain('<dd>Q23.39</dd>')
+    expect(html).toContain('<dd>Q2.81</dd>')
+  })
+})
+
 describe('IVA por línea en el detalle de la venta (HU-04.03)', () => {
   const ARROZ = {
     id: 1,
