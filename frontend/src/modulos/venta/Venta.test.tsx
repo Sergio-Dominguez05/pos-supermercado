@@ -21,6 +21,7 @@ import {
   obtenerCobro,
   registrarPago,
   type Cobro,
+  type FacturaDeVenta,
   type Pago,
   type VentaFinalizada,
 } from '../../api/pagos'
@@ -39,6 +40,7 @@ import {
   rotuloSuspendidas,
 } from './textos'
 import {
+  avisoFactura,
   avisoVentaFinalizada,
   confirmacionEliminarPago,
   descripcionPago,
@@ -622,8 +624,10 @@ describe('finalizar el cobro (HU-07.08)', () => {
   const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
     subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
   const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const CERTIFICADA: FacturaDeVenta = { estado: 'CERTIFICADA', autorizacion: '5b2c1f0e-1a2b-4c3d-9e8f-001122334455',
+    serie: 'A1B2C3D4', numero: '123456789', certificadaEn: '2026-11-17T10:00:00-06:00', motivo: null }
   const FINALIZADA: VentaFinalizada = { ventaId: 31, numero: 1042, articulos: 3, total: 15, pagado: 15, pagos: [PAGO],
-    facturaEmitida: false }
+    factura: CERTIFICADA }
 
   it('con el pago completo, finalizar recibe el foco para confirmar con Enter (crit. 1)', () => {
     const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
@@ -637,19 +641,29 @@ describe('finalizar el cobro (HU-07.08)', () => {
   it('finalizar es un POST sobre la venta en curso', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(FINALIZADA), { status: 200 })))
 
-    await expect(finalizarCobro()).resolves.toMatchObject({ numero: 1042, facturaEmitida: false })
+    await expect(finalizarCobro()).resolves.toMatchObject({ numero: 1042, factura: { estado: 'CERTIFICADA' } })
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/finalizar')
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
     vi.unstubAllGlobals()
   })
 
-  it('avisa qué venta se finalizó y si se emitió la factura (crit. 1 y 5)', () => {
+  it('avisa qué venta se finalizó y con qué serie y número se certificó la factura (crit. 1 y 5, HU-08.03)', () => {
     expect(avisoVentaFinalizada(FINALIZADA)).toBe(
-      'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. ' +
-        'La factura se emitirá cuando esté disponible la facturación electrónica (EP-08).',
+      'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. Factura certificada: serie A1B2C3D4, N.º 123456789.',
     )
-    expect(avisoVentaFinalizada({ ...FINALIZADA, articulos: 1, facturaEmitida: true })).toBe(
-      'Venta N.º 1042 finalizada: 1 artículo, Q15.00 cobrados. Factura emitida.',
+    expect(avisoVentaFinalizada({ ...FINALIZADA, articulos: 1 })).toContain('1 artículo, Q15.00 cobrados.')
+  })
+
+  it('si la factura no se certificó, el aviso dice por qué (HU-08.03 crit. 3)', () => {
+    const contingencia: FacturaDeVenta = { ...CERTIFICADA, estado: 'CONTINGENCIA', autorizacion: null, serie: null,
+      numero: null, certificadaEn: null,
+      motivo: 'El certificador no respondió en 8 segundos. La factura queda en contingencia y se certificará después.' }
+
+    expect(avisoFactura(contingencia)).toBe(contingencia.motivo)
+    expect(avisoFactura({ ...contingencia, estado: 'RECHAZADA', motivo: 'El certificador rechazó la factura: NIT.' }))
+      .toBe('El certificador rechazó la factura: NIT.')
+    expect(avisoFactura({ ...contingencia, estado: 'PENDIENTE', motivo: null })).toBe(
+      'La factura está pendiente de certificar.',
     )
   })
 })

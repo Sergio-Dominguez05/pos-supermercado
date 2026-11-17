@@ -1,6 +1,8 @@
 package gt.supermercado.pos.pagos;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.facturacion.FacturacionDePrueba;
 import gt.supermercado.pos.pagos.dominio.EmisionDeFactura;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +48,7 @@ class PagosIntegracionTest {
     @Autowired
     PasswordEncoder codificador;
 
-    /** La emisión real (provisional, sin factura hasta EP-08); una prueba la hace fallar (HU-07.08 crit. 4). */
+    /** La emisión real de la factura (HU-08.03); una prueba la hace fallar (HU-07.08 crit. 4). */
     @MockitoSpyBean
     EmisionDeFactura emision;
 
@@ -60,6 +62,7 @@ class PagosIntegracionTest {
     void sesionDelAdministrador() throws Exception {
         cookieAdmin = cookie(enviar("/api/auth/login", "POST", login("admin", "contrasena", CONTRASENA_ADMIN), null),
                 "POS_SESION");
+        FacturacionDePrueba.configurarEmisorYEstablecimiento(jdbc);
     }
 
     // Crit. 1 y 2: el total a cobrar y el monto propuesto
@@ -306,7 +309,7 @@ class PagosIntegracionTest {
 
         assertThat(respuesta.statusCode()).isEqualTo(200);
         assertThat(respuesta.body()).contains("\"articulos\":3", "\"total\":15.00", "\"pagado\":15.00",
-                "\"facturaEmitida\":false", "\"id\":" + pago);
+                "\"factura\":{\"estado\":\"CERTIFICADA\"", "\"id\":" + pago);
         Map<String, Object> venta = jdbc.queryForMap("""
                 SELECT estado, finalizada_en IS NOT NULL AS con_hora, subtotal::text AS subtotal, iva::text AS iva,
                        total::text AS total
@@ -382,6 +385,27 @@ class PagosIntegracionTest {
         HttpResponse<String> reintento = finalizar(cajero);
         assertThat(reintento.statusCode()).isEqualTo(200);
         assertThat(estadoDeLaVenta(cajero)).isEqualTo("FINALIZADA");
+    }
+
+    @Test
+    void sinLosDatosDelEmisorLaVentaNoSeFinaliza() throws Exception {   // crit. 1 y HU-08.03
+        Cajero cajero = cajeroConVenta("5.00", 1);
+        pagar(cajero, pago("5.00"));
+        doThrow(new NegocioException("EMISOR_NO_CONFIGURADO", "Faltan los datos del emisor."))
+                .when(emision).emitir(any());
+
+        HttpResponse<String> respuesta = finalizar(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("EMISOR_NO_CONFIGURADO");
+        assertThat(estadoDeLaVenta(cajero)).isEqualTo("EN_CURSO");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM factura f JOIN venta v ON v.id = f.venta_id WHERE v.usuario_id = ?""",
+                Integer.class, cajero.usuarioId())).isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND NOT exitoso AND usuario_id = ?
+                  AND descripcion LIKE '%emisor%'""", Integer.class, cajero.usuarioId())).isEqualTo(1);
+        doCallRealMethod().when(emision).emitir(any());
     }
 
     // Apoyo

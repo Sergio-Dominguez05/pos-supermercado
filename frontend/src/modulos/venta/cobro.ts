@@ -1,4 +1,4 @@
-import type { Cobro, Pago, VentaFinalizada } from '../../api/pagos'
+import type { Cobro, FacturaDeVenta, Pago, VentaFinalizada } from '../../api/pagos'
 import { formatoQuetzales } from '../catalogo/textos'
 
 /** HU-07.03 crit. 4: el campo de los últimos 4 dígitos solo admite dígitos, y como mucho 4. */
@@ -25,12 +25,15 @@ export const motivoSinFinalizar = (cobro: Cobro) =>
     : `Para finalizar, los pagos deben cubrir el total: falta cobrar ${formatoQuetzales(cobro.pendiente)}.`
 
 /**
- * HU-07.08: qué venta se finalizó y cuánto se cobró; la pantalla ya está en la siguiente. Mientras no exista la
- * facturación (EP-08) la venta se registra sin factura, y se dice.
+ * HU-08.03: cómo quedó la factura. Certificada, con su serie y número (crit. 2); si no, el motivo que da el servidor:
+ * en contingencia se certificará después (crit. 3) y el rechazo se corrige con HU-08.06.
  */
+export const avisoFactura = (factura: FacturaDeVenta) => {
+  if (factura.estado === 'CERTIFICADA') return `Factura certificada: serie ${factura.serie}, N.º ${factura.numero}.`
+  return factura.motivo ?? 'La factura está pendiente de certificar.'
+}
+
+/** HU-07.08: qué venta se finalizó, cuánto se cobró y cómo quedó su factura; la pantalla ya está en la siguiente. */
 export const avisoVentaFinalizada = (venta: VentaFinalizada) =>
   `Venta N.º ${venta.numero} finalizada: ${venta.articulos} ${venta.articulos === 1 ? 'artículo' : 'artículos'}, ` +
-  `${formatoQuetzales(venta.pagado)} cobrados. ` +
-  (venta.facturaEmitida
-    ? 'Factura emitida.'
-    : 'La factura se emitirá cuando esté disponible la facturación electrónica (EP-08).')
+  `${formatoQuetzales(venta.pagado)} cobrados. ${avisoFactura(venta.factura)}`
