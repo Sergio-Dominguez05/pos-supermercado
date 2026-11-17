@@ -399,6 +399,19 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // NIT inválido
     }
 
+    @Test
+    void cambioDelEstablecimientoExitosoYRechazado() throws Exception {   // HU-12.02 y HU-12.15 crit. 4
+        String cuerpo = """
+                {"codigoSat":"%s","nombre":"Establecimiento auditado %d","direccion":"Zona 1, Guatemala"}""";
+
+        assertThat(registrosDe(() -> enviar("/api/configuracion/establecimiento", "PUT",
+                cuerpo.formatted("1", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/configuracion/establecimiento", "PUT",
+                cuerpo.formatted("0", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // código inválido
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

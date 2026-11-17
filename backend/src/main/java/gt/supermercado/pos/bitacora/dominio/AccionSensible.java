@@ -63,8 +63,8 @@ public enum AccionSensible {
     CAJA_DESACTIVADA(Categoria.CONFIGURACION, "configuracion"),
     EQUIPO_VINCULADO(Categoria.CONFIGURACION, "configuracion"),
     /**
-     * Cualquier parámetro del sistema. Lo registran la conexión FEL (HU-12.03) y el emisor (HU-12.01); pendiente en
-     * HU-12.02, 12.07, 12.08 y 12.13.
+     * Cualquier parámetro del sistema. Lo registran la conexión FEL (HU-12.03), el emisor (HU-12.01) y el
+     * establecimiento (HU-12.02); pendiente en HU-12.07, 12.08 y 12.13.
      */
     PARAMETRO_MODIFICADO(Categoria.CONFIGURACION, "configuracion"),
 
