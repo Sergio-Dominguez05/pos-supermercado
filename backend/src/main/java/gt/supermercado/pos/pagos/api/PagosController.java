@@ -8,7 +8,9 @@ import gt.supermercado.pos.pagos.dominio.TipoTarjeta;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,5 +69,15 @@ public class PagosController {
     @PreAuthorize("hasAuthority('PAGO_REGISTRAR')")
     public RespuestaCobro registrar(@RequestBody SolicitudPago solicitud, @AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaCobro.de(gestionPagos.registrar(solicitud, sesion));
+    }
+
+    /**
+     * HU-07.06: elimina un pago de la venta en curso y devuelve el cobro con el pendiente recalculado (crit. 2). 404
+     * {@code PAGO_NO_ENCONTRADO} si no es un pago vigente de la venta en curso del turno (crit. 3).
+     */
+    @DeleteMapping("/{pagoId}")
+    @PreAuthorize("hasAuthority('PAGO_REGISTRAR')")
+    public RespuestaCobro eliminar(@PathVariable long pagoId, @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaCobro.de(gestionPagos.eliminar(pagoId, sesion));
     }
 }

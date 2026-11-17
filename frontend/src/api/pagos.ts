@@ -41,3 +41,11 @@ export const obtenerCobro = () => pedir<Cobro>('/api/ventas/actual/pagos')
  */
 export const registrarPago = (solicitud: SolicitudPago) =>
   pedir<Cobro>('/api/ventas/actual/pagos', { method: 'POST', body: JSON.stringify(solicitud) })
+
+/**
+ * HU-07.06: elimina un pago de la venta en curso y devuelve el cobro con el pendiente recalculado. El pago no se
+ * borra: queda marcado como eliminado y registrado en la bitácora. Responde 404 `PAGO_NO_ENCONTRADO` si no es un pago
+ * vigente de la venta en curso.
+ */
+export const eliminarPago = (pagoId: number) =>
+  pedir<Cobro>(`/api/ventas/actual/pagos/${pagoId}`, { method: 'DELETE' })

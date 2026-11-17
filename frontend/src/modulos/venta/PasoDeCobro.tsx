@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { CLAVE_COBRO, obtenerCobro, registrarPago, type Cobro, type TipoTarjeta } from '../../api/pagos'
+import { useEffect, useState } from 'react'
+import {
+  CLAVE_COBRO,
+  eliminarPago,
+  obtenerCobro,
+  registrarPago,
+  type Cobro,
+  type Pago,
+  type TipoTarjeta,
+} from '../../api/pagos'
 import type { Venta } from '../../api/ventas'
 import { avisoSonoro, confirmacionSonora } from '../catalogo/sonido'
 import { formatoQuetzales } from '../catalogo/textos'
-import { descripcionPago, montoValido, soloUltimos4 } from './cobro'
+import { confirmacionEliminarPago, descripcionPago, montoValido, soloUltimos4 } from './cobro'
 
 /**
  * HU-06.15 y HU-07.03: el paso de cobro de la venta. Muestra el total a cobrar, que el cajero ingresa en la terminal
@@ -14,14 +22,18 @@ import { descripcionPago, montoValido, soloUltimos4 } from './cobro'
 export function PasoDeCobro({ venta, onRegresar }: { venta: Venta; onRegresar: () => void }) {
   const { data: cobro } = useQuery({ queryKey: CLAVE_COBRO, queryFn: obtenerCobro })
 
+  // Escape regresa a la venta esté donde esté el foco: al registrar o eliminar un pago, el formulario se reemplaza y
+  // el foco queda fuera del cobro.
+  useEffect(() => {
+    const alPresionar = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') onRegresar()
+    }
+    window.addEventListener('keydown', alPresionar)
+    return () => window.removeEventListener('keydown', alPresionar)
+  }, [onRegresar])
+
   return (
-    <section
-      className="cobro"
-      aria-label="Cobro"
-      onKeyDown={(evento) => {
-        if (evento.key === 'Escape') onRegresar()
-      }}
-    >
+    <section className="cobro" aria-label="Cobro">
       <h3>Cobro con tarjeta</h3>
       <dl className="totales" aria-label="Total a cobrar">
         <dt>Artículos</dt>
@@ -47,23 +59,63 @@ export function PasoDeCobro({ venta, onRegresar }: { venta: Venta; onRegresar: (
   )
 }
 
-/** HU-07.03: el pago ya registrado. La venta queda bloqueada hasta eliminarlo (HU-07.06) o finalizar (HU-07.08). */
+/**
+ * HU-07.03: el pago ya registrado. La venta queda bloqueada hasta eliminarlo o finalizar el cobro (HU-07.08). HU-07.06:
+ * cada pago se puede eliminar mientras la venta no se haya finalizado (crit. 1).
+ */
 export function PagoRegistrado({ cobro }: { cobro: Cobro }) {
   return (
     <div role="status">
       <ul className="lista-pagos">
         {cobro.pagos.map((pago) => (
-          <li key={pago.id}>{descripcionPago(pago)}</li>
+          <li key={pago.id}>
+            <span>{descripcionPago(pago)}</span>
+            <EliminarPago pago={pago} />
+          </li>
         ))}
       </ul>
       <p className="pendiente">
         {cobro.pendiente > 0
           ? `Falta cobrar ${formatoQuetzales(cobro.pendiente)}: en esta versión se cobra con una sola tarjeta.`
           : 'El pago cubre el total.'}{' '}
-        Finalizar el cobro y emitir la factura estará disponible con HU-07.08 (#63). Para modificar la venta hay que
-        eliminar el pago (HU-07.06, #61).
+        Finalizar el cobro y emitir la factura estará disponible con HU-07.08 (#63). Para modificar la venta, elimine
+        el pago.
       </p>
     </div>
+  )
+}
+
+/**
+ * HU-07.06: quita un pago registrado por error, después de confirmarlo. El servidor lo registra en la bitácora
+ * (crit. 4) y devuelve el pendiente recalculado, que la pantalla muestra al instante (crit. 2): vuelve el formulario
+ * para registrar el pago correcto.
+ */
+export function EliminarPago({ pago }: { pago: Pago }) {
+  const clienteConsultas = useQueryClient()
+  const eliminacion = useMutation({
+    mutationFn: () => eliminarPago(pago.id),
+    onSuccess: (actualizado) => clienteConsultas.setQueryData(CLAVE_COBRO, actualizado),
+    onError: () => avisoSonoro(),
+  })
+
+  return (
+    <>
+      <button
+        type="button"
+        data-control="eliminar-pago"
+        disabled={eliminacion.isPending}
+        onClick={() => {
+          if (window.confirm(confirmacionEliminarPago(pago))) eliminacion.mutate()
+        }}
+      >
+        {eliminacion.isPending ? 'Eliminando…' : 'Eliminar pago'}
+      </button>
+      {eliminacion.error && (
+        <span className="error" role="alert">
+          {eliminacion.error.message}
+        </span>
+      )}
+    </>
   )
 }
 

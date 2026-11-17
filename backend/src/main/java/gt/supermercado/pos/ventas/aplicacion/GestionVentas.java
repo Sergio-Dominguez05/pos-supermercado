@@ -315,12 +315,21 @@ public class GestionVentas {
      */
     @Transactional
     public Venta paraRegistrarPago(Turno turno) {
+        return validarParaCobrar(enCursoBloqueada(turno));
+    }
+
+    /**
+     * La venta en curso del turno, bloqueada hasta el final de la transacción. La usa el módulo {@code pagos} para
+     * eliminar un pago (HU-07.06) sin que la venta cambie mientras tanto; debe correr en la misma transacción.
+     */
+    @Transactional
+    public Venta enCursoBloqueada(Turno turno) {
         Venta venta = ventas.enCursoDelTurno(turno.id())
                 .orElseThrow(() -> new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso."));
         if (!ventas.bloquearEnCurso(venta.id())) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }
-        return validarParaCobrar(ventas.buscarPorId(venta.id()).orElseThrow());
+        return ventas.buscarPorId(venta.id()).orElseThrow();
     }
 
     private Venta validarParaCobrar(Venta venta) {
