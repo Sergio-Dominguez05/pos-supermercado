@@ -50,5 +50,6 @@ pos:
     # el Administrador guarda en Configuración > Conexión FEL (HU-12.03). El certificador aún no se elige.
     modo: simulado
     simulador:
-      # ACEPTAR, RECHAZAR o SIN_CONEXION, para probar certificación, rechazos y contingencia.
+      # ACEPTAR, RECHAZAR, SIN_CONEXION o RESPUESTA_PERDIDA, para probar certificación, rechazos, contingencia y
+      # reintentos sin duplicar (HU-08.04).
       escenario: ACEPTAR

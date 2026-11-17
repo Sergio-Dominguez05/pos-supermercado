@@ -13,12 +13,17 @@ public interface RepositorioFacturas {
 
     Optional<Factura> deLaVenta(long ventaId);
 
-    /** Crit. 2: guarda la autorización, la serie, el número y la fecha, y completa la tarea. */
-    void certificada(long facturaId, ResultadoCertificacion resultado);
+    /*
+     * Los cambios de estado solo se aplican a una factura PENDIENTE o en CONTINGENCIA y devuelven false si ya no lo
+     * estaba (otro proceso la certificó antes): HU-08.04 crit. 3, una factura certificada no se vuelve a facturar.
+     */
+
+    /** HU-08.03 crit. 2: guarda la autorización, la serie, el número y la fecha, y completa la tarea. */
+    boolean certificada(long facturaId, ResultadoCertificacion resultado);
 
     /** El certificador la rechazó: queda el intento con el error (HU-08.06 lo corrige y la reenvía). */
-    void rechazada(long facturaId, ResultadoCertificacion resultado);
+    boolean rechazada(long facturaId, ResultadoCertificacion resultado);
 
-    /** Crit. 3: sin respuesta a tiempo. La tarea queda pendiente para reintentarla (HU-08.07 y HU-08.08). */
-    void enContingencia(long facturaId, String motivo);
+    /** HU-08.03 crit. 3: sin respuesta a tiempo. La tarea queda pendiente para reintentarla (HU-08.07 y HU-08.08). */
+    boolean enContingencia(long facturaId, String motivo);
 }

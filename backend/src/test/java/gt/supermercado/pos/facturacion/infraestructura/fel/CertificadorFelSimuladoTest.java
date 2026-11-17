@@ -60,6 +60,20 @@ class CertificadorFelSimuladoTest {
     }
 
     @Test
+    void escenarioRespuestaPerdidaCertificaPeroNoResponde() {   // HU-08.04 crit. 2
+        UUID venta = UUID.randomUUID();
+        certificador.usarEscenario(Escenario.RESPUESTA_PERDIDA);
+
+        assertThatThrownBy(() -> certificador.certificar("<dte/>", venta))
+                .isInstanceOf(CertificadorNoDisponibleException.class);
+
+        certificador.usarEscenario(Escenario.ACEPTAR);
+        assertThat(certificador.consultarPorIdentificador(venta)).hasValueSatisfying(
+                resultado -> assertThat(resultado.certificada()).isTrue());
+        assertThat(certificador.enviosDe(venta)).isEqualTo(1);
+    }
+
+    @Test
     void soloSePuedeAnularUnaFacturaCertificada() {
         ResultadoCertificacion certificada = certificador.certificar("<dte/>", UUID.randomUUID());
 

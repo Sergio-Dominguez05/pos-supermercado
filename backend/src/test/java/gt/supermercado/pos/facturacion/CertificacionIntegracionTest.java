@@ -1,8 +1,10 @@
 package gt.supermercado.pos.facturacion;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.facturacion.aplicacion.EmisionFacturas;
 import gt.supermercado.pos.facturacion.infraestructura.fel.CertificadorFelSimulado;
 import gt.supermercado.pos.facturacion.infraestructura.fel.CertificadorFelSimulado.Escenario;
+import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -19,11 +22,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** HU-08.03 Certificar la factura al finalizar la venta, contra PostgreSQL real y el certificador simulado. */
+/**
+ * HU-08.03 Certificar la factura al finalizar la venta y HU-08.04 Evitar facturas duplicadas, contra PostgreSQL real
+ * y el certificador simulado.
+ */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "pos.seguridad.admin-inicial.contrasena=" + CertificacionIntegracionTest.CONTRASENA_ADMIN)
@@ -44,6 +52,9 @@ class CertificacionIntegracionTest {
 
     @Autowired
     CertificadorFelSimulado simulador;
+
+    @Autowired
+    EmisionFacturas emision;
 
     @Value("${local.server.port}")
     int puerto;
@@ -154,7 +165,7 @@ class CertificacionIntegracionTest {
     }
 
     @Test
-    void unaVentaTieneUnaSolaFactura() throws Exception {   // HU-08.04
+    void unaVentaTieneUnaSolaFactura() throws Exception {   // HU-08.04 crit. 3
         Cajero cajero = cajeroConVentaCobrada("Producto único", "5.00", 1);
         finalizar(cajero);
 
@@ -164,9 +175,85 @@ class CertificacionIntegracionTest {
                 Integer.class, cajero.usuarioId())).isEqualTo(1);
     }
 
+    // HU-08.04 Evitar facturas duplicadas
+
+    @Test
+    void elIdentificadorUnicoQueSeEnviaEsElDeLaVenta() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConVentaCobrada("Producto identificado", "5.00", 1);
+
+        finalizar(cajero);
+
+        assertThat(simulador.enviosDe(uuidDeLaVenta(cajero))).isEqualTo(1);
+    }
+
+    @Test
+    void siSePierdeLaRespuestaElReintentoConsultaYNoVuelveACertificar() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConVentaCobrada("Producto con respuesta perdida", "5.00", 1);
+        simulador.usarEscenario(Escenario.RESPUESTA_PERDIDA);
+        assertThat(finalizar(cajero).body()).contains("\"estado\":\"CONTINGENCIA\"");
+        UUID venta = uuidDeLaVenta(cajero);
+        String certificadaEnElCertificador = simulador.consultarPorIdentificador(venta).orElseThrow().autorizacion()
+                .toString();
+        simulador.usarEscenario(Escenario.ACEPTAR);
+
+        FacturaDeVenta reintento = emision.reintentar(ventaId(cajero));
+
+        assertThat(reintento.estado()).isEqualTo("CERTIFICADA");
+        assertThat(reintento.autorizacion()).hasToString(certificadaEnElCertificador);
+        assertThat(simulador.enviosDe(venta)).isEqualTo(1);   // se consultó, no se reenvió
+        assertThat(facturaDe(cajero)).containsEntry("estado", "CERTIFICADA")
+                .containsEntry("autorizacion", certificadaEnElCertificador);
+        assertThat(jdbc.queryForObject("SELECT completada FROM tarea_pendiente WHERE factura_id = ?", Boolean.class,
+                facturaDe(cajero).get("id"))).isTrue();
+    }
+
+    @Test
+    void siElCertificadorNoLaTieneElReintentoLaEnvia() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConVentaCobrada("Producto sin conexión", "5.00", 1);
+        simulador.usarEscenario(Escenario.SIN_CONEXION);
+        finalizar(cajero);
+        simulador.usarEscenario(Escenario.ACEPTAR);
+
+        assertThat(emision.reintentar(ventaId(cajero)).estado()).isEqualTo("CERTIFICADA");
+        assertThat(simulador.enviosDe(uuidDeLaVenta(cajero))).isEqualTo(1);
+    }
+
+    @Test
+    void unaVentaConFacturaCertificadaNoSeVuelveAFacturar() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConVentaCobrada("Producto certificado una vez", "5.00", 1);
+        finalizar(cajero);
+        Map<String, Object> factura = facturaDe(cajero);
+
+        FacturaDeVenta reintento = emision.reintentar(ventaId(cajero));
+
+        assertThat(reintento.estado()).isEqualTo("CERTIFICADA");
+        assertThat(reintento.autorizacion()).hasToString((String) factura.get("autorizacion"));
+        assertThat(simulador.enviosDe(uuidDeLaVenta(cajero))).isEqualTo(1);
+        // La base de datos tampoco lo permite: ni otra factura para la venta ni cambiar la certificada.
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO factura (venta_id, receptor_tipo, receptor_id, receptor_nombre, emisor_snapshot, xml_enviado)
+                VALUES (?, 'CF', 'CF', 'Consumidor Final', '{}', '<dte/>')""", ventaId(cajero)))
+                .isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update("UPDATE factura SET estado = 'PENDIENTE' WHERE id = ?", factura.get("id")))
+                .hasMessageContaining("ya está certificada");
+        assertThatThrownBy(() -> jdbc.update("UPDATE factura SET numero = '1' WHERE id = ?", factura.get("id")))
+                .hasMessageContaining("ya está certificada");
+        assertThat(facturaDe(cajero)).isEqualTo(factura);
+    }
+
     // Apoyo
 
     record Cajero(long usuarioId, String sesion, long productoId) {}
+
+    private long ventaId(Cajero cajero) {
+        return jdbc.queryForObject("SELECT id FROM venta WHERE usuario_id = ? ORDER BY id DESC LIMIT 1", Long.class,
+                cajero.usuarioId());
+    }
+
+    private UUID uuidDeLaVenta(Cajero cajero) {
+        return jdbc.queryForObject("SELECT uuid FROM venta WHERE usuario_id = ? ORDER BY id DESC LIMIT 1", UUID.class,
+                cajero.usuarioId());
+    }
 
     private Map<String, Object> facturaDe(Cajero cajero) {
         return jdbc.queryForMap("""
