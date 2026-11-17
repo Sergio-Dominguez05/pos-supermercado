@@ -240,6 +240,41 @@ public class GestionVentas {
         return ventas.buscarPorId(venta.id()).orElseThrow();
     }
 
+    /** HU-06.13 crit. 1 y 3: las ventas suspendidas de la caja de la sesión, con su hora, artículos y total. */
+    @Transactional(readOnly = true)
+    public List<Venta> suspendidas(SesionActiva sesion) {
+        return ventas.suspendidasDeLaCaja(turnos.exigirTurnoAbierto(sesion).cajaId());
+    }
+
+    /**
+     * HU-06.13: retoma una venta suspendida como venta en curso.
+     * <ul>
+     *   <li>Crit. 2: se carga con todas sus líneas.</li>
+     *   <li>Crit. 3: solo de la caja propia; de otra caja, 404 como si no existiera.</li>
+     *   <li>Crit. 4: las líneas no se recalculan: conservan el precio con el que se agregaron (HU-06.09).</li>
+     * </ul>
+     * Un turno tiene una sola venta en curso. La pantalla siempre tiene una lista, normalmente vacía: si está vacía se
+     * cancela (no tiene nada que perder); si tiene productos, el cajero debe suspenderla o cancelarla antes.
+     */
+    @Transactional
+    public Venta retomar(long ventaId, SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        ventas.bloquearTurno(turno.id());
+        Optional<Venta> enCurso = ventas.enCursoDelTurno(turno.id());
+        if (enCurso.isPresent()) {
+            if (!enCurso.get().lineas().isEmpty()) {
+                throw new NegocioException("VENTA_EN_CURSO_CON_PRODUCTOS",
+                        "Hay una venta en curso con productos: suspéndala o cancélela antes de retomar otra.");
+            }
+            ventas.cancelar(enCurso.get().id());
+        }
+        if (!ventas.retomar(ventaId, turno.cajaId(), turno.id(), sesion.usuarioId())) {
+            throw new RecursoNoEncontradoException("VENTA_SUSPENDIDA_NO_ENCONTRADA",
+                    "La venta no está suspendida en esta caja.");
+        }
+        return ventas.buscarPorId(ventaId).orElseThrow();
+    }
+
     /**
      * HU-06.14: cancela la venta en curso del turno. No requiere autorización de un supervisor (crit. 2): basta el
      * permiso del cajero. La venta queda {@code CANCELADA}, así que no genera factura ni cuenta para la caja

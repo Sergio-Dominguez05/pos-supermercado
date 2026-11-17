@@ -14,6 +14,7 @@ import java.util.List;
  *
  * @param numero  número interno único (HU-06.01 crit. 4)
  * @param tasaIva tasa con la que se calculó, guardada en la venta (HU-04.01 crit. 3)
+ * @param suspendidaEn cuándo se dejó en espera (HU-06.12); {@code null} si nunca se suspendió
  */
 public record Venta(
         long id,
@@ -25,6 +26,7 @@ public record Venta(
         EstadoVenta estado,
         BigDecimal tasaIva,
         OffsetDateTime creadaEn,
+        OffsetDateTime suspendidaEn,
         List<LineaVenta> lineas) {
 
     public Venta {

@@ -3,6 +3,7 @@ package gt.supermercado.pos.ventas.dominio;
 import gt.supermercado.pos.impuestos.dominio.LineaCalculada;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 public interface RepositorioVentas {
@@ -29,6 +30,21 @@ public interface RepositorioVentas {
      * Devuelve {@code false} si ya no estaba en curso.
      */
     boolean suspender(long ventaId);
+
+    /** HU-06.13 crit. 1 y 3: las ventas suspendidas de la caja, con sus líneas, de la más antigua a la más reciente. */
+    List<Venta> suspendidasDeLaCaja(long cajaId);
+
+    /**
+     * Bloquea la fila del turno hasta el final de la transacción, para que dos peticiones del mismo turno no dejen dos
+     * ventas en curso a la vez.
+     */
+    void bloquearTurno(long turnoId);
+
+    /**
+     * HU-06.13 crit. 2: vuelve a poner en curso una venta suspendida de la caja, en el turno y a nombre del usuario que
+     * la retoma, con sus líneas intactas. Devuelve {@code false} si no está suspendida en esa caja.
+     */
+    boolean retomar(long ventaId, long cajaId, long turnoId, long usuarioId);
 
     /** Cuántas ventas suspendidas tiene el turno (HU-06.12 crit. 4). */
     int suspendidasDelTurno(long turnoId);

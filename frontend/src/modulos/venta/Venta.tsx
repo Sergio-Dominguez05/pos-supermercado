@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { cancelarVenta, CLAVE_VENTA_EN_CURSO, iniciarVenta, type Venta as DatosVenta } from '../../api/ventas'
+import {
+  cancelarVenta,
+  CLAVE_VENTA_EN_CURSO,
+  CLAVE_VENTAS_SUSPENDIDAS,
+  iniciarVenta,
+  listarSuspendidas,
+  type Venta as DatosVenta,
+} from '../../api/ventas'
 import { ACCIONES_PENDIENTES, ATAJOS, avisoPendiente } from '../../atajos/atajos'
 import { useAtajos, type Manejador, type Manejadores } from '../../atajos/useAtajos'
 import { EstadoTurno } from '../caja/EstadoTurno'
@@ -12,9 +19,16 @@ import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { CantidadLinea } from './CantidadLinea'
 import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
+import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
 import { type AccionDeLaVenta, lineaSeleccionada, moverSeleccion, supresionEsParaLaLinea } from './teclado'
-import { avisoVentaSuspendida, confirmacionCancelarVenta, formatoDesglose } from './textos'
+import {
+  avisoVentaRetomada,
+  avisoVentaSuspendida,
+  confirmacionCancelarVenta,
+  formatoDesglose,
+  rotuloSuspendidas,
+} from './textos'
 
 /** Lleva el foco a un campo de la pantalla de venta por su nombre (`codigo` o `descripcion`). */
 const enfocar = (campo: 'codigo' | 'descripcion') =>
@@ -36,6 +50,13 @@ export function Venta() {
     queryFn: iniciarVenta,
     enabled: habilitada,
   })
+  // HU-06.13 crit. 1 y 3: las ventas en espera de la caja propia.
+  const { data: suspendidas = [] } = useQuery({
+    queryKey: CLAVE_VENTAS_SUSPENDIDAS,
+    queryFn: listarSuspendidas,
+    enabled: habilitada,
+  })
+  const [listaVisible, setListaVisible] = useState(false)
 
   // HU-06.17: la línea sobre la que actúan F4 y Supr. Se ajusta en el render cada vez que llega otra venta.
   const [seleccion, setSeleccion] = useState<{ venta?: DatosVenta; id?: number }>({})
@@ -64,6 +85,7 @@ export function Venta() {
         if (seleccionada !== undefined) controlDeLinea(seleccionada, 'quitar')?.click()
       },
       suspenderVenta: () => document.querySelector<HTMLElement>('main [data-control="suspender-venta"]')?.click(),
+      retomarVenta: () => setListaVisible((visible) => !visible),
       cancelarVenta: () => document.querySelector<HTMLElement>('main [data-control="cancelar-venta"]')?.click(),
     }
     const pendientes: Manejadores = Object.fromEntries(
@@ -100,12 +122,35 @@ export function Venta() {
       {/* HU-06.17 crit. 2: los atajos, en una ayuda rápida que se abre y se cierra con F1. */}
       {ayudaVisible && <AyudaAtajos onCerrar={() => setAyudaVisible(false)} />}
 
+      {/* HU-06.13: la lista de ventas en espera, con F8 o con su botón. */}
+      {habilitada && listaVisible && (
+        <VentasSuspendidas
+          suspendidas={suspendidas}
+          onCerrar={() => {
+            setListaVisible(false)
+            enfocar('codigo')
+          }}
+          onRetomada={(retomada) => {
+            setListaVisible(false)
+            setAviso(avisoVentaRetomada(retomada))
+            enfocar('codigo')
+          }}
+        />
+      )}
+
       {/* HU-09.01 crit. 1: en una caja cerrada se pide abrir el turno. */}
       <EstadoTurno />
 
       {/* HU-09.02 crit. 1 y HU-06.01 crit. 2: con la caja cerrada la pantalla de venta está deshabilitada. */}
       <section className="tarjeta formulario" aria-label="Venta">
         {habilitada && venta && <h2>Venta N.º {venta.numero}</h2>}
+        {habilitada && suspendidas.length > 0 && (
+          <p>
+            <button type="button" onClick={() => setListaVisible((visible) => !visible)}>
+              {rotuloSuspendidas(suspendidas.length)} <kbd>F8</kbd>
+            </button>
+          </p>
+        )}
         {aviso && (
           <p className="pendiente" role="status">
             {aviso}

@@ -21,6 +21,8 @@ export interface Venta {
   estado: 'EN_CURSO' | 'SUSPENDIDA' | 'CANCELADA' | 'FINALIZADA'
   cajaNombre: string
   creadaEn: string
+  /** Cuándo se dejó en espera (HU-06.12); `null` si nunca se suspendió. */
+  suspendidaEn: string | null
   lineas: LineaVenta[]
   articulos: number
   subtotal: number
@@ -29,6 +31,7 @@ export interface Venta {
 }
 
 export const CLAVE_VENTA_EN_CURSO = ['ventas', 'actual'] as const
+export const CLAVE_VENTAS_SUSPENDIDAS = ['ventas', 'suspendidas'] as const
 
 /** HU-06.01: inicia la venta del turno, o devuelve la que ya está en curso. */
 export const iniciarVenta = () => pedir<Venta>('/api/ventas', { method: 'POST' })
@@ -76,3 +79,14 @@ export const eliminarLinea = (lineaId: number) =>
  * iniciar la siguiente venta. Responde 422 `VENTA_VACIA` si no tiene productos.
  */
 export const suspenderVenta = () => pedir<Venta>('/api/ventas/actual/suspender', { method: 'POST' })
+
+/** HU-06.13 crit. 1 y 3: las ventas en espera de la caja propia, de la más antigua a la más reciente. */
+export const listarSuspendidas = () => pedir<Venta[]>('/api/ventas/suspendidas')
+
+/**
+ * HU-06.13 crit. 2: retoma la venta suspendida como venta en curso, con todas sus líneas y sus precios. Responde 404
+ * `VENTA_SUSPENDIDA_NO_ENCONTRADA` si no está en espera en la caja propia y 422 `VENTA_EN_CURSO_CON_PRODUCTOS` si hay
+ * otra venta en curso con productos.
+ */
+export const retomarVenta = (ventaId: number) =>
+  pedir<Venta>(`/api/ventas/suspendidas/${ventaId}/retomar`, { method: 'POST' })

@@ -41,12 +41,13 @@ public class VentasController {
 
     /** La venta con sus totales ya calculados por el servidor: la pantalla nunca calcula montos (§6.1). */
     public record RespuestaVenta(long id, long numero, EstadoVenta estado, String cajaNombre, OffsetDateTime creadaEn,
-                                 List<LineaVenta> lineas, int articulos, BigDecimal subtotal, BigDecimal iva,
+                                 OffsetDateTime suspendidaEn, List<LineaVenta> lineas, int articulos, BigDecimal subtotal, BigDecimal iva,
                                  BigDecimal total) {
 
         static RespuestaVenta de(Venta venta) {
             var totales = venta.totales();
             return new RespuestaVenta(venta.id(), venta.numero(), venta.estado(), venta.cajaNombre(), venta.creadaEn(),
+                    venta.suspendidaEn(),
                     venta.lineas(), venta.articulos(), totales.subtotal(), totales.iva(), totales.total());
         }
     }
@@ -140,6 +141,24 @@ public class VentasController {
     @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
     public RespuestaVenta suspender(@AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaVenta.de(gestionVentas.suspender(sesion));
+    }
+
+    /** HU-06.13 crit. 1 y 3: las ventas suspendidas de la caja propia, con su hora, artículos y total. */
+    @GetMapping("/suspendidas")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public List<RespuestaVenta> suspendidas(@AuthenticationPrincipal SesionActiva sesion) {
+        return gestionVentas.suspendidas(sesion).stream().map(RespuestaVenta::de).toList();
+    }
+
+    /**
+     * HU-06.13 crit. 2: retoma la venta suspendida como venta en curso, con todas sus líneas y sus precios. 404 si no
+     * está suspendida en la caja propia (crit. 3); 422 {@code VENTA_EN_CURSO_CON_PRODUCTOS} si hay otra venta en curso
+     * con productos.
+     */
+    @PostMapping("/suspendidas/{ventaId}/retomar")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public RespuestaVenta retomar(@PathVariable long ventaId, @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.retomar(ventaId, sesion));
     }
 
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */

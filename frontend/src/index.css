@@ -495,3 +495,21 @@ kbd {
 .ayuda-atajos .atajos li.pendiente {
   color: var(--texto-suave);
 }
+
+/* HU-06.13: lista de ventas en espera (F8). */
+.lista-suspendidas {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.lista-suspendidas li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
