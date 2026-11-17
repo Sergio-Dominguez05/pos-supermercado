@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** pantalla de venta completa (`v0.4.0`) — cantidades, quitar líneas, ventas en espera, atajos de teclado y paso al cobro, sobre el catálogo, el IVA y la apertura de caja del Sprint 2. Aún no incluye clientes, registro del pago, cierre de caja ni certificación FEL real.
+> **Estado:** cobro y emisión FEL (`v0.5.0`) — cobro con tarjeta, factura electrónica (DTE) certificada al finalizar la venta, impresión en impresoras térmicas de red y cliente por NIT, sobre la pantalla de venta del Sprint 3. La certificación se prueba con un certificador simulado (el certificador real aún no se elige). Aún no incluye contingencia, anulación ni cierre de caja.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -34,6 +34,11 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | Caja | Abrir el turno en la caja del equipo (uno por caja y por cajero); sin turno abierto no se vende | HU-09.01 a 09.03 | `v0.3.0` |
 | Venta | Pantalla de venta con número interno; agregar con lector, código escrito o búsqueda por descripción (F2); el precio de cada línea se mantiene aunque cambie en el catálogo; totales y desglose de IVA calculados por el servidor; cancelar con confirmación | HU-06.01 a 06.03, 06.09, 06.14 | `v0.3.0` (adelanto del Sprint 3) |
 | Venta | Totales siempre visibles; cantidad con `6*` antes del código o editando la línea, con confirmación por encima del límite configurado; quitar líneas (quedan en la bitácora, sin borrarse); dejar ventas en espera y retomarlas; atajos de teclado con ayuda (F1); pasar al cobro con el total (el registro del pago con tarjeta llega con EP-07) | HU-06.04, 06.07, 06.08, 06.12, 06.13, 06.15, 06.17 | `v0.4.0` |
+| Cobro | Cobrar con tarjeta (tipo, autorización y últimos 4, nunca el número completo); quitar un pago antes de finalizar; finalizar solo con el pago completo, en una transacción, y la caja queda lista para la siguiente venta | HU-07.03, 07.06, 07.07, 07.08 | `v0.5.0` |
+| Clientes | Cliente de la venta por NIT (con o sin guion, F6): se cargan sus datos o se consulta el nombre al certificador; registro sin duplicados; NIT validado con el módulo 11 de la SAT; volver a Consumidor Final con un clic | HU-05.01 a 05.05 | `v0.5.0` |
+| Facturación FEL | Documento de la factura (DTE tipo FACT, esquema FEL de la SAT) con los montos que guardó el POS; certificación al finalizar con tiempo límite (sin respuesta, queda en contingencia); identificador único por venta y consulta antes de reenviar, para no duplicar facturas | HU-08.01 a 08.04, 04.09 (parcial) | `v0.5.0` |
+| Impresión | Factura impresa en la impresora térmica de red de la caja (ESC/POS, 58 u 80 mm) con emisor, receptor, autorización, detalle, Subtotal, IVA y TOTAL, pago y certificador; si la impresora falla, la factura sigue válida | HU-08.05 | `v0.5.0` |
+| Configuración | Datos del emisor y del establecimiento SAT; conexión con el certificador (https, llave cifrada con AES-256-GCM, ambiente de pruebas o producción); impresoras por caja con página de prueba y copias | HU-12.01, 12.02, 12.03, 12.08, 12.15 | `v0.5.0` |
 
 Las reglas que dependen de módulos futuros (clientes, cobro, facturación, cierre de caja) quedan anotadas en sus Issues y se completan en su sprint.
 
@@ -165,7 +170,7 @@ flowchart TB
 
     subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
         direction LR
-        S3["🔄 Sprint 3 · v0.4.0<br/>Pantalla de venta ✅ y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+        S3["🔄 Sprint 3 · v0.4.0<br/>Pantalla de venta ✅ y clientes<br/>18 HU · Alta"] --> S4["✅ Sprint 4 · v0.5.0<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
     end
 
     subgraph MEJORAS["Etapa 3 · Reportes y operación"]
@@ -233,4 +238,4 @@ Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](
 
 ---
 
-**Proyecto académico · Guatemala · Pantalla de venta del Sprint 3 (`v0.4.0`)**
+**Proyecto académico · Guatemala · Cobro y emisión FEL del Sprint 4 (`v0.5.0`)**
