@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link } from 'react-router'
 import {
   CLAVE_CONEXION_FEL,
   guardarConexionFel,
@@ -11,6 +10,7 @@ import {
   type DatosConexionFel,
 } from '../../api/conexionFel'
 import { useSesion } from '../login/sesion'
+import { NavConfiguracion } from './NavConfiguracion'
 import { avisoConexionGuardada, CONFIRMACION_PRODUCCION, segundosAMs, segundosValidos } from './textos'
 
 /**
@@ -24,9 +24,7 @@ export function PaginaConexionFel() {
   return (
     <main className="pagina">
       <h1>Conexión FEL</h1>
-      <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Configuración · <Link to="/configuracion/cajas">Cajas</Link> · Conexión FEL
-      </p>
+      <NavConfiguracion actual="Conexión FEL" />
       {usuario.permisos.includes('CONFIGURACION_MODIFICAR') ? (
         <CargaConexionFel />
       ) : (

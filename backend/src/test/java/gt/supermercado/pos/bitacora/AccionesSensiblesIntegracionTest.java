@@ -385,6 +385,20 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // tiempo límite inválido
     }
 
+    @Test
+    void cambioDeLosDatosDelEmisorExitosoYRechazado() throws Exception {   // HU-12.01 y HU-12.15 crit. 4
+        String cuerpo = """
+                {"nit":"%s","razonSocial":"Emisor auditado %d, S.A.","nombreComercial":"Auditado",\
+                "direccionFiscal":"Zona 1, Guatemala"}""";
+
+        assertThat(registrosDe(() -> enviar("/api/configuracion/emisor", "PUT",
+                cuerpo.formatted("1234560", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/configuracion/emisor", "PUT",
+                cuerpo.formatted("1234561", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // NIT inválido
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

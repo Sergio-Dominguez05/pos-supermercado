@@ -148,7 +148,7 @@ class ConexionFelIntegracionTest {
                 WHERE accion = 'PARAMETRO_MODIFICADO' AND exitoso ORDER BY secuencia DESC LIMIT 1""");
         assertThat(registro).containsEntry("modulo", "configuracion").containsEntry("entidad", "config_fel");
         assertThat((String) registro.get("cambios")).contains("\"timeoutMs\"", "\"antes\": 5000", "\"despues\": 9000",
-                "\"secreto\": \"cambiado\"").doesNotContain(llave);
+                "\"secreto\": \"modificado\"").doesNotContain(llave);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bitacora WHERE cambios::text LIKE ?", Integer.class,
                 "%" + llave + "%")).isZero();
     }

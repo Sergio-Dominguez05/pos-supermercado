@@ -166,7 +166,7 @@ public class GestionConexionFel {
                 "La dirección del servicio debe ser https:// (canal cifrado), por ejemplo https://certificador.com/api.");
     }
 
-    /** Los campos que cambiaron, con su valor anterior y el nuevo. De la llave solo se dice si cambió. */
+    /** Los campos que cambiaron, con su valor anterior y el nuevo. De la llave solo se dice que cambió ({@link EventoBitacora#MODIFICADO}). */
     private static Map<String, Object> cambios(ConfiguracionFel antes, ConexionFel despues, boolean secretoNuevo) {
         Map<String, Object> cambios = new LinkedHashMap<>();
         cambio(cambios, "certificador", antes == null ? null : antes.certificador(), despues.certificador());
@@ -175,7 +175,7 @@ public class GestionConexionFel {
         cambio(cambios, "ambiente", antes == null ? null : antes.ambiente().name(), despues.ambiente().name());
         cambio(cambios, "timeoutMs", antes == null ? null : antes.timeoutMs(), despues.timeoutMs());
         if (secretoNuevo) {
-            cambios.put("secreto", "cambiado");
+            cambios.put("secreto", EventoBitacora.MODIFICADO);
         }
         return cambios;
     }

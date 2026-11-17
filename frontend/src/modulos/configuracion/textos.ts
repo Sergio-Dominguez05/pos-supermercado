@@ -33,3 +33,10 @@ export const segundosValidos = (segundos: string) =>
 
 export const avisoConexionGuardada = (ambiente: 'PRUEBAS' | 'PRODUCCION') =>
   `Se guardó la conexión con el certificador, ambiente ${ambiente === 'PRODUCCION' ? 'de producción' : 'de pruebas'}.`
+
+// Datos del emisor (HU-12.01).
+
+/** Crit. 2: el NIT no pasó la validación de la SAT (HU-05.03). */
+export const NIT_INVALIDO = 'El NIT no es válido: revise los dígitos y el verificador (puede terminar en K).'
+
+export const AVISO_EMISOR_GUARDADO = 'Se guardaron los datos del emisor. Las próximas facturas los usarán.'
