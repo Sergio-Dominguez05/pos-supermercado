@@ -2,6 +2,7 @@ package gt.supermercado.pos.bitacora;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
+import gt.supermercado.pos.clientes.NitsDePrueba;
 import gt.supermercado.pos.facturacion.FacturacionDePrueba;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -374,6 +375,18 @@ class AccionesSensiblesIntegracionTest {
         assertThat(jdbc.queryForObject("""
                 SELECT entidad_id FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
                 Long.class, id)).isEqualTo(venta);
+    }
+
+    @Test
+    void registroDeClienteExitosoYRechazado() throws Exception {   // HU-05.05 crit. 4
+        String nit = NitsDePrueba.nuevo();
+
+        assertThat(registrosDe(() -> enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"Cliente auditado\"}".formatted(nit), cookieAdmin)))
+                .containsExactly(new Registro(CLIENTE_REGISTRADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"\"}".formatted(NitsDePrueba.nuevo()), cookieAdmin)))
+                .containsExactly(new Registro(CLIENTE_REGISTRADO, false, adminId));   // sin nombre
     }
 
     @Test

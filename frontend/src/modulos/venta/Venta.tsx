@@ -16,6 +16,7 @@ import { useAtajos, type Manejador, type Manejadores } from '../../atajos/useAta
 import { EstadoTurno } from '../caja/EstadoTurno'
 import { puedeVender, useTurnoActual } from '../caja/turno'
 import { formatoQuetzales } from '../catalogo/textos'
+import { ClienteDeLaVenta } from '../clientes/ClienteDeLaVenta'
 import { useSesion } from '../login/sesion'
 import { avisoSonoro } from '../catalogo/sonido'
 import { AyudaAtajos } from './AyudaAtajos'
@@ -37,7 +38,7 @@ import {
 } from './textos'
 
 /** Lleva el foco a un campo de la pantalla de venta por su nombre (`codigo` o `descripcion`). */
-const enfocar = (campo: 'codigo' | 'descripcion') =>
+const enfocar = (campo: 'codigo' | 'descripcion' | 'nit') =>
   document.querySelector<HTMLInputElement>(`main input[name="${campo}"]`)?.focus()
 
 /** HU-06.15 crit. 2: el servidor rechazó el cobro porque la venta no tenía productos. */
@@ -116,6 +117,8 @@ export function Venta() {
         if (!supresionEsParaLaLinea(evento.target)) return false
         if (seleccionada !== undefined) controlDeLinea(seleccionada, 'quitar')?.click()
       },
+      // EP-05: F6 lleva al NIT del cliente (HU-05.02); "CF" vuelve a Consumidor Final (HU-05.01).
+      asignarCliente: () => enfocar('nit'),
       suspenderVenta: () => document.querySelector<HTMLElement>('main [data-control="suspender-venta"]')?.click(),
       retomarVenta: () => setListaVisible((visible) => !visible),
       cancelarVenta: () => document.querySelector<HTMLElement>('main [data-control="cancelar-venta"]')?.click(),
@@ -196,6 +199,8 @@ export function Venta() {
             {cobro.error.message}
           </p>
         )}
+        {/* EP-05: el cliente de la venta, también en el cobro (se puede cambiar hasta finalizar). */}
+        {habilitada && venta && <ClienteDeLaVenta key={venta.id} ventaId={venta.id} />}
         {habilitada && venta && enCobro ? (
           <>
             <PasoDeCobro

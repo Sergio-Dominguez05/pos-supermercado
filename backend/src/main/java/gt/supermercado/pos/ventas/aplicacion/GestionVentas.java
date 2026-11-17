@@ -332,6 +332,20 @@ public class GestionVentas {
     }
 
     /**
+     * EP-05 (HU-05.01, HU-05.02 y HU-05.08): el cliente al que se factura la venta en curso; {@code null} vuelve a
+     * Consumidor Final. Lo llama el módulo {@code clientes} después de comprobar que el cliente existe. Se puede
+     * cambiar aunque la venta ya tenga un pago con tarjeta (decisión de Sergio): el cliente no cambia el monto cobrado.
+     */
+    @Transactional
+    public Venta asignarCliente(SesionActiva sesion, Long clienteId) {
+        Venta venta = enCursoBloqueada(turnos.exigirTurnoAbierto(sesion));
+        if (!ventas.asignarCliente(venta.id(), clienteId)) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        return venta;
+    }
+
+    /**
      * La venta en curso del turno, bloqueada hasta el final de la transacción. La usa el módulo {@code pagos} para
      * eliminar un pago (HU-07.06) sin que la venta cambie mientras tanto; debe correr en la misma transacción.
      */

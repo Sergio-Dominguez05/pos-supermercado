@@ -335,6 +335,14 @@ kbd {
   gap: 12px;
 }
 
+/* EP-05: el NIT del cliente, "Buscar" y "CF" en un solo renglón. */
+.en-linea {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
 .boton-texto {
   font: inherit;
   font-weight: 600;

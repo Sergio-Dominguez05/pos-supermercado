@@ -41,7 +41,6 @@ export const ATAJOS: readonly Atajo[] = [
  */
 export const ACCIONES_PENDIENTES: Partial<Record<AccionCaja, string>> = {
   consultarPrecio: 'HU-03.10 (#28)',
-  asignarCliente: 'HU-05.08 (#44)',
   reimprimirUltima: 'HU-08.12 (#74)',
 }
 
