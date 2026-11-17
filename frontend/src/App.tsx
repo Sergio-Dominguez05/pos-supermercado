@@ -7,6 +7,7 @@ import { ListaProductos } from './modulos/catalogo/ListaProductos'
 import { NuevoProducto } from './modulos/catalogo/NuevoProducto'
 import { PaginaConexionFel } from './modulos/configuracion/ConexionFel'
 import { PaginaEmisor } from './modulos/configuracion/DatosEmisor'
+import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimiento'
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
@@ -85,6 +86,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaEmisor />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/establecimiento"
+            element={
+              <RutaProtegida>
+                <PaginaEstablecimiento />
               </RutaProtegida>
             }
           />

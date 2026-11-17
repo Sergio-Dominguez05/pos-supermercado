@@ -40,3 +40,7 @@ export const avisoConexionGuardada = (ambiente: 'PRUEBAS' | 'PRODUCCION') =>
 export const NIT_INVALIDO = 'El NIT no es válido: revise los dígitos y el verificador (puede terminar en K).'
 
 export const AVISO_EMISOR_GUARDADO = 'Se guardaron los datos del emisor. Las próximas facturas los usarán.'
+
+// Establecimiento SAT (HU-12.02).
+
+export const AVISO_ESTABLECIMIENTO_GUARDADO = 'Se guardaron los datos del establecimiento. Las próximas facturas los usarán.'
