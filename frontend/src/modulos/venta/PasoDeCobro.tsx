@@ -12,7 +12,7 @@ import {
 import type { Venta } from '../../api/ventas'
 import { avisoSonoro, confirmacionSonora } from '../catalogo/sonido'
 import { formatoQuetzales } from '../catalogo/textos'
-import { confirmacionEliminarPago, descripcionPago, montoValido, soloUltimos4 } from './cobro'
+import { confirmacionEliminarPago, descripcionPago, montoValido, motivoSinFinalizar, soloUltimos4 } from './cobro'
 
 /**
  * HU-06.15 y HU-07.03: el paso de cobro de la venta. Muestra el total a cobrar, que el cajero ingresa en la terminal
@@ -50,6 +50,7 @@ export function PasoDeCobro({ venta, onRegresar }: { venta: Venta; onRegresar: (
         )}
       </dl>
       {cobro && cobro.pagos.length > 0 ? <PagoRegistrado cobro={cobro} /> : cobro && <FormularioPago cobro={cobro} />}
+      {cobro && <FinalizarCobro cobro={cobro} />}
       <div className="acciones">
         <button type="button" data-control="regresar-a-la-venta" onClick={onRegresar}>
           Regresar a la venta <kbd>Esc</kbd>
@@ -78,9 +79,44 @@ export function PagoRegistrado({ cobro }: { cobro: Cobro }) {
         {cobro.pendiente > 0
           ? `Falta cobrar ${formatoQuetzales(cobro.pendiente)}: en esta versión se cobra con una sola tarjeta.`
           : 'El pago cubre el total.'}{' '}
-        Finalizar el cobro y emitir la factura estará disponible con HU-07.08 (#63). Para modificar la venta, elimine
-        el pago.
+        Para modificar la venta, elimine el pago.
       </p>
+    </div>
+  )
+}
+
+/**
+ * HU-07.07: la opción de finalizar solo se habilita cuando los pagos cubren el total (crit. 2); mientras falte dinero
+ * queda deshabilitada con el motivo (crit. 1), y el servidor también lo exige (`PAGO_INCOMPLETO`). Finalizar el cobro
+ * y emitir la factura llega con HU-07.08 (#63): hasta entonces el botón solo lo avisa.
+ */
+export function FinalizarCobro({ cobro }: { cobro: Cobro }) {
+  const [aviso, setAviso] = useState<string>()
+  const motivo = motivoSinFinalizar(cobro)
+
+  return (
+    <div className="finalizar-cobro">
+      <button
+        type="button"
+        data-control="finalizar-cobro"
+        className="principal"
+        disabled={motivo !== undefined}
+        aria-describedby="motivo-sin-finalizar"
+        onClick={() => setAviso('Finalizar el cobro y emitir la factura estará disponible con HU-07.08 (#63).')}
+      >
+        Finalizar cobro
+      </button>
+      {motivo ? (
+        <p id="motivo-sin-finalizar" className="pendiente">
+          {motivo}
+        </p>
+      ) : (
+        aviso && (
+          <p id="motivo-sin-finalizar" className="pendiente" role="status">
+            {aviso}
+          </p>
+        )
+      )}
     </div>
   )
 }

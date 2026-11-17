@@ -531,3 +531,11 @@ kbd {
   gap: 8px;
   font-variant-numeric: tabular-nums;
 }
+
+/* HU-07.07: finalizar el cobro, habilitado solo cuando los pagos cubren el total. */
+.finalizar-cobro {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  margin: 12px 0;
+}

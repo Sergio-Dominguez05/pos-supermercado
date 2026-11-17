@@ -44,13 +44,17 @@ public class PagosController {
         }
     }
 
-    /** Crit. 1 y 2: el total a cobrar, lo pagado y lo pendiente, que se propone como monto. */
+    /**
+     * Crit. 1 y 2: el total a cobrar, lo pagado y lo pendiente, que se propone como monto. HU-07.07: {@code completo}
+     * indica si los pagos cubren el total y, por tanto, si se puede finalizar.
+     */
     public record RespuestaCobro(long ventaId, long numero, BigDecimal total, BigDecimal pagado, BigDecimal pendiente,
-                                 List<RespuestaPago> pagos) {
+                                 boolean completo, List<RespuestaPago> pagos) {
 
         static RespuestaCobro de(EstadoCobro estado) {
             return new RespuestaCobro(estado.venta().id(), estado.venta().numero(), estado.venta().totales().total(),
-                    estado.pagado(), estado.pendiente(), estado.pagos().stream().map(RespuestaPago::de).toList());
+                    estado.pagado(), estado.pendiente(), estado.completo(),
+                    estado.pagos().stream().map(RespuestaPago::de).toList());
         }
     }
 
