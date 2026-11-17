@@ -14,6 +14,7 @@ import {
   suspenderVenta,
   type Venta as DatosVenta,
 } from '../../api/ventas'
+import { CLAVE_COBRO, obtenerCobro, registrarPago, type Cobro, type Pago } from '../../api/pagos'
 import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
@@ -28,6 +29,7 @@ import {
   formatoDesglose,
   rotuloSuspendidas,
 } from './textos'
+import { descripcionPago, montoValido, soloUltimos4 } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
@@ -412,6 +414,20 @@ describe('retomar una venta suspendida (HU-06.13)', () => {
   })
 })
 
+const COBRO_SIN_PAGOS: Cobro = { ventaId: 31, numero: 1042, total: 15, pagado: 0, pendiente: 15, pagos: [] }
+const PAGO: Pago = { id: 3, tipoTarjeta: 'CREDITO', autorizacion: 'A1B2C3', ultimos4: '4321', monto: 15,
+  registradoEn: '2026-11-17T00:10:00Z' }
+
+const renderizarCobro = (venta: DatosVenta, cobro: Cobro) => {
+  const cliente = new QueryClient()
+  cliente.setQueryData(CLAVE_COBRO, cobro)
+  return renderToString(
+    <QueryClientProvider client={cliente}>
+      <PasoDeCobro venta={venta} onRegresar={() => {}} />
+    </QueryClientProvider>,
+  ).replaceAll('<!-- -->', '')
+}
+
 describe('pasar al cobro (HU-06.15)', () => {
   const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
     subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
@@ -430,13 +446,12 @@ describe('pasar al cobro (HU-06.15)', () => {
   })
 
   it('el cobro muestra el total a cobrar y permite regresar a la venta (crit. 1 y 4)', () => {
-    const html = renderToString(<PasoDeCobro venta={conArroz} onRegresar={() => {}} />).replaceAll('<!-- -->', '')
+    const html = renderizarCobro(conArroz, COBRO_SIN_PAGOS)
 
     expect(html).toContain('<dt>Total a cobrar</dt><dd class="total">Q15.00</dd>')
     expect(html).toContain('<dd>3</dd>')
-    expect(html).toMatch(/<button[^>]*data-control="regresar-a-la-venta"[^>]*autofocus=""/i)
+    expect(html).toContain('data-control="regresar-a-la-venta"')
     expect(html).toContain('Regresar a la venta <kbd>Esc</kbd>')
-    expect(html).toContain('HU-07.03 (#60)')
   })
 
   it('pasar al cobro es un POST de validación sobre la venta en curso', async () => {
@@ -452,6 +467,68 @@ describe('pasar al cobro (HU-06.15)', () => {
     const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
 
     expect(html).toContain('<kbd>F12</kbd> Cobrar</li>')
+  })
+})
+
+describe('cobrar con tarjeta (HU-07.03)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+
+  it('sin pago muestra el formulario con el monto propuesto igual al pendiente (crit. 1 y 2)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, total: 26.2, pendiente: 26.2 })
+
+    expect(html).toContain('aria-label="Pago con tarjeta"')
+    expect(html).toMatch(/<input[^>]*name="monto"[^>]*value="26.20"/)
+    expect(html).toContain('Ingrese Q26.20 en la terminal bancaria')
+  })
+
+  it('pide tipo de tarjeta y autorización, y los últimos 4 como opcionales (crit. 3 y 4)', () => {
+    const html = renderizarCobro(conArroz, COBRO_SIN_PAGOS)
+
+    const debito = html.match(/<input[^>]*value="DEBITO"[^>]*>/)?.[0] ?? ''
+    expect(debito).toContain('type="radio"')
+    expect(debito).toMatch(/autofocus=""/i)
+    expect(html).toContain('value="CREDITO"')
+    expect(html).toContain('name="autorizacion"')
+    expect(html).toContain('Últimos 4 dígitos (opcional)')
+    expect(html).toMatch(/<input[^>]*name="ultimos4"[^>]*maxLength="4"|<input[^>]*maxLength="4"[^>]*name="ultimos4"/i)
+  })
+
+  it('explica qué hacer si la terminal rechaza la tarjeta (crit. 6)', () => {
+    expect(renderizarCobro(conArroz, COBRO_SIN_PAGOS)).toContain(
+      'Si la rechaza, no registre nada: intente con otra tarjeta o regrese y cancele la venta.',
+    )
+  })
+
+  it('con el pago registrado lo muestra en lugar del formulario', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, pagos: [PAGO] })
+
+    expect(html).not.toContain('aria-label="Pago con tarjeta"')
+    expect(html).toContain('Tarjeta de crédito ••••4321 · Aut. A1B2C3 · Q15.00')
+    expect(html).toContain('<dt>Pendiente</dt><dd>Q0.00</dd>')
+    expect(html).toContain('HU-07.08 (#63)')
+  })
+
+  it('el campo de los últimos 4 solo admite 4 dígitos y el monto, quetzales con centavos (crit. 4, 5 y 7)', () => {
+    expect(soloUltimos4('4111 1111 1111 1111')).toBe('4111')
+    expect(soloUltimos4('12a4')).toBe('124')
+    for (const monto of ['15', '15.5', '15.50']) expect(montoValido(monto), monto).toBe(true)
+    for (const monto of ['0', '-5', '10.005', 'diez', '']) expect(montoValido(monto), monto).toBe(false)
+    expect(descripcionPago({ ...PAGO, tipoTarjeta: 'DEBITO', ultimos4: null })).toBe('Tarjeta de débito · Aut. A1B2C3 · Q15.00')
+  })
+
+  it('registrar es un POST con el tipo, la autorización, los últimos 4 y el monto', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('{}', { status: 200 }))))
+
+    await obtenerCobro()
+    await registrarPago({ tipoTarjeta: 'DEBITO', autorizacion: '123456', monto: 15 })
+    const [[rutaEstado, opcionesEstado], [rutaPago, opcionesPago]] = vi.mocked(fetch).mock.calls
+    expect(rutaEstado).toBe('/api/ventas/actual/pagos')
+    expect(opcionesEstado?.method).toBeUndefined()
+    expect(rutaPago).toBe('/api/ventas/actual/pagos')
+    expect(opcionesPago).toMatchObject({ method: 'POST', body: '{"tipoTarjeta":"DEBITO","autorizacion":"123456","monto":15}' })
+    vi.unstubAllGlobals()
   })
 })
 
