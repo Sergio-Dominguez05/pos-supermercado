@@ -9,6 +9,7 @@ import {
   CLAVE_VENTAS_SUSPENDIDAS,
   eliminarLinea,
   listarSuspendidas,
+  pasarAlCobro,
   retomarVenta,
   suspenderVenta,
   type Venta as DatosVenta,
@@ -27,6 +28,7 @@ import {
   formatoDesglose,
   rotuloSuspendidas,
 } from './textos'
+import { PasoDeCobro } from './PasoDeCobro'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
 import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
@@ -269,7 +271,7 @@ describe('operar con atajos de teclado (HU-06.17)', () => {
     for (const atajo of ATAJOS) expect(html).toContain(atajo.descripcion)
     expect(html).toContain('<kbd>Supr</kbd> Eliminar línea')
     expect(html).toContain('<kbd>6*</kbd> antes del código')
-    expect(html).toContain('Cobrar<small> (llega con HU-06.15 (#58))</small>')
+    expect(html).toContain('Consultar precio<small> (llega con HU-03.10 (#28))</small>')
     expect(html).not.toContain('Cancelar venta<small>')
   })
 
@@ -407,6 +409,49 @@ describe('retomar una venta suspendida (HU-06.13)', () => {
     const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
 
     expect(html).toContain('<kbd>F8</kbd> Retomar venta</li>')
+  })
+})
+
+describe('pasar al cobro (HU-06.15)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, subtotal: 13.39, iva: 1.61, total: 15, lineas: [ARROZ] }
+
+  it('con productos ofrece cobrar con su atajo F12, antes de suspender y cancelar (crit. 1)', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('data-control="cobrar"')
+    expect(html).toContain('Cobrar <kbd>F12</kbd>')
+    expect(html.indexOf('data-control="cobrar"')).toBeLessThan(html.indexOf('data-control="suspender-venta"'))
+  })
+
+  it('sin productos no se ofrece cobrar (crit. 2)', () => {
+    expect(renderizar(CAJERO, TURNO)).not.toContain('data-control="cobrar"')
+  })
+
+  it('el cobro muestra el total a cobrar y permite regresar a la venta (crit. 1 y 4)', () => {
+    const html = renderToString(<PasoDeCobro venta={conArroz} onRegresar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<dt>Total a cobrar</dt><dd class="total">Q15.00</dd>')
+    expect(html).toContain('<dd>3</dd>')
+    expect(html).toMatch(/<button[^>]*data-control="regresar-a-la-venta"[^>]*autofocus=""/i)
+    expect(html).toContain('Regresar a la venta <kbd>Esc</kbd>')
+    expect(html).toContain('HU-07.03 (#60)')
+  })
+
+  it('pasar al cobro es un POST de validación sobre la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(conArroz), { status: 200 })))
+
+    await expect(pasarAlCobro()).resolves.toMatchObject({ total: 15 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/cobro')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('F12 ya no figura como pendiente en la ayuda (HU-06.17 crit. 3)', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<kbd>F12</kbd> Cobrar</li>')
   })
 })
 

@@ -13,6 +13,7 @@ export const ACCIONES_DE_LA_VENTA = [
   'suspenderVenta',
   'retomarVenta',
   'cancelarVenta',
+  'cobrar',
 ] as const satisfies readonly AccionCaja[]
 
 export type AccionDeLaVenta = (typeof ACCIONES_DE_LA_VENTA)[number]

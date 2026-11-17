@@ -90,3 +90,9 @@ export const listarSuspendidas = () => pedir<Venta[]>('/api/ventas/suspendidas')
  */
 export const retomarVenta = (ventaId: number) =>
   pedir<Venta>(`/api/ventas/suspendidas/${ventaId}/retomar`, { method: 'POST' })
+
+/**
+ * HU-06.15: valida que la venta en curso puede pasar al cobro y la devuelve con el total a cobrar. Responde 422
+ * `VENTA_VACIA` si no tiene productos o el motivo de EP-05 si el cliente no cumple sus reglas. No cambia la venta.
+ */
+export const pasarAlCobro = () => pedir<Venta>('/api/ventas/actual/cobro', { method: 'POST' })

@@ -161,6 +161,17 @@ public class VentasController {
         return RespuestaVenta.de(gestionVentas.retomar(ventaId, sesion));
     }
 
+    /**
+     * HU-06.15: valida que la venta en curso puede pasar al cobro y la devuelve con el total a cobrar. 422
+     * {@code VENTA_VACIA} sin productos (crit. 2) o el motivo de EP-05 si el cliente no cumple sus reglas (crit. 3).
+     * No cambia la venta: desde el cobro se puede regresar a modificarla (crit. 4).
+     */
+    @PostMapping("/actual/cobro")
+    @PreAuthorize("hasAuthority('PAGO_REGISTRAR')")
+    public RespuestaVenta pasarAlCobro(@AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.pasarAlCobro(sesion));
+    }
+
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */
     @PostMapping("/actual/cancelar")
     @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
