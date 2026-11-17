@@ -25,6 +25,7 @@ import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
+import { avisoVentaFinalizada } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { type AccionDeLaVenta, lineaSeleccionada, moverSeleccion, supresionEsParaLaLinea } from './teclado'
 import {
@@ -197,7 +198,15 @@ export function Venta() {
         )}
         {habilitada && venta && enCobro ? (
           <>
-            <PasoDeCobro venta={venta} onRegresar={regresarALaVenta} />
+            <PasoDeCobro
+              venta={venta}
+              onRegresar={regresarALaVenta}
+              onFinalizada={(finalizada) => {
+                // HU-07.08 crit. 5: el aviso dice qué venta se finalizó y la pantalla queda en la siguiente.
+                setAviso(avisoVentaFinalizada(finalizada))
+                regresarALaVenta()
+              }}
+            />
             <DetalleVenta venta={venta} />
           </>
         ) : (

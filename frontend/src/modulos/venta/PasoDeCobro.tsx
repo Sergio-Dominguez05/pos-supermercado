@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CLAVE_COBRO,
   eliminarPago,
+  finalizarCobro,
   obtenerCobro,
   registrarPago,
   type Cobro,
   type Pago,
   type TipoTarjeta,
+  type VentaFinalizada,
 } from '../../api/pagos'
-import type { Venta } from '../../api/ventas'
+import { CLAVE_VENTA_EN_CURSO, type Venta } from '../../api/ventas'
 import { avisoSonoro, confirmacionSonora } from '../catalogo/sonido'
 import { formatoQuetzales } from '../catalogo/textos'
 import { confirmacionEliminarPago, descripcionPago, montoValido, motivoSinFinalizar, soloUltimos4 } from './cobro'
@@ -19,7 +21,15 @@ import { confirmacionEliminarPago, descripcionPago, montoValido, motivoSinFinali
  * bancaria (crit. 1), y el formulario para registrar el pago aprobado. Desde aquí se regresa a la venta (HU-06.15
  * crit. 4): el botón "Regresar" o Escape.
  */
-export function PasoDeCobro({ venta, onRegresar }: { venta: Venta; onRegresar: () => void }) {
+export function PasoDeCobro({
+  venta,
+  onRegresar,
+  onFinalizada,
+}: {
+  venta: Venta
+  onRegresar: () => void
+  onFinalizada?: (finalizada: VentaFinalizada) => void
+}) {
   const { data: cobro } = useQuery({ queryKey: CLAVE_COBRO, queryFn: obtenerCobro })
 
   // Escape regresa a la venta esté donde esté el foco: al registrar o eliminar un pago, el formulario se reemplaza y
@@ -50,7 +60,7 @@ export function PasoDeCobro({ venta, onRegresar }: { venta: Venta; onRegresar: (
         )}
       </dl>
       {cobro && cobro.pagos.length > 0 ? <PagoRegistrado cobro={cobro} /> : cobro && <FormularioPago cobro={cobro} />}
-      {cobro && <FinalizarCobro cobro={cobro} />}
+      {cobro && <FinalizarCobro cobro={cobro} onFinalizada={onFinalizada} />}
       <div className="acciones">
         <button type="button" data-control="regresar-a-la-venta" onClick={onRegresar}>
           Regresar a la venta <kbd>Esc</kbd>
@@ -87,12 +97,41 @@ export function PagoRegistrado({ cobro }: { cobro: Cobro }) {
 
 /**
  * HU-07.07: la opción de finalizar solo se habilita cuando los pagos cubren el total (crit. 2); mientras falte dinero
- * queda deshabilitada con el motivo (crit. 1), y el servidor también lo exige (`PAGO_INCOMPLETO`). Finalizar el cobro
- * y emitir la factura llega con HU-07.08 (#63): hasta entonces el botón solo lo avisa.
+ * queda deshabilitada con el motivo (crit. 1), y el servidor también lo exige (`PAGO_INCOMPLETO`).
+ *
+ * HU-07.08: al confirmar, el servidor registra la venta con sus pagos y emite la factura (crit. 1); la pantalla pasa a
+ * la siguiente venta (crit. 5). Si algo falla, la venta sigue en curso con sus pagos: se muestra el motivo y se puede
+ * reintentar (crit. 4). Con el pago completo, el botón recibe el foco para confirmar con Enter.
  */
-export function FinalizarCobro({ cobro }: { cobro: Cobro }) {
-  const [aviso, setAviso] = useState<string>()
+export function FinalizarCobro({
+  cobro,
+  onFinalizada,
+}: {
+  cobro: Cobro
+  onFinalizada?: (finalizada: VentaFinalizada) => void
+}) {
+  const clienteConsultas = useQueryClient()
   const motivo = motivoSinFinalizar(cobro)
+  // El botón ya está en pantalla (deshabilitado) antes de registrar el pago: recibe el foco cuando se habilita.
+  const boton = useRef<HTMLButtonElement>(null)
+  const completo = motivo === undefined
+  useEffect(() => {
+    if (completo) boton.current?.focus()
+  }, [completo])
+  const finalizacion = useMutation({
+    mutationFn: () => finalizarCobro(),
+    onSuccess: (finalizada) => {
+      confirmacionSonora()
+      clienteConsultas.removeQueries({ queryKey: CLAVE_COBRO })
+      onFinalizada?.(finalizada)
+      return clienteConsultas.invalidateQueries({ queryKey: CLAVE_VENTA_EN_CURSO })
+    },
+    onError: () => {
+      avisoSonoro()
+      // Por ejemplo, PAGO_INCOMPLETO si el pago cambió en otra pestaña: se muestra el cobro actualizado.
+      return clienteConsultas.invalidateQueries({ queryKey: CLAVE_COBRO })
+    },
+  })
 
   return (
     <div className="finalizar-cobro">
@@ -100,22 +139,23 @@ export function FinalizarCobro({ cobro }: { cobro: Cobro }) {
         type="button"
         data-control="finalizar-cobro"
         className="principal"
-        disabled={motivo !== undefined}
+        ref={boton}
+        autoFocus={completo}
+        disabled={!completo || finalizacion.isPending}
         aria-describedby="motivo-sin-finalizar"
-        onClick={() => setAviso('Finalizar el cobro y emitir la factura estará disponible con HU-07.08 (#63).')}
+        onClick={() => finalizacion.mutate()}
       >
-        Finalizar cobro
+        {finalizacion.isPending ? 'Finalizando…' : 'Finalizar cobro'}
       </button>
-      {motivo ? (
+      {motivo && (
         <p id="motivo-sin-finalizar" className="pendiente">
           {motivo}
         </p>
-      ) : (
-        aviso && (
-          <p id="motivo-sin-finalizar" className="pendiente" role="status">
-            {aviso}
-          </p>
-        )
+      )}
+      {finalizacion.error && (
+        <p className="error" role="alert">
+          {finalizacion.error.message} La venta sigue en curso con sus pagos: puede reintentar.
+        </p>
       )}
     </div>
   )

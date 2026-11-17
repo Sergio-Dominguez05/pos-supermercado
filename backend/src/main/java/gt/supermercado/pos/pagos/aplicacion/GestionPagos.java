@@ -7,6 +7,7 @@ import gt.supermercado.pos.caja.aplicacion.GestionTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
+import gt.supermercado.pos.pagos.dominio.EmisionDeFactura;
 import gt.supermercado.pos.pagos.dominio.Pago;
 import gt.supermercado.pos.pagos.dominio.RepositorioPagos;
 import gt.supermercado.pos.pagos.dominio.TipoTarjeta;
@@ -39,13 +40,19 @@ public class GestionPagos {
     private final GestionTurnos turnos;
     private final GestionVentas ventas;
     private final Bitacora bitacora;
+    private final EmisionDeFactura facturas;
 
-    public GestionPagos(RepositorioPagos pagos, GestionTurnos turnos, GestionVentas ventas, Bitacora bitacora) {
+    public GestionPagos(RepositorioPagos pagos, GestionTurnos turnos, GestionVentas ventas, Bitacora bitacora,
+                        EmisionDeFactura facturas) {
         this.pagos = pagos;
         this.turnos = turnos;
         this.ventas = ventas;
         this.bitacora = bitacora;
+        this.facturas = facturas;
     }
+
+    /** HU-07.08: la venta finalizada, sus pagos y si se emitió la factura (EP-08). */
+    public record VentaFinalizada(Venta venta, List<Pago> pagos, BigDecimal pagado, boolean facturaEmitida) {}
 
     /** Lo que pide el cajero al registrar el pago. {@code monto} vacío es el total pendiente (crit. 2). */
     public record SolicitudPago(TipoTarjeta tipoTarjeta, String autorizacion, String ultimos4, BigDecimal monto) {}
@@ -130,6 +137,54 @@ public class GestionPagos {
     public EstadoCobro paraFinalizar(SesionActiva sesion) {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
         return estado(ventas.enCursoBloqueada(turno), turno).exigirCompleto();
+    }
+
+    /**
+     * HU-07.08: el cajero confirma el cobro.
+     * <ul>
+     *   <li>Crit. 1: con el pago completo (HU-07.07, {@code PAGO_INCOMPLETO} si no), la venta queda registrada como
+     *       finalizada con sus totales y sus pagos, y se emite la factura ({@link EmisionDeFactura}, EP-08).</li>
+     *   <li>Crit. 2: cada pago ya está asociado a la venta, al turno y al usuario; la caja es la de la venta.</li>
+     *   <li>Crit. 3: los pagos guardan el turno, así que el resumen del turno (HU-09.06) los suma.</li>
+     *   <li>Crit. 4: todo ocurre en una transacción: si algo falla, la venta sigue en curso con sus pagos y se puede
+     *       reintentar.</li>
+     *   <li>Crit. 5: al terminar, el turno no tiene venta en curso y la pantalla inicia la siguiente.</li>
+     * </ul>
+     * La finalización queda en la bitácora; también el intento rechazado.
+     */
+    @Transactional
+    public VentaFinalizada finalizar(SesionActiva sesion) {
+        EstadoCobro estado;
+        try {
+            estado = paraFinalizar(sesion);
+        } catch (NegocioException error) {
+            throw rechazarFinalizacion(sesion, error);
+        }
+        Venta venta = ventas.finalizarCobrada(estado.venta());
+        boolean facturaEmitida = facturas.emitir(venta);
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), AccionSensible.VENTA_FINALIZADA,
+                true, "Venta N.º %d finalizada: %d artículos, total Q%s".formatted(venta.numero(), venta.articulos(),
+                        venta.totales().total()), "venta", venta.id(), detalleFinalizacion(venta, estado,
+                        facturaEmitida)));
+        return new VentaFinalizada(venta, estado.pagos(), estado.pagado(), facturaEmitida);
+    }
+
+    private NegocioException rechazarFinalizacion(SesionActiva sesion, NegocioException error) {
+        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.VENTA_FINALIZADA, false, "Finalización de venta rechazada: " + error.getMessage(),
+                "venta", null, null));
+        return error;
+    }
+
+    private static Map<String, Object> detalleFinalizacion(Venta venta, EstadoCobro estado, boolean facturaEmitida) {
+        Map<String, Object> detalle = new LinkedHashMap<>();
+        detalle.put("venta", venta.numero());
+        detalle.put("articulos", venta.articulos());
+        detalle.put("total", venta.totales().total());
+        detalle.put("pagado", estado.pagado());
+        detalle.put("pagos", estado.pagos().stream().map(Pago::id).toList());
+        detalle.put("facturaEmitida", facturaEmitida);
+        return detalle;
     }
 
     /**

@@ -1,4 +1,4 @@
-import type { Cobro, Pago } from '../../api/pagos'
+import type { Cobro, Pago, VentaFinalizada } from '../../api/pagos'
 import { formatoQuetzales } from '../catalogo/textos'
 
 /** HU-07.03 crit. 4: el campo de los últimos 4 dígitos solo admite dígitos, y como mucho 4. */
@@ -23,3 +23,14 @@ export const motivoSinFinalizar = (cobro: Cobro) =>
   cobro.completo
     ? undefined
     : `Para finalizar, los pagos deben cubrir el total: falta cobrar ${formatoQuetzales(cobro.pendiente)}.`
+
+/**
+ * HU-07.08: qué venta se finalizó y cuánto se cobró; la pantalla ya está en la siguiente. Mientras no exista la
+ * facturación (EP-08) la venta se registra sin factura, y se dice.
+ */
+export const avisoVentaFinalizada = (venta: VentaFinalizada) =>
+  `Venta N.º ${venta.numero} finalizada: ${venta.articulos} ${venta.articulos === 1 ? 'artículo' : 'artículos'}, ` +
+  `${formatoQuetzales(venta.pagado)} cobrados. ` +
+  (venta.facturaEmitida
+    ? 'Factura emitida.'
+    : 'La factura se emitirá cuando esté disponible la facturación electrónica (EP-08).')
