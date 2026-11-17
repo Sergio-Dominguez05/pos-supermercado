@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
 /**
  * HU-12.02 Configurar el establecimiento registrado en la SAT.
  * <ul>
- *   <li>Crit. 1: código de establecimiento, nombre y dirección.</li>
+ *   <li>Crit. 1: código de establecimiento, nombre y dirección. HU-08.02 agrega el código postal, el municipio y
+ *       el departamento, que el DTE pide como dirección del emisor.</li>
  *   <li>Crit. 2: la facturación (EP-08) lee los datos con {@link #deLaSucursal(long)} y los copia en cada factura.</li>
  *   <li>Crit. 3: un establecimiento por sucursal. En V1 solo existe la sucursal "Matriz"; EP-13 agrega las demás.</li>
  * </ul>
@@ -31,6 +32,7 @@ public class GestionEstablecimiento {
 
     /** El número de establecimiento que asigna la SAT: 1, 2, 3... (hasta 6 dígitos, sin ceros a la izquierda). */
     private static final Pattern CODIGO_SAT = Pattern.compile("[1-9]\\d{0,5}");
+    private static final Pattern CODIGO_POSTAL = Pattern.compile("\\d{5}");
 
     private final RepositorioEstablecimientos repositorio;
     private final Bitacora bitacora;
@@ -40,7 +42,8 @@ public class GestionEstablecimiento {
         this.bitacora = bitacora;
     }
 
-    public record SolicitudEstablecimiento(String codigoSat, String nombre, String direccion) {}
+    public record SolicitudEstablecimiento(String codigoSat, String nombre, String direccion, String codigoPostal,
+                                           String municipio, String departamento) {}
 
     /** La sucursal de V1 (EP-13 agrega la elección de sucursal). */
     @Transactional(readOnly = true)
@@ -59,12 +62,21 @@ public class GestionEstablecimiento {
         String codigo;
         String nombre;
         String direccion;
+        String codigoPostal;
+        String municipio;
+        String departamento;
         try {
             codigo = codigoSat(solicitud.codigoSat());
             nombre = requerido(solicitud.nombre(), 200, "NOMBRE_ESTABLECIMIENTO_REQUERIDO",
                     "el nombre del establecimiento");
             direccion = requerido(solicitud.direccion(), 300, "DIRECCION_ESTABLECIMIENTO_REQUERIDA",
                     "la dirección del establecimiento");
+            codigoPostal = solicitud.codigoPostal() == null ? "" : solicitud.codigoPostal().strip();
+            if (!CODIGO_POSTAL.matcher(codigoPostal).matches()) {
+                throw new NegocioException("CODIGO_POSTAL_INVALIDO", "El código postal tiene 5 dígitos, por ejemplo 01001.");
+            }
+            municipio = requerido(solicitud.municipio(), 100, "MUNICIPIO_REQUERIDO", "el municipio");
+            departamento = requerido(solicitud.departamento(), 100, "DEPARTAMENTO_REQUERIDO", "el departamento");
         } catch (NegocioException error) {
             throw rechazar(sesion, sucursalId, error);
         }
@@ -73,11 +85,15 @@ public class GestionEstablecimiento {
         cambio(cambios, "codigoSat", anterior.map(Establecimiento::codigoSat).orElse(null), codigo);
         cambio(cambios, "nombre", anterior.map(Establecimiento::nombre).orElse(null), nombre);
         cambio(cambios, "direccion", anterior.map(Establecimiento::direccion).orElse(null), direccion);
+        cambio(cambios, "codigoPostal", anterior.map(Establecimiento::codigoPostal).orElse(null), codigoPostal);
+        cambio(cambios, "municipio", anterior.map(Establecimiento::municipio).orElse(null), municipio);
+        cambio(cambios, "departamento", anterior.map(Establecimiento::departamento).orElse(null), departamento);
         if (cambios.isEmpty()) {
             return anterior.orElseThrow();
         }
         try {
-            repositorio.guardar(sucursalId, codigo, nombre, direccion, sesion.usuarioId());
+            repositorio.guardar(sucursalId, codigo, nombre, direccion, codigoPostal, municipio, departamento,
+                    sesion.usuarioId());
         } catch (DuplicateKeyException e) {
             throw rechazar(sesion, sucursalId, new NegocioException("CODIGO_ESTABLECIMIENTO_DUPLICADO",
                     "El código de establecimiento %s ya es de otra sucursal.".formatted(codigo)));

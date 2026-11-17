@@ -1,6 +1,13 @@
 package gt.supermercado.pos.configuracion;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.facturacion.aplicacion.GeneracionDte;
+import gt.supermercado.pos.facturacion.dominio.Receptor;
+import gt.supermercado.pos.impuestos.dominio.CalculadoraIva;
+import gt.supermercado.pos.impuestos.dominio.LineaCalculada;
+import gt.supermercado.pos.ventas.dominio.EstadoVenta;
+import gt.supermercado.pos.ventas.dominio.LineaVenta;
+import gt.supermercado.pos.ventas.dominio.Venta;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,10 +18,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -41,6 +51,9 @@ class EstablecimientoIntegracionTest {
 
     @Autowired
     PasswordEncoder codificador;
+
+    @Autowired
+    GeneracionDte generacionDte;
 
     @Value("${local.server.port}")
     int puerto;
@@ -81,6 +94,38 @@ class EstablecimientoIntegracionTest {
         assertThat(guardar(establecimiento("1", " "), cookieAdmin).body()).contains("NOMBRE_ESTABLECIMIENTO_REQUERIDO");
         assertThat(jdbc.queryForObject("SELECT nombre FROM establecimiento", String.class))
                 .isEqualTo("Establecimiento válido");
+    }
+
+    @Test
+    void laDireccionDesglosadaQuePideElDteEsObligatoria() throws Exception {   // HU-08.02
+        String base = establecimiento("1", "Matriz");
+        assertThat(guardar(base.replace("01001", "1001"), cookieAdmin).body()).contains("CODIGO_POSTAL_INVALIDO");
+        assertThat(guardar(base.replace("\"municipio\":\"Guatemala\"", "\"municipio\":\"\""), cookieAdmin).body())
+                .contains("MUNICIPIO_REQUERIDO");
+        assertThat(guardar(base.replace("\"departamento\":\"Guatemala\"", "\"departamento\":\"\""), cookieAdmin)
+                .body()).contains("DEPARTAMENTO_REQUERIDO");
+        assertThat(guardar(base, cookieAdmin).body()).contains("\"codigoPostal\":\"01001\"",
+                "\"municipio\":\"Guatemala\"", "\"departamento\":\"Guatemala\"");
+    }
+
+    /** HU-08.02 y HU-12.01/12.02 crit. 2 y 3: el DTE se arma con la configuración guardada. */
+    @Test
+    void elDteUsaElEmisorYElEstablecimientoConfigurados() throws Exception {
+        guardar(establecimiento("1", "Súper del Valle, zona 1"), cookieAdmin);
+        assertThat(enviar("/api/configuracion/emisor", "PUT", """
+                {"nit":"576937-K","razonSocial":"Supermercados del Valle, S.A.","nombreComercial":"Súper del Valle",\
+                "direccionFiscal":"Zona 1, Guatemala","afiliacionIva":"GEN"}""", cookieAdmin).statusCode())
+                .isEqualTo(200);
+        LineaCalculada arroz = CalculadoraIva.linea(new BigDecimal("5.00"), 3);
+        Venta venta = new Venta(1, 1, 1, 1, "Caja 1", 1, EstadoVenta.EN_CURSO, new BigDecimal("0.12"),
+                OffsetDateTime.now(), null, List.of(new LineaVenta(1, 1, "7401", "Arroz 1 lb", 3,
+                arroz.precioUnitario(), arroz.subtotalConIva(), arroz.base(), arroz.iva())));
+
+        String xml = generacionDte.generar(venta, Receptor.consumidorFinal(), OffsetDateTime.now());
+
+        assertThat(xml).contains("NITEmisor=\"576937K\"", "NombreEmisor=\"Supermercados del Valle, S.A.\"",
+                "CodigoEstablecimiento=\"1\"", "NombreComercial=\"Súper del Valle, zona 1\"",
+                "<dte:CodigoPostal>01001</dte:CodigoPostal>", "IDReceptor=\"CF\"", "<dte:GranTotal>15.00</dte:GranTotal>");
     }
 
     @Test
@@ -127,7 +172,8 @@ class EstablecimientoIntegracionTest {
 
     private static String establecimiento(String codigo, String nombre) {
         return """
-                {"codigoSat":"%s","nombre":"%s","direccion":"6a. avenida 5-10, zona 1, Guatemala"}"""
+                {"codigoSat":"%s","nombre":"%s","direccion":"6a. avenida 5-10, zona 1, Guatemala",\
+                "codigoPostal":"01001","municipio":"Guatemala","departamento":"Guatemala"}"""
                 .formatted(codigo, nombre);
     }
 

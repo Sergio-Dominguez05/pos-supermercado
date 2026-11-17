@@ -389,7 +389,7 @@ class AccionesSensiblesIntegracionTest {
     void cambioDeLosDatosDelEmisorExitosoYRechazado() throws Exception {   // HU-12.01 y HU-12.15 crit. 4
         String cuerpo = """
                 {"nit":"%s","razonSocial":"Emisor auditado %d, S.A.","nombreComercial":"Auditado",\
-                "direccionFiscal":"Zona 1, Guatemala"}""";
+                "direccionFiscal":"Zona 1, Guatemala","afiliacionIva":"GEN"}""";
 
         assertThat(registrosDe(() -> enviar("/api/configuracion/emisor", "PUT",
                 cuerpo.formatted("1234560", System.nanoTime()), cookieAdmin)))
@@ -402,7 +402,8 @@ class AccionesSensiblesIntegracionTest {
     @Test
     void cambioDelEstablecimientoExitosoYRechazado() throws Exception {   // HU-12.02 y HU-12.15 crit. 4
         String cuerpo = """
-                {"codigoSat":"%s","nombre":"Establecimiento auditado %d","direccion":"Zona 1, Guatemala"}""";
+                {"codigoSat":"%s","nombre":"Establecimiento auditado %d","direccion":"Zona 1, Guatemala",\
+                "codigoPostal":"01001","municipio":"Guatemala","departamento":"Guatemala"}""";
 
         assertThat(registrosDe(() -> enviar("/api/configuracion/establecimiento", "PUT",
                 cuerpo.formatted("1", System.nanoTime()), cookieAdmin)))

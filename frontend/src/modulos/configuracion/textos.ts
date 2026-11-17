@@ -44,3 +44,10 @@ export const AVISO_EMISOR_GUARDADO = 'Se guardaron los datos del emisor. Las pr�
 // Establecimiento SAT (HU-12.02).
 
 export const AVISO_ESTABLECIMIENTO_GUARDADO = 'Se guardaron los datos del establecimiento. Las próximas facturas los usarán.'
+
+/** HU-08.02: los 22 departamentos de Guatemala, como sugerencias para la dirección del establecimiento. */
+export const DEPARTAMENTOS = [
+  'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso', 'Escuintla', 'Guatemala',
+  'Huehuetenango', 'Izabal', 'Jalapa', 'Jutiapa', 'Petén', 'Quetzaltenango', 'Quiché', 'Retalhuleu',
+  'Sacatepéquez', 'San Marcos', 'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa',
+] as const

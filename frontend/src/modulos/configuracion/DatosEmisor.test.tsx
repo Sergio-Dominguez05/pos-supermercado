@@ -14,10 +14,10 @@ const ADMIN: Partial<UsuarioSesion> = { rol: 'ADMIN', permisos: ['CONFIGURACION_
 const SUPERVISOR: Partial<UsuarioSesion> = { rol: 'SUPERVISOR', permisos: ['FACTURA_ANULAR'] }
 
 const SIN_CONFIGURAR: Emisor = { configurado: false, nit: null, razonSocial: null, nombreComercial: null,
-  direccionFiscal: null, telefono: null, correo: null, modificadoEn: null }
+  direccionFiscal: null, telefono: null, correo: null, afiliacionIva: null, modificadoEn: null }
 const GUARDADO: Emisor = { configurado: true, nit: '576937K', razonSocial: 'Supermercados del Valle, S.A.',
   nombreComercial: 'Súper del Valle', direccionFiscal: 'Zona 1, Guatemala', telefono: '2222-3333',
-  correo: 'facturas@delvalle.com', modificadoEn: '2026-11-17T03:00:00Z' }
+  correo: 'facturas@delvalle.com', afiliacionIva: 'GEN', modificadoEn: '2026-11-17T03:00:00Z' }
 
 const renderizar = (contenido: ReactNode, sesion: Partial<UsuarioSesion> = ADMIN) => {
   const cliente = new QueryClient()
@@ -57,6 +57,16 @@ describe('datos del emisor (HU-12.01)', () => {
       expect(campo(html, nombre), nombre).toContain('required')
     for (const nombre of ['telefono', 'correo']) expect(campo(html, nombre), nombre).not.toContain('required')
     expect(campo(html, 'correo')).toContain('type="email"')
+  })
+
+  it('pide la afiliación al IVA que exige el DTE (HU-08.02)', () => {
+    const html = renderizar(<FormularioEmisor guardado={SIN_CONFIGURAR} />)
+
+    expect(html).toContain('<legend>Afiliación al IVA</legend>')
+    const general = (contenido: string) => contenido.match(/<input[^>]*value="GEN"[^>]*>/)?.[0] ?? ''
+    expect(general(html)).toContain('required')
+    expect(html).toContain('value="PEQ"')
+    expect(general(renderizar(<FormularioEmisor guardado={GUARDADO} />))).toContain('checked')
   })
 
   it('carga los datos guardados', () => {
