@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ErrorDeApi } from '../../api/cliente'
+import { CLAVE_COBRO } from '../../api/pagos'
 import {
   cancelarVenta,
   CLAVE_VENTA_EN_CURSO,
@@ -82,6 +83,7 @@ export function Venta() {
     mutationFn: () => pasarAlCobro(),
     onSuccess: (lista) => {
       clienteConsultas.setQueryData(CLAVE_VENTA_EN_CURSO, lista)
+      void clienteConsultas.invalidateQueries({ queryKey: CLAVE_COBRO })
       setAviso(undefined)
       setEnCobro(true)
     },

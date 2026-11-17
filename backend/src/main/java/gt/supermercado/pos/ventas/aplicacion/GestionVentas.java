@@ -17,6 +17,7 @@ import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.RepositorioVentas;
 import gt.supermercado.pos.ventas.dominio.ValidadorClienteDeVenta;
 import gt.supermercado.pos.ventas.dominio.Venta;
+import gt.supermercado.pos.ventas.dominio.VerificadorPagosDeVenta;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,15 +45,18 @@ public class GestionVentas {
     private final GestionProductos productos;
     private final Parametros parametros;
     private final ValidadorClienteDeVenta clientes;
+    private final VerificadorPagosDeVenta pagos;
     private final Bitacora bitacora;
 
     public GestionVentas(RepositorioVentas ventas, GestionTurnos turnos, GestionProductos productos,
-                         Parametros parametros, ValidadorClienteDeVenta clientes, Bitacora bitacora) {
+                         Parametros parametros, ValidadorClienteDeVenta clientes,
+                         VerificadorPagosDeVenta pagos, Bitacora bitacora) {
         this.ventas = ventas;
         this.turnos = turnos;
         this.productos = productos;
         this.parametros = parametros;
         this.clientes = clientes;
+        this.pagos = pagos;
         this.bitacora = bitacora;
     }
 
@@ -122,6 +126,7 @@ public class GestionVentas {
         if (!ventas.bloquearEnCurso(venta.id())) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }
+        exigirSinPagos(venta.id());
         LineaVenta linea = ventas.lineaDeVenta(venta.id(), lineaId).orElseThrow(
                 () -> new RecursoNoEncontradoException("LINEA_NO_ENCONTRADA", "La línea no está en la venta en curso."));
         ventas.actualizarLinea(linea.id(),
@@ -160,6 +165,7 @@ public class GestionVentas {
         if (!ventas.bloquearEnCurso(ventaId)) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }
+        exigirSinPagos(ventaId);
         Venta venta = ventas.buscarPorId(ventaId).orElseThrow();
         TasaIva tasa = TasaIva.de(venta.tasaIva());
         Optional<LineaVenta> existente = ventas.lineaDelProducto(ventaId, producto.id(), producto.precio());
@@ -195,6 +201,9 @@ public class GestionVentas {
         if (!ventas.bloquearEnCurso(venta.id())) {
             throw rechazarEliminacion(sesion, lineaId,
                     new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso."));
+        }
+        if (pagos.tienePagos(venta.id())) {
+            throw rechazarEliminacion(sesion, lineaId, ventaConPago());
         }
         LineaVenta linea = ventas.lineaDeVenta(venta.id(), lineaId).orElseThrow(() -> rechazarEliminacion(sesion,
                 lineaId, new RecursoNoEncontradoException("LINEA_NO_ENCONTRADA",
@@ -237,7 +246,11 @@ public class GestionVentas {
         if (venta.lineas().isEmpty()) {
             throw new NegocioException("VENTA_VACIA", "La venta no tiene productos: no hay nada que dejar en espera.");
         }
-        if (!ventas.bloquearEnCurso(venta.id()) || !ventas.suspender(venta.id())) {
+        if (!ventas.bloquearEnCurso(venta.id())) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        exigirSinPagos(venta.id());
+        if (!ventas.suspender(venta.id())) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }
         return ventas.buscarPorId(venta.id()).orElseThrow();
@@ -292,11 +305,45 @@ public class GestionVentas {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
         Venta venta = ventas.enCursoDelTurno(turno.id())
                 .orElseThrow(() -> new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso."));
+        return validarParaCobrar(venta);
+    }
+
+    /**
+     * HU-07.03: la venta en curso del turno, bloqueada hasta el final de la transacción para registrarle un pago, con
+     * las mismas validaciones que al pasar al cobro (HU-06.15). La usa el módulo {@code pagos}, que debe correr en
+     * la misma transacción.
+     */
+    @Transactional
+    public Venta paraRegistrarPago(Turno turno) {
+        Venta venta = ventas.enCursoDelTurno(turno.id())
+                .orElseThrow(() -> new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso."));
+        if (!ventas.bloquearEnCurso(venta.id())) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        return validarParaCobrar(ventas.buscarPorId(venta.id()).orElseThrow());
+    }
+
+    private Venta validarParaCobrar(Venta venta) {
         if (venta.lineas().isEmpty()) {
             throw new NegocioException("VENTA_VACIA", "La venta no tiene productos: agregue al menos uno para cobrar.");
         }
         clientes.validar(venta);
         return venta;
+    }
+
+    /**
+     * HU-07.03: con un pago registrado la venta ya se cobró en la terminal bancaria: no se agregan ni quitan
+     * productos, no cambian las cantidades y no se suspende ni se cancela hasta eliminar el pago (HU-07.06).
+     */
+    private void exigirSinPagos(long ventaId) {
+        if (pagos.tienePagos(ventaId)) {
+            throw ventaConPago();
+        }
+    }
+
+    private static NegocioException ventaConPago() {
+        return new NegocioException("VENTA_CON_PAGO",
+                "La venta ya tiene un pago con tarjeta registrado: elimine el pago antes de modificarla.");
     }
 
     /**
@@ -310,6 +357,13 @@ public class GestionVentas {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
         Venta venta = ventas.enCursoDelTurno(turno.id())
                 .orElseThrow(() -> rechazar(sesion, "SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso para cancelar."));
+        if (!ventas.bloquearEnCurso(venta.id())) {
+            throw rechazar(sesion, "SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        if (pagos.tienePagos(venta.id())) {
+            NegocioException error = ventaConPago();
+            throw rechazar(sesion, error.getCodigo(), error.getMessage());
+        }
         if (!ventas.cancelar(venta.id())) {
             throw rechazar(sesion, "SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }
