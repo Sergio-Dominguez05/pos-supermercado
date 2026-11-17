@@ -67,15 +67,32 @@ public class EmisionFacturas implements EmisionDeFactura {
     /** Envía la factura pendiente al certificador, después del {@code COMMIT}. Nunca lanza por una falla del envío. */
     @Override
     public FacturaDeVenta certificar(Venta venta) {
-        Factura factura = facturas.deLaVenta(venta.id()).orElseThrow(() -> new IllegalStateException(
-                "La venta %d no tiene factura.".formatted(venta.id())));
-        if (factura.estado() != EstadoFactura.PENDIENTE) {
+        return enviar(facturaDe(venta.id()), false);
+    }
+
+    /**
+     * HU-08.04 crit. 2: vuelve a certificar una factura que quedó sin respuesta (pendiente o en contingencia). Como la
+     * respuesta anterior pudo perderse, primero pregunta al certificador por el identificador de la venta y solo la
+     * envía si no la tiene. Lo usan la certificación de contingencias (HU-08.08) y el reenvío (HU-08.06).
+     */
+    public FacturaDeVenta reintentar(long ventaId) {
+        return enviar(facturaDe(ventaId), true);
+    }
+
+    /**
+     * Crit. 1: el identificador único es el de la venta, así que un reenvío no genera otra factura. Crit. 3: una
+     * factura certificada (o rechazada, o anulada) no se vuelve a enviar.
+     */
+    private FacturaDeVenta enviar(Factura factura, boolean consultarAntes) {
+        if (factura.estado() != EstadoFactura.PENDIENTE && factura.estado() != EstadoFactura.CONTINGENCIA) {
             return deFactura(factura);
         }
         ResultadoCertificacion resultado;
         try {
-            resultado = LlamadaConLimite.conLimite(
-                    () -> certificador.certificar(factura.xmlEnviado(), factura.identificador()), limite());
+            resultado = LlamadaConLimite.conLimite(() -> consultarAntes
+                    ? certificador.consultarPorIdentificador(factura.identificador())
+                            .orElseGet(() -> certificador.certificar(factura.xmlEnviado(), factura.identificador()))
+                    : certificador.certificar(factura.xmlEnviado(), factura.identificador()), limite());
         } catch (CertificadorNoDisponibleException e) {
             return contingencia(factura, e.getMessage());
         } catch (RuntimeException e) {
@@ -84,19 +101,30 @@ public class EmisionFacturas implements EmisionDeFactura {
             return contingencia(factura, "Falló la comunicación con el certificador.");
         }
         if (resultado.certificada()) {
-            facturas.certificada(factura.id(), resultado);
+            if (!facturas.certificada(factura.id(), resultado)) {
+                return deFactura(facturaDe(factura.ventaId()));
+            }
             return new FacturaDeVenta(EstadoFactura.CERTIFICADA.name(), resultado.autorizacion(), resultado.serie(),
                     resultado.numero(), resultado.fechaCertificacion(), null);
         }
-        facturas.rechazada(factura.id(), resultado);
+        if (!facturas.rechazada(factura.id(), resultado)) {
+            return deFactura(facturaDe(factura.ventaId()));
+        }
         return new FacturaDeVenta(EstadoFactura.RECHAZADA.name(), null, null, null, null,
                 "El certificador rechazó la factura: " + resultado.mensajeError());
     }
 
     private FacturaDeVenta contingencia(Factura factura, String motivo) {
-        facturas.enContingencia(factura.id(), motivo);
+        if (!facturas.enContingencia(factura.id(), motivo)) {
+            return deFactura(facturaDe(factura.ventaId()));
+        }
         return new FacturaDeVenta(EstadoFactura.CONTINGENCIA.name(), null, null, null, null, motivo
                 + " La factura queda en contingencia y se certificará después.");
+    }
+
+    private Factura facturaDe(long ventaId) {
+        return facturas.deLaVenta(ventaId).orElseThrow(() -> new IllegalStateException(
+                "La venta %d no tiene factura.".formatted(ventaId)));
     }
 
     private Duration limite() {

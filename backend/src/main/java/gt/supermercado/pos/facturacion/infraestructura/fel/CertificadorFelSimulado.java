@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -27,9 +28,14 @@ import java.util.concurrent.atomic.AtomicLong;
 @ConditionalOnProperty(name = "pos.fel.modo", havingValue = "simulado")
 public class CertificadorFelSimulado implements CertificadorFel {
 
-    public enum Escenario { ACEPTAR, RECHAZAR, SIN_CONEXION }
+    /**
+     * RESPUESTA_PERDIDA (HU-08.04 crit. 2): el certificador certifica el documento, pero la respuesta no llega al POS,
+     * que la toma como falta de conexión.
+     */
+    public enum Escenario { ACEPTAR, RECHAZAR, SIN_CONEXION, RESPUESTA_PERDIDA }
 
     private final Map<UUID, ResultadoCertificacion> certificadas = new ConcurrentHashMap<>();
+    private final Map<UUID, AtomicInteger> envios = new ConcurrentHashMap<>();
     private final AtomicLong correlativo = new AtomicLong();
     private volatile Escenario escenario;
 
@@ -42,9 +48,17 @@ public class CertificadorFelSimulado implements CertificadorFel {
         this.escenario = escenario;
     }
 
+    /** Cuántas veces se envió a certificar el documento con ese identificador, para las pruebas de HU-08.04. */
+    public int enviosDe(UUID identificadorUnico) {
+        AtomicInteger cuenta = envios.get(identificadorUnico);
+        return cuenta == null ? 0 : cuenta.get();
+    }
+
+    /** Como un certificador real: el mismo identificador nunca genera una segunda factura (HU-08.04 crit. 1). */
     @Override
     public ResultadoCertificacion certificar(String xmlDte, UUID identificadorUnico) {
         verificarConexion();
+        envios.computeIfAbsent(identificadorUnico, id -> new AtomicInteger()).incrementAndGet();
         ResultadoCertificacion previa = certificadas.get(identificadorUnico);
         if (previa != null) {
             return previa;
@@ -52,8 +66,13 @@ public class CertificadorFelSimulado implements CertificadorFel {
         if (escenario == Escenario.RECHAZAR) {
             return ResultadoCertificacion.rechazada("SIM-001", "NIT del receptor no válido (simulado).");
         }
-        return certificadas.computeIfAbsent(identificadorUnico, id -> ResultadoCertificacion.aceptada(
-                UUID.randomUUID(), "SIM", String.valueOf(correlativo.incrementAndGet()), OffsetDateTime.now()));
+        ResultadoCertificacion certificada = certificadas.computeIfAbsent(identificadorUnico,
+                id -> ResultadoCertificacion.aceptada(UUID.randomUUID(), "SIM",
+                        String.valueOf(correlativo.incrementAndGet()), OffsetDateTime.now()));
+        if (escenario == Escenario.RESPUESTA_PERDIDA) {
+            throw new CertificadorNoDisponibleException("Se perdió la respuesta del certificador (simulado).");
+        }
+        return certificada;
     }
 
     @Override

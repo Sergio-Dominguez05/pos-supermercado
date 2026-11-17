@@ -21,6 +21,9 @@ import java.util.UUID;
 @Repository
 class RepositorioFacturasJdbc implements RepositorioFacturas {
 
+    /** Los estados en los que una factura todavía se puede certificar (HU-08.04 crit. 3). */
+    private static final String SIN_CERTIFICAR = "('PENDIENTE', 'CONTINGENCIA')";
+
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
 
@@ -65,12 +68,14 @@ class RepositorioFacturasJdbc implements RepositorioFacturas {
 
     @Override
     @Transactional
-    public void certificada(long facturaId, ResultadoCertificacion resultado) {
-        jdbc.update("""
+    public boolean certificada(long facturaId, ResultadoCertificacion resultado) {
+        if (jdbc.update("""
                 UPDATE factura SET estado = 'CERTIFICADA', uuid_autorizacion = ?, serie = ?, numero = ?,
                                    fecha_certificacion = ?
-                WHERE id = ?""", resultado.autorizacion(), resultado.serie(), resultado.numero(),
-                resultado.fechaCertificacion(), facturaId);
+                WHERE id = ? AND estado IN """ + SIN_CERTIFICAR, resultado.autorizacion(), resultado.serie(),
+                resultado.numero(), resultado.fechaCertificacion(), facturaId) == 0) {
+            return false;
+        }
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("autorizacion", resultado.autorizacion().toString());
         respuesta.put("serie", resultado.serie());
@@ -78,29 +83,38 @@ class RepositorioFacturasJdbc implements RepositorioFacturas {
         respuesta.put("fechaCertificacion", resultado.fechaCertificacion().toString());
         intento(facturaId, true, null, respuesta);
         completarTarea(facturaId, null);
+        return true;
     }
 
     @Override
     @Transactional
-    public void rechazada(long facturaId, ResultadoCertificacion resultado) {
-        jdbc.update("UPDATE factura SET estado = 'RECHAZADA' WHERE id = ?", facturaId);
+    public boolean rechazada(long facturaId, ResultadoCertificacion resultado) {
+        if (jdbc.update("UPDATE factura SET estado = 'RECHAZADA' WHERE id = ? AND estado IN " + SIN_CERTIFICAR,
+                facturaId) == 0) {
+            return false;
+        }
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("codigo", resultado.codigoError());
         respuesta.put("mensaje", resultado.mensajeError());
         intento(facturaId, false, resultado.codigoError(), respuesta);
         // Reenviarla después de corregir los datos es de HU-08.06: no se reintenta sola.
         completarTarea(facturaId, resultado.mensajeError());
+        return true;
     }
 
     @Override
     @Transactional
-    public void enContingencia(long facturaId, String motivo) {
-        jdbc.update("UPDATE factura SET estado = 'CONTINGENCIA' WHERE id = ?", facturaId);
+    public boolean enContingencia(long facturaId, String motivo) {
+        if (jdbc.update("UPDATE factura SET estado = 'CONTINGENCIA' WHERE id = ? AND estado IN " + SIN_CERTIFICAR,
+                facturaId) == 0) {
+            return false;
+        }
         intento(facturaId, false, "SIN_RESPUESTA", Map.of("error", motivo));
         jdbc.update("""
                 UPDATE tarea_pendiente SET intentos = intentos + 1, ultimo_error = ?,
                                            proximo_intento = now() + interval '1 minute'
                 WHERE factura_id = ? AND tipo = 'CERTIFICAR' AND NOT completada""", motivo, facturaId);
+        return true;
     }
 
     private void intento(long facturaId, boolean exitoso, String codigoError, Map<String, Object> respuesta) {
