@@ -335,6 +335,14 @@ kbd {
   gap: 12px;
 }
 
+/* EP-05: el NIT del cliente, "Buscar" y "CF" en un solo renglón. */
+.en-linea {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
 .boton-texto {
   font: inherit;
   font-weight: 600;
@@ -512,4 +520,30 @@ kbd {
   justify-content: space-between;
   gap: 8px;
   font-variant-numeric: tabular-nums;
+}
+
+/* HU-07.03 y HU-07.06: pagos registrados en el cobro, cada uno con su botón para eliminarlo. */
+.lista-pagos {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.lista-pagos li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* HU-07.07: finalizar el cobro, habilitado solo cuando los pagos cubren el total. */
+.finalizar-cobro {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  margin: 12px 0;
 }

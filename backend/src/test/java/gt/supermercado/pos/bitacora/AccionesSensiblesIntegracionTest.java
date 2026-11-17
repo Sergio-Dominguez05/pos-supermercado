@@ -2,6 +2,8 @@ package gt.supermercado.pos.bitacora;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
+import gt.supermercado.pos.clientes.NitsDePrueba;
+import gt.supermercado.pos.facturacion.FacturacionDePrueba;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -321,6 +323,109 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(LINEA_VENTA_ELIMINADA, true, id));
         assertThat(registrosDe(() -> enviar("/api/ventas/actual/lineas/" + linea, "DELETE", null, sesion)))
                 .containsExactly(new Registro(LINEA_VENTA_ELIMINADA, false, id));   // ya estaba eliminada
+    }
+
+    // Pagos
+
+    @Test
+    void eliminacionDePagoExitosaYRechazada() throws Exception {   // HU-07.06 crit. 4
+        String nombre = "Caja pago " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        enviar("/api/turnos", "POST", null, sesion);
+        String codigo = "AP" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":11.20}".formatted(codigo),
+                cookieAdmin);
+        enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), sesion);
+        enviar("/api/ventas/actual/pagos", "POST", "{\"tipoTarjeta\":\"DEBITO\",\"autorizacion\":\"123456\"}", sesion);
+        long pago = jdbc.queryForObject("SELECT id FROM pago WHERE usuario_id = ?", Long.class, id);
+
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/pagos/" + pago, "DELETE", null, sesion)))
+                .containsExactly(new Registro(PAGO_TARJETA_ELIMINADO, true, id));
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/pagos/" + pago, "DELETE", null, sesion)))
+                .containsExactly(new Registro(PAGO_TARJETA_ELIMINADO, false, id));   // ya estaba eliminado
+    }
+
+    @Test
+    void finalizacionDeVentaExitosaYRechazada() throws Exception {   // HU-07.08
+        FacturacionDePrueba.configurarEmisorYEstablecimiento(jdbc);
+        String nombre = "Caja fin " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        enviar("/api/turnos", "POST", null, sesion);
+        String codigo = "AF" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":11.20}".formatted(codigo),
+                cookieAdmin);
+        enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), sesion);
+        long venta = jdbc.queryForObject("SELECT id FROM venta WHERE usuario_id = ?", Long.class, id);
+
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/finalizar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_FINALIZADA, false, id));   // sin pago
+        enviar("/api/ventas/actual/pagos", "POST", "{\"tipoTarjeta\":\"DEBITO\",\"autorizacion\":\"123456\"}", sesion);
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/finalizar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_FINALIZADA, true, id));
+        assertThat(jdbc.queryForObject("""
+                SELECT entidad_id FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
+                Long.class, id)).isEqualTo(venta);
+    }
+
+    @Test
+    void registroDeClienteExitosoYRechazado() throws Exception {   // HU-05.05 crit. 4
+        String nit = NitsDePrueba.nuevo();
+
+        assertThat(registrosDe(() -> enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"Cliente auditado\"}".formatted(nit), cookieAdmin)))
+                .containsExactly(new Registro(CLIENTE_REGISTRADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"\"}".formatted(NitsDePrueba.nuevo()), cookieAdmin)))
+                .containsExactly(new Registro(CLIENTE_REGISTRADO, false, adminId));   // sin nombre
+    }
+
+    @Test
+    void cambioDeLaConexionFelExitosoYRechazado() throws Exception {   // HU-12.03 y HU-12.15 crit. 4
+        String cuerpo = """
+                {"certificador":"Certificador auditado","urlServicio":"https://certificador.test/api",                "usuario":"usuario-fel","secreto":"llave","ambiente":"PRUEBAS","timeoutMs":%d}""";
+
+        assertThat(registrosDe(() -> enviar("/api/configuracion/fel", "PUT", cuerpo.formatted(8000), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/configuracion/fel", "PUT", cuerpo.formatted(10), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // tiempo límite inválido
+    }
+
+    @Test
+    void cambioDeLosDatosDelEmisorExitosoYRechazado() throws Exception {   // HU-12.01 y HU-12.15 crit. 4
+        String cuerpo = """
+                {"nit":"%s","razonSocial":"Emisor auditado %d, S.A.","nombreComercial":"Auditado",\
+                "direccionFiscal":"Zona 1, Guatemala","afiliacionIva":"GEN"}""";
+
+        assertThat(registrosDe(() -> enviar("/api/configuracion/emisor", "PUT",
+                cuerpo.formatted("1234560", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/configuracion/emisor", "PUT",
+                cuerpo.formatted("1234561", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // NIT inválido
+    }
+
+    @Test
+    void cambioDelEstablecimientoExitosoYRechazado() throws Exception {   // HU-12.02 y HU-12.15 crit. 4
+        String cuerpo = """
+                {"codigoSat":"%s","nombre":"Establecimiento auditado %d","direccion":"Zona 1, Guatemala",\
+                "codigoPostal":"01001","municipio":"Guatemala","departamento":"Guatemala"}""";
+
+        assertThat(registrosDe(() -> enviar("/api/configuracion/establecimiento", "PUT",
+                cuerpo.formatted("1", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/configuracion/establecimiento", "PUT",
+                cuerpo.formatted("0", System.nanoTime()), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // código inválido
     }
 
     // Criterio 2: sin intervención del usuario, en el momento

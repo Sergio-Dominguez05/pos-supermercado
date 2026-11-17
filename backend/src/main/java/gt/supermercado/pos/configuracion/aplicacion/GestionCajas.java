@@ -8,6 +8,7 @@ import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
 import gt.supermercado.pos.configuracion.dominio.Caja;
 import gt.supermercado.pos.configuracion.dominio.ReglasCaja;
 import gt.supermercado.pos.configuracion.dominio.RepositorioCajas;
+import gt.supermercado.pos.configuracion.dominio.RepositorioImpresoras;
 import gt.supermercado.pos.configuracion.dominio.VerificadorTurnoAbiertoCaja;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.seguridad.dominio.TokenSesion;
@@ -23,7 +24,7 @@ import java.util.Optional;
 
 /**
  * Registro de las cajas del supermercado (HU-12.05): crear, editar, activar, desactivar y vincular el equipo físico.
- * La impresora de cada caja llega con HU-12.08 (#117).
+ * HU-12.05 crit. 2 y HU-12.08: cada caja elige la impresora de red donde salen sus tickets.
  */
 @Service
 public class GestionCajas {
@@ -32,11 +33,14 @@ public class GestionCajas {
     private final RepositorioCajas cajas;
     private final VerificadorTurnoAbiertoCaja turnos;
     private final Bitacora bitacora;
+    private final RepositorioImpresoras impresoras;
 
-    public GestionCajas(RepositorioCajas cajas, VerificadorTurnoAbiertoCaja turnos, Bitacora bitacora) {
+    public GestionCajas(RepositorioCajas cajas, VerificadorTurnoAbiertoCaja turnos, Bitacora bitacora,
+                        RepositorioImpresoras impresoras) {
         this.cajas = cajas;
         this.turnos = turnos;
         this.bitacora = bitacora;
+        this.impresoras = impresoras;
     }
 
     /** Resultado de vincular un equipo: el token solo existe aquí, para guardarlo en la cookie del equipo. */
@@ -61,10 +65,10 @@ public class GestionCajas {
     }
 
     @Transactional
-    public Caja crear(String nombre, String serieFel, SesionActiva actor) {
+    public Caja crear(String nombre, String serieFel, Long impresoraId, SesionActiva actor) {
         String nombreNormal = ReglasCaja.normalizarNombre(nombre);
         String serie = ReglasCaja.normalizarSerie(serieFel);
-        validar(nombreNormal, serie, null, actor, AccionSensible.CAJA_CREADA);
+        validar(nombreNormal, serie, impresoraId, null, actor, AccionSensible.CAJA_CREADA);
 
         long id;
         try {
@@ -72,16 +76,19 @@ public class GestionCajas {
         } catch (DuplicateKeyException e) {
             throw rechazar(actor, AccionSensible.CAJA_CREADA, null, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
         }
+        if (impresoraId != null) {
+            cajas.asignarImpresora(id, impresoraId);
+        }
         bitacora.registrar(evento(actor, AccionSensible.CAJA_CREADA, true, "Caja '%s' creada".formatted(nombreNormal), id, null));
         return obtener(id);
     }
 
     @Transactional
-    public Caja editar(long id, String nombre, String serieFel, SesionActiva actor) {
+    public Caja editar(long id, String nombre, String serieFel, Long impresoraId, SesionActiva actor) {
         Caja actual = obtener(id);
         String nombreNormal = ReglasCaja.normalizarNombre(nombre);
         String serie = ReglasCaja.normalizarSerie(serieFel);
-        validar(nombreNormal, serie, id, actor, AccionSensible.CAJA_EDITADA);
+        validar(nombreNormal, serie, impresoraId, id, actor, AccionSensible.CAJA_EDITADA);
 
         Map<String, Object> cambios = new LinkedHashMap<>();
         if (!nombreNormal.equals(actual.nombre())) {
@@ -90,6 +97,11 @@ public class GestionCajas {
         if (!Objects.equals(serie, actual.serieFel())) {
             cambios.put("serieFel", cambioNulable(actual.serieFel(), serie));
         }
+        boolean otraImpresora = !Objects.equals(impresoraId, actual.impresoraId());
+        if (otraImpresora) {
+            cambios.put("impresora", EventoBitacora.cambio(actual.impresoraId() == null ? "" : actual.impresoraId(),
+                    impresoraId == null ? "" : impresoraId));
+        }
         if (cambios.isEmpty()) {
             return actual;
         }
@@ -97,6 +109,9 @@ public class GestionCajas {
             cajas.actualizar(id, nombreNormal, serie);
         } catch (DuplicateKeyException e) {
             throw rechazar(actor, AccionSensible.CAJA_EDITADA, id, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
+        }
+        if (otraImpresora) {
+            cajas.asignarImpresora(id, impresoraId);
         }
         bitacora.registrar(evento(actor, AccionSensible.CAJA_EDITADA, true,
                 "Caja '%s' editada: %s".formatted(nombreNormal, String.join(", ", cambios.keySet())), id, cambios));
@@ -148,7 +163,8 @@ public class GestionCajas {
         return obtener(caja.id());
     }
 
-    private void validar(String nombre, String serie, Long id, SesionActiva actor, AccionSensible accion) {
+    private void validar(String nombre, String serie, Long impresoraId, Long id, SesionActiva actor,
+                         AccionSensible accion) {
         if (!ReglasCaja.esNombreValido(nombre)) {
             throw rechazar(actor, accion, id, "NOMBRE_CAJA_INVALIDO", "El nombre de la caja debe tener de 1 a 40 caracteres.");
         }
@@ -158,6 +174,9 @@ public class GestionCajas {
         }
         if (cajas.existeNombre(nombre, id)) {
             throw rechazar(actor, accion, id, "CAJA_DUPLICADA", "Ya existe una caja con ese nombre.");
+        }
+        if (impresoraId != null && impresoras.buscarPorId(impresoraId).isEmpty()) {
+            throw rechazar(actor, accion, id, "IMPRESORA_NO_ENCONTRADA", "La impresora elegida no existe.");
         }
     }
 

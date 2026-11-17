@@ -34,6 +34,10 @@ public enum AccionSensible {
     LINEA_VENTA_ELIMINADA(Categoria.VENTAS, "ventas"),
     /** Pendiente: HU-06.14. */
     VENTA_CANCELADA(Categoria.VENTAS, "ventas"),
+    /** El cajero finaliza el cobro: la venta queda registrada con sus pagos (HU-07.08). */
+    VENTA_FINALIZADA(Categoria.VENTAS, "pagos"),
+    /** HU-05.05 crit. 4: un cliente nuevo, registrado a mano o con el nombre que dio el certificador (HU-05.04). */
+    CLIENTE_REGISTRADO(Categoria.VENTAS, "clientes"),
 
     // Facturación
     /** Pendiente: HU-08.10. */
@@ -60,7 +64,10 @@ public enum AccionSensible {
     CAJA_ACTIVADA(Categoria.CONFIGURACION, "configuracion"),
     CAJA_DESACTIVADA(Categoria.CONFIGURACION, "configuracion"),
     EQUIPO_VINCULADO(Categoria.CONFIGURACION, "configuracion"),
-    /** Cualquier parámetro del sistema. Pendiente: HU-12.01, 12.02, 12.03, 12.07, 12.08 y 12.13. */
+    /**
+     * Cualquier parámetro del sistema. Lo registran la conexión FEL (HU-12.03), el emisor (HU-12.01) y el
+     * establecimiento (HU-12.02); pendiente en HU-12.07, 12.08 y 12.13.
+     */
     PARAMETRO_MODIFICADO(Categoria.CONFIGURACION, "configuracion"),
 
     // Catálogo

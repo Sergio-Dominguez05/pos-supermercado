@@ -8,11 +8,16 @@ export interface Caja {
   serieFel: string | null
   activo: boolean
   equipoVinculado: boolean
+  /** HU-12.08: la impresora de red donde salen sus tickets, o `null` si no tiene. */
+  impresoraId: number | null
+  impresoraNombre: string | null
 }
 
 export interface DatosCaja {
   nombre: string
   serieFel: string
+  /** `null` deja la caja sin impresora. */
+  impresoraId: number | null
 }
 
 export const CLAVE_CAJAS = ['cajas'] as const

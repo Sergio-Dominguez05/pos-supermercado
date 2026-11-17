@@ -1,6 +1,8 @@
 package gt.supermercado.pos.facturacion.infraestructura.fel;
 
+import gt.supermercado.pos.facturacion.dominio.AmbienteFel;
 import gt.supermercado.pos.facturacion.dominio.CertificadorNoDisponibleException;
+import gt.supermercado.pos.facturacion.dominio.ConexionFel;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
 import gt.supermercado.pos.facturacion.infraestructura.fel.CertificadorFelSimulado.Escenario;
 import org.junit.jupiter.api.Test;
@@ -37,11 +39,38 @@ class CertificadorFelSimuladoTest {
     }
 
     @Test
+    void laPruebaDeConexionSigueElEscenarioSinEmitirFacturas() {   // HU-08.01 crit. 3
+        ConexionFel conexion = new ConexionFel("Simulado", "https://simulado.test", "usuario", "llave",
+                AmbienteFel.PRUEBAS, 2000);
+
+        assertThat(certificador.probarConexion(conexion).mensaje()).contains("ambiente de pruebas");
+        certificador.usarEscenario(Escenario.RECHAZAR);
+        assertThat(certificador.probarConexion(conexion).exitosa()).isFalse();
+        certificador.usarEscenario(Escenario.SIN_CONEXION);
+        assertThatThrownBy(() -> certificador.probarConexion(conexion))
+                .isInstanceOf(CertificadorNoDisponibleException.class);
+    }
+
+    @Test
     void escenarioSinConexionPermiteProbarLaContingencia() {
         certificador.usarEscenario(Escenario.SIN_CONEXION);
 
         assertThatThrownBy(() -> certificador.certificar("<dte/>", UUID.randomUUID()))
                 .isInstanceOf(CertificadorNoDisponibleException.class);
+    }
+
+    @Test
+    void escenarioRespuestaPerdidaCertificaPeroNoResponde() {   // HU-08.04 crit. 2
+        UUID venta = UUID.randomUUID();
+        certificador.usarEscenario(Escenario.RESPUESTA_PERDIDA);
+
+        assertThatThrownBy(() -> certificador.certificar("<dte/>", venta))
+                .isInstanceOf(CertificadorNoDisponibleException.class);
+
+        certificador.usarEscenario(Escenario.ACEPTAR);
+        assertThat(certificador.consultarPorIdentificador(venta)).hasValueSatisfying(
+                resultado -> assertThat(resultado.certificada()).isTrue());
+        assertThat(certificador.enviosDe(venta)).isEqualTo(1);
     }
 
     @Test

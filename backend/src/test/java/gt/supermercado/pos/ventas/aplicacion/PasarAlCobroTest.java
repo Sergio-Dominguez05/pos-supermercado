@@ -45,7 +45,7 @@ class PasarAlCobroTest {
     private final ValidadorClienteDeVenta clientes = mock(ValidadorClienteDeVenta.class);
     private final SesionActiva sesion = new SesionActiva(1, 20, "ana", "Ana López", Rol.CAJERO, "Cajero", false,
             Set.of("VENTA_REGISTRAR", "PAGO_REGISTRAR"), 1L, "Caja 1");
-    private final GestionVentas gestion = new GestionVentas(ventas, turnos, null, null, clientes, null);
+    private final GestionVentas gestion = new GestionVentas(ventas, turnos, null, null, clientes, ventaId -> false, null);
 
     @BeforeEach
     void turnoAbierto() {

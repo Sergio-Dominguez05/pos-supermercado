@@ -14,6 +14,17 @@ import {
   suspenderVenta,
   type Venta as DatosVenta,
 } from '../../api/ventas'
+import {
+  CLAVE_COBRO,
+  eliminarPago,
+  finalizarCobro,
+  obtenerCobro,
+  registrarPago,
+  type Cobro,
+  type FacturaDeVenta,
+  type Pago,
+  type VentaFinalizada,
+} from '../../api/pagos'
 import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
@@ -28,6 +39,15 @@ import {
   formatoDesglose,
   rotuloSuspendidas,
 } from './textos'
+import {
+  avisoFactura,
+  avisoVentaFinalizada,
+  confirmacionEliminarPago,
+  descripcionPago,
+  montoValido,
+  motivoSinFinalizar,
+  soloUltimos4,
+} from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
@@ -412,6 +432,20 @@ describe('retomar una venta suspendida (HU-06.13)', () => {
   })
 })
 
+const COBRO_SIN_PAGOS: Cobro = { ventaId: 31, numero: 1042, total: 15, pagado: 0, pendiente: 15, completo: false, pagos: [] }
+const PAGO: Pago = { id: 3, tipoTarjeta: 'CREDITO', autorizacion: 'A1B2C3', ultimos4: '4321', monto: 15,
+  registradoEn: '2026-11-17T00:10:00Z' }
+
+const renderizarCobro = (venta: DatosVenta, cobro: Cobro) => {
+  const cliente = new QueryClient()
+  cliente.setQueryData(CLAVE_COBRO, cobro)
+  return renderToString(
+    <QueryClientProvider client={cliente}>
+      <PasoDeCobro venta={venta} onRegresar={() => {}} />
+    </QueryClientProvider>,
+  ).replaceAll('<!-- -->', '')
+}
+
 describe('pasar al cobro (HU-06.15)', () => {
   const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
     subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
@@ -430,13 +464,12 @@ describe('pasar al cobro (HU-06.15)', () => {
   })
 
   it('el cobro muestra el total a cobrar y permite regresar a la venta (crit. 1 y 4)', () => {
-    const html = renderToString(<PasoDeCobro venta={conArroz} onRegresar={() => {}} />).replaceAll('<!-- -->', '')
+    const html = renderizarCobro(conArroz, COBRO_SIN_PAGOS)
 
     expect(html).toContain('<dt>Total a cobrar</dt><dd class="total">Q15.00</dd>')
     expect(html).toContain('<dd>3</dd>')
-    expect(html).toMatch(/<button[^>]*data-control="regresar-a-la-venta"[^>]*autofocus=""/i)
+    expect(html).toContain('data-control="regresar-a-la-venta"')
     expect(html).toContain('Regresar a la venta <kbd>Esc</kbd>')
-    expect(html).toContain('HU-07.03 (#60)')
   })
 
   it('pasar al cobro es un POST de validación sobre la venta en curso', async () => {
@@ -452,6 +485,195 @@ describe('pasar al cobro (HU-06.15)', () => {
     const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
 
     expect(html).toContain('<kbd>F12</kbd> Cobrar</li>')
+  })
+})
+
+describe('cobrar con tarjeta (HU-07.03)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+
+  it('sin pago muestra el formulario con el monto propuesto igual al pendiente (crit. 1 y 2)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, total: 26.2, pendiente: 26.2 })
+
+    expect(html).toContain('aria-label="Pago con tarjeta"')
+    expect(html).toMatch(/<input[^>]*name="monto"[^>]*value="26.20"/)
+    expect(html).toContain('Ingrese Q26.20 en la terminal bancaria')
+  })
+
+  it('pide tipo de tarjeta y autorización, y los últimos 4 como opcionales (crit. 3 y 4)', () => {
+    const html = renderizarCobro(conArroz, COBRO_SIN_PAGOS)
+
+    const debito = html.match(/<input[^>]*value="DEBITO"[^>]*>/)?.[0] ?? ''
+    expect(debito).toContain('type="radio"')
+    expect(debito).toMatch(/autofocus=""/i)
+    expect(html).toContain('value="CREDITO"')
+    expect(html).toContain('name="autorizacion"')
+    expect(html).toContain('Últimos 4 dígitos (opcional)')
+    expect(html).toMatch(/<input[^>]*name="ultimos4"[^>]*maxLength="4"|<input[^>]*maxLength="4"[^>]*name="ultimos4"/i)
+  })
+
+  it('explica qué hacer si la terminal rechaza la tarjeta (crit. 6)', () => {
+    expect(renderizarCobro(conArroz, COBRO_SIN_PAGOS)).toContain(
+      'Si la rechaza, no registre nada: intente con otra tarjeta o regrese y cancele la venta.',
+    )
+  })
+
+  it('con el pago registrado lo muestra en lugar del formulario', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
+
+    expect(html).not.toContain('aria-label="Pago con tarjeta"')
+    expect(html).toContain('Tarjeta de crédito ••••4321 · Aut. A1B2C3 · Q15.00')
+    expect(html).toContain('<dt>Pendiente</dt><dd>Q0.00</dd>')
+  })
+
+  it('el campo de los últimos 4 solo admite 4 dígitos y el monto, quetzales con centavos (crit. 4, 5 y 7)', () => {
+    expect(soloUltimos4('4111 1111 1111 1111')).toBe('4111')
+    expect(soloUltimos4('12a4')).toBe('124')
+    for (const monto of ['15', '15.5', '15.50']) expect(montoValido(monto), monto).toBe(true)
+    for (const monto of ['0', '-5', '10.005', 'diez', '']) expect(montoValido(monto), monto).toBe(false)
+    expect(descripcionPago({ ...PAGO, tipoTarjeta: 'DEBITO', ultimos4: null })).toBe('Tarjeta de débito · Aut. A1B2C3 · Q15.00')
+  })
+
+  it('registrar es un POST con el tipo, la autorización, los últimos 4 y el monto', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('{}', { status: 200 }))))
+
+    await obtenerCobro()
+    await registrarPago({ tipoTarjeta: 'DEBITO', autorizacion: '123456', monto: 15 })
+    const [[rutaEstado, opcionesEstado], [rutaPago, opcionesPago]] = vi.mocked(fetch).mock.calls
+    expect(rutaEstado).toBe('/api/ventas/actual/pagos')
+    expect(opcionesEstado?.method).toBeUndefined()
+    expect(rutaPago).toBe('/api/ventas/actual/pagos')
+    expect(opcionesPago).toMatchObject({ method: 'POST', body: '{"tipoTarjeta":"DEBITO","autorizacion":"123456","monto":15}' })
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('eliminar un pago antes de finalizar (HU-07.06)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+
+  it('cada pago registrado se puede eliminar (crit. 1)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
+
+    expect(html).toContain('data-control="eliminar-pago"')
+    expect(html).toContain('>Eliminar pago</button>')
+    expect(html).toContain('Para modificar la venta, elimine el pago.')
+  })
+
+  it('sin pagos no hay nada que eliminar', () => {
+    expect(renderizarCobro(conArroz, COBRO_SIN_PAGOS)).not.toContain('Eliminar pago')
+  })
+
+  it('pide confirmación con los datos del pago y recuerda anularlo en la terminal', () => {
+    expect(confirmacionEliminarPago(PAGO)).toBe(
+      '¿Eliminar el pago (Tarjeta de crédito ••••4321 · Aut. A1B2C3 · Q15.00)? Si la terminal ya lo cobró, ' +
+        'anúlelo también en la terminal bancaria.',
+    )
+  })
+
+  it('eliminar es un DELETE del pago en la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(COBRO_SIN_PAGOS), { status: 200 })))
+
+    await expect(eliminarPago(3)).resolves.toMatchObject({ pendiente: 15 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/pagos/3')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('validar que el pago cubra el total (HU-07.07)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const botonFinalizar = (html: string) => html.match(/<button[^>]*data-control="finalizar-cobro"[^>]*>/)?.[0] ?? ''
+
+  it('sin pagos no se puede finalizar y se explica cuánto falta (crit. 1)', () => {
+    const html = renderizarCobro(conArroz, COBRO_SIN_PAGOS)
+
+    expect(botonFinalizar(html)).toContain('disabled=""')
+    expect(html).toContain('Para finalizar, los pagos deben cubrir el total: falta cobrar Q15.00.')
+  })
+
+  it('con pagos menores al total no se puede finalizar (crit. 1)', () => {
+    const parcial = { ...COBRO_SIN_PAGOS, pagado: 10, pendiente: 5, pagos: [{ ...PAGO, monto: 10 }] }
+    const html = renderizarCobro(conArroz, parcial)
+
+    expect(botonFinalizar(html)).toContain('disabled=""')
+    expect(html).toContain('falta cobrar Q5.00.')
+  })
+
+  it('con pagos iguales al total se habilita finalizar (crit. 2)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
+
+    expect(botonFinalizar(html)).not.toBe('')
+    expect(botonFinalizar(html)).not.toContain('disabled')
+    expect(html).not.toContain('Para finalizar, los pagos deben cubrir el total')
+  })
+
+  it('el motivo depende de lo que indica el servidor', () => {
+    expect(motivoSinFinalizar({ ...COBRO_SIN_PAGOS, pendiente: 26.2 })).toBe(
+      'Para finalizar, los pagos deben cubrir el total: falta cobrar Q26.20.',
+    )
+    expect(motivoSinFinalizar({ ...COBRO_SIN_PAGOS, pendiente: 0, completo: true })).toBeUndefined()
+  })
+})
+
+describe('finalizar el cobro (HU-07.08)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const CERTIFICADA: FacturaDeVenta = { estado: 'CERTIFICADA', autorizacion: '5b2c1f0e-1a2b-4c3d-9e8f-001122334455',
+    serie: 'A1B2C3D4', numero: '123456789', certificadaEn: '2026-11-17T10:00:00-06:00', motivo: null }
+  const FINALIZADA: VentaFinalizada = { ventaId: 31, numero: 1042, articulos: 3, total: 15, pagado: 15, pagos: [PAGO],
+    factura: CERTIFICADA, impresion: { impresa: true, mensaje: null } }
+
+  it('con el pago completo, finalizar recibe el foco para confirmar con Enter (crit. 1)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
+    const boton = html.match(/<button[^>]*data-control="finalizar-cobro"[^>]*>[^<]*/)?.[0] ?? ''
+
+    expect(boton).toMatch(/autofocus=""/i)
+    expect(boton).toContain('>Finalizar cobro')
+    expect(html).not.toContain('HU-07.08 (#63)')
+  })
+
+  it('finalizar es un POST sobre la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(FINALIZADA), { status: 200 })))
+
+    await expect(finalizarCobro()).resolves.toMatchObject({ numero: 1042, factura: { estado: 'CERTIFICADA' } })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/finalizar')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('avisa qué venta se finalizó y con qué serie y número se certificó la factura (crit. 1 y 5, HU-08.03)', () => {
+    expect(avisoVentaFinalizada(FINALIZADA)).toBe(
+      'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. Factura certificada: serie A1B2C3D4, N.º 123456789.',
+    )
+    expect(avisoVentaFinalizada({ ...FINALIZADA, articulos: 1 })).toContain('1 artículo, Q15.00 cobrados.')
+  })
+
+  it('si la factura no se imprimió, el aviso lo dice y que se puede reimprimir (HU-08.05 crit. 6)', () => {
+    const mensaje = 'No se pudo imprimir: La impresora 192.168.1.50:9100 no respondió. La factura es válida: se puede reimprimir.'
+
+    expect(avisoVentaFinalizada({ ...FINALIZADA, impresion: { impresa: false, mensaje } })).toBe(
+      'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. Factura certificada: serie A1B2C3D4, N.º 123456789. ' +
+        mensaje,
+    )
+  })
+
+  it('si la factura no se certificó, el aviso dice por qué (HU-08.03 crit. 3)', () => {
+    const contingencia: FacturaDeVenta = { ...CERTIFICADA, estado: 'CONTINGENCIA', autorizacion: null, serie: null,
+      numero: null, certificadaEn: null,
+      motivo: 'El certificador no respondió en 8 segundos. La factura queda en contingencia y se certificará después.' }
+
+    expect(avisoFactura(contingencia)).toBe(contingencia.motivo)
+    expect(avisoFactura({ ...contingencia, estado: 'RECHAZADA', motivo: 'El certificador rechazó la factura: NIT.' }))
+      .toBe('El certificador rechazó la factura: NIT.')
+    expect(avisoFactura({ ...contingencia, estado: 'PENDIENTE', motivo: null })).toBe(
+      'La factura está pendiente de certificar.',
+    )
   })
 })
 

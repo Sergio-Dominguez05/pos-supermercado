@@ -1,6 +1,7 @@
 package gt.supermercado.pos.ventas.infraestructura;
 
 import gt.supermercado.pos.impuestos.dominio.LineaCalculada;
+import gt.supermercado.pos.impuestos.dominio.Totales;
 import gt.supermercado.pos.ventas.dominio.EstadoVenta;
 import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.RepositorioVentas;
@@ -59,6 +60,11 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
+    public boolean asignarCliente(long ventaId, Long clienteId) {
+        return jdbc.update("UPDATE venta SET cliente_id = ? WHERE id = ? AND estado = 'EN_CURSO'", clienteId, ventaId) == 1;
+    }
+
+    @Override
     public Optional<Venta> buscarPorId(long id) {
         return unaVenta(SELECT_VENTA + "WHERE v.id = ?", id);
     }
@@ -86,6 +92,14 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     @Override
     public boolean cancelar(long ventaId) {
         return jdbc.update("UPDATE venta SET estado = 'CANCELADA' WHERE id = ? AND estado = 'EN_CURSO'", ventaId) == 1;
+    }
+
+    @Override
+    public boolean finalizar(long ventaId, Totales totales) {
+        return jdbc.update("""
+                UPDATE venta SET estado = 'FINALIZADA', finalizada_en = now(), subtotal = ?, iva = ?, total = ?
+                WHERE id = ? AND estado = 'EN_CURSO'""", totales.subtotal(), totales.iva(), totales.total(),
+                ventaId) == 1;
     }
 
     @Override

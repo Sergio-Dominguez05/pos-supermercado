@@ -12,6 +12,7 @@ import {
   type Caja,
 } from '../../api/cajas'
 import { useSesion } from '../login/sesion'
+import { NavConfiguracion } from './NavConfiguracion'
 import { avisoEquipoVinculado, avisoEstadoCaja, confirmacionDesactivarCaja, confirmacionVincular } from './textos'
 
 /** HU-12.05: cajas del supermercado, con el equipo físico vinculado a cada una. */
@@ -26,9 +27,7 @@ export function ListaCajas() {
   return (
     <main className="pagina pagina-ancha">
       <h1>Cajas</h1>
-      <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Configuración · Cajas
-      </p>
+      <NavConfiguracion actual="Cajas" />
       {aviso && (
         <p className="tarjeta exito" role="status">
           {aviso}
@@ -97,6 +96,7 @@ function TablaCajas({ onAviso }: { onAviso: (aviso?: string) => void }) {
               <tr>
                 <th>Caja</th>
                 <th>Serie FEL</th>
+                <th>Impresora</th>
                 <th>Estado</th>
                 <th>Equipo</th>
                 <th>
@@ -109,6 +109,7 @@ function TablaCajas({ onAviso }: { onAviso: (aviso?: string) => void }) {
                 <tr key={caja.id}>
                   <td>{caja.nombre}</td>
                   <td>{caja.serieFel ?? '—'}</td>
+                  <td>{caja.impresoraNombre ?? '—'}</td>
                   <td>
                     <span className={caja.activo ? 'estado estado-activo' : 'estado estado-inactivo'}>
                       {caja.activo ? 'Activa' : 'Inactiva'}

@@ -33,14 +33,12 @@ class CatalogoAccionesSensiblesTest {
             entry(FACTURA_ANULADA, "HU-08.10"),
             entry(FACTURA_REIMPRESA, "HU-08.12"),
             entry(FACTURA_RECHAZADA_CERTIFICADOR, "HU-08.06"),
-            entry(PAGO_TARJETA_ELIMINADO, "HU-07.06"),
             entry(TURNO_CERRADO, "HU-09.08"),
             entry(TURNO_CERRADO_POR_SUPERVISOR, "HU-09.12"),
-            entry(PARAMETRO_MODIFICADO, "HU-12.01, 12.02, 12.03, 12.07, 12.08 y 12.13"),
             entry(CATALOGO_CARGADO, "HU-03.05"));
 
     private static final Set<String> MODULOS = Set.of(
-            "seguridad", "catalogo", "ventas", "pagos", "facturacion", "caja", "configuracion");
+            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion");
 
     @Test
     void elCatalogoTieneTodosLosEventosDelCriterio1() {
