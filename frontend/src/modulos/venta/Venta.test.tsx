@@ -29,7 +29,7 @@ import {
   formatoDesglose,
   rotuloSuspendidas,
 } from './textos'
-import { confirmacionEliminarPago, descripcionPago, montoValido, soloUltimos4 } from './cobro'
+import { confirmacionEliminarPago, descripcionPago, montoValido, motivoSinFinalizar, soloUltimos4 } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
@@ -414,7 +414,7 @@ describe('retomar una venta suspendida (HU-06.13)', () => {
   })
 })
 
-const COBRO_SIN_PAGOS: Cobro = { ventaId: 31, numero: 1042, total: 15, pagado: 0, pendiente: 15, pagos: [] }
+const COBRO_SIN_PAGOS: Cobro = { ventaId: 31, numero: 1042, total: 15, pagado: 0, pendiente: 15, completo: false, pagos: [] }
 const PAGO: Pago = { id: 3, tipoTarjeta: 'CREDITO', autorizacion: 'A1B2C3', ultimos4: '4321', monto: 15,
   registradoEn: '2026-11-17T00:10:00Z' }
 
@@ -502,12 +502,11 @@ describe('cobrar con tarjeta (HU-07.03)', () => {
   })
 
   it('con el pago registrado lo muestra en lugar del formulario', () => {
-    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, pagos: [PAGO] })
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
 
     expect(html).not.toContain('aria-label="Pago con tarjeta"')
     expect(html).toContain('Tarjeta de crédito ••••4321 · Aut. A1B2C3 · Q15.00')
     expect(html).toContain('<dt>Pendiente</dt><dd>Q0.00</dd>')
-    expect(html).toContain('HU-07.08 (#63)')
   })
 
   it('el campo de los últimos 4 solo admite 4 dígitos y el monto, quetzales con centavos (crit. 4, 5 y 7)', () => {
@@ -538,7 +537,7 @@ describe('eliminar un pago antes de finalizar (HU-07.06)', () => {
   const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
 
   it('cada pago registrado se puede eliminar (crit. 1)', () => {
-    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, pagos: [PAGO] })
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
 
     expect(html).toContain('data-control="eliminar-pago"')
     expect(html).toContain('>Eliminar pago</button>')
@@ -563,6 +562,43 @@ describe('eliminar un pago antes de finalizar (HU-07.06)', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/pagos/3')
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
     vi.unstubAllGlobals()
+  })
+})
+
+describe('validar que el pago cubra el total (HU-07.07)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const botonFinalizar = (html: string) => html.match(/<button[^>]*data-control="finalizar-cobro"[^>]*>/)?.[0] ?? ''
+
+  it('sin pagos no se puede finalizar y se explica cuánto falta (crit. 1)', () => {
+    const html = renderizarCobro(conArroz, COBRO_SIN_PAGOS)
+
+    expect(botonFinalizar(html)).toContain('disabled=""')
+    expect(html).toContain('Para finalizar, los pagos deben cubrir el total: falta cobrar Q15.00.')
+  })
+
+  it('con pagos menores al total no se puede finalizar (crit. 1)', () => {
+    const parcial = { ...COBRO_SIN_PAGOS, pagado: 10, pendiente: 5, pagos: [{ ...PAGO, monto: 10 }] }
+    const html = renderizarCobro(conArroz, parcial)
+
+    expect(botonFinalizar(html)).toContain('disabled=""')
+    expect(html).toContain('falta cobrar Q5.00.')
+  })
+
+  it('con pagos iguales al total se habilita finalizar (crit. 2)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
+
+    expect(botonFinalizar(html)).not.toBe('')
+    expect(botonFinalizar(html)).not.toContain('disabled')
+    expect(html).not.toContain('Para finalizar, los pagos deben cubrir el total')
+  })
+
+  it('el motivo depende de lo que indica el servidor', () => {
+    expect(motivoSinFinalizar({ ...COBRO_SIN_PAGOS, pendiente: 26.2 })).toBe(
+      'Para finalizar, los pagos deben cubrir el total: falta cobrar Q26.20.',
+    )
+    expect(motivoSinFinalizar({ ...COBRO_SIN_PAGOS, pendiente: 0, completo: true })).toBeUndefined()
   })
 })
 

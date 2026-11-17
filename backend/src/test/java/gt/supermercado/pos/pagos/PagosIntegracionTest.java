@@ -270,6 +270,22 @@ class PagosIntegracionTest {
                 pago)).hasMessageContaining("fue eliminado");
     }
 
+    // HU-07.07 Validar que el pago cubra el total
+
+    @Test
+    void elCobroSoloQuedaCompletoCuandoLosPagosCubrenElTotal() throws Exception {   // crit. 1 y 2
+        Cajero cajero = cajeroConVenta("5.00", 3);   // Q15.00
+        assertThat(enviar("/api/ventas/actual/pagos", "GET", null, cajero.sesion()).body())
+                .contains("\"completo\":false");
+
+        long parcial = idDePago(pagar(cajero, pago("10.00")));
+        assertThat(enviar("/api/ventas/actual/pagos", "GET", null, cajero.sesion()).body())
+                .contains("\"pendiente\":5.00", "\"completo\":false");
+
+        assertThat(eliminarPago(parcial, cajero).body()).contains("\"completo\":false");
+        assertThat(pagar(cajero, pago("15.00")).body()).contains("\"pendiente\":0.00", "\"completo\":true");
+    }
+
     // Apoyo
 
     private HttpResponse<String> eliminarPago(long pago, Cajero cajero) throws Exception {

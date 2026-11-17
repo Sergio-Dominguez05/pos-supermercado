@@ -20,6 +20,8 @@ export interface Cobro {
   total: number
   pagado: number
   pendiente: number
+  /** HU-07.07: los pagos cubren el total, así que se puede finalizar. */
+  completo: boolean
   pagos: Pago[]
 }
 

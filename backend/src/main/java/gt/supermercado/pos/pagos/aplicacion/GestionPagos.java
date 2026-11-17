@@ -51,7 +51,26 @@ public class GestionPagos {
     public record SolicitudPago(TipoTarjeta tipoTarjeta, String autorizacion, String ultimos4, BigDecimal monto) {}
 
     /** La venta en curso, sus pagos, lo pagado y lo pendiente (crit. 1). */
-    public record EstadoCobro(Venta venta, List<Pago> pagos, BigDecimal pagado, BigDecimal pendiente) {}
+    public record EstadoCobro(Venta venta, List<Pago> pagos, BigDecimal pagado, BigDecimal pendiente) {
+
+        /**
+         * HU-07.07 crit. 2: la suma de los pagos cubre el total, así que se puede finalizar. Sin pagos no está
+         * completo: una venta se cobra siempre (una venta vacía no llega al cobro).
+         */
+        public boolean completo() {
+            return !pagos.isEmpty() && pendiente.signum() == 0;
+        }
+
+        /** HU-07.07 crit. 1: con pagos que suman menos que el total, la venta no se finaliza. */
+        public EstadoCobro exigirCompleto() {
+            if (!completo()) {
+                throw new NegocioException("PAGO_INCOMPLETO",
+                        "Falta cobrar Q%s: la venta no se puede finalizar con el pago incompleto."
+                                .formatted(pendiente.setScale(2)));
+            }
+            return this;
+        }
+    }
 
     /** Crit. 1 y 2: el total a cobrar y lo pendiente de la venta en curso del turno. */
     @Transactional(readOnly = true)
@@ -100,6 +119,17 @@ public class GestionPagos {
         pagos.registrar(venta.id(), turno.id(), sesion.usuarioId(), solicitud.tipoTarjeta(), autorizacion, ultimos4,
                 monto.setScale(2));
         return estado(venta, turno);
+    }
+
+    /**
+     * HU-07.07: el cobro de la venta en curso, bloqueada, solo si los pagos cubren el total (crit. 1); si no, 422
+     * {@code PAGO_INCOMPLETO}. Finalizar el cobro (HU-07.08) parte de aquí, en la misma transacción, para que la venta
+     * y sus pagos no cambien mientras se emite la factura.
+     */
+    @Transactional
+    public EstadoCobro paraFinalizar(SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        return estado(ventas.enCursoBloqueada(turno), turno).exigirCompleto();
     }
 
     /**

@@ -1,4 +1,4 @@
-import type { Pago } from '../../api/pagos'
+import type { Cobro, Pago } from '../../api/pagos'
 import { formatoQuetzales } from '../catalogo/textos'
 
 /** HU-07.03 crit. 4: el campo de los últimos 4 dígitos solo admite dígitos, y como mucho 4. */
@@ -15,3 +15,11 @@ export const descripcionPago = (pago: Pago) =>
 /** HU-07.06: se confirma antes de eliminar un pago, y se recuerda anularlo también en la terminal bancaria. */
 export const confirmacionEliminarPago = (pago: Pago) =>
   `¿Eliminar el pago (${descripcionPago(pago)})? Si la terminal ya lo cobró, anúlelo también en la terminal bancaria.`
+
+/**
+ * HU-07.07: por qué todavía no se puede finalizar el cobro, o `undefined` si los pagos cubren el total (crit. 1 y 2).
+ */
+export const motivoSinFinalizar = (cobro: Cobro) =>
+  cobro.completo
+    ? undefined
+    : `Para finalizar, los pagos deben cubrir el total: falta cobrar ${formatoQuetzales(cobro.pendiente)}.`
