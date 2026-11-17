@@ -60,6 +60,11 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
+    public boolean asignarCliente(long ventaId, Long clienteId) {
+        return jdbc.update("UPDATE venta SET cliente_id = ? WHERE id = ? AND estado = 'EN_CURSO'", clienteId, ventaId) == 1;
+    }
+
+    @Override
     public Optional<Venta> buscarPorId(long id) {
         return unaVenta(SELECT_VENTA + "WHERE v.id = ?", id);
     }

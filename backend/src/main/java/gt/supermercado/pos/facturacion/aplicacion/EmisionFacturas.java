@@ -6,7 +6,7 @@ import gt.supermercado.pos.facturacion.dominio.DatosDte;
 import gt.supermercado.pos.facturacion.dominio.EstadoFactura;
 import gt.supermercado.pos.facturacion.dominio.Factura;
 import gt.supermercado.pos.facturacion.dominio.GeneradorDte;
-import gt.supermercado.pos.facturacion.dominio.Receptor;
+import gt.supermercado.pos.facturacion.dominio.ReceptorDeVenta;
 import gt.supermercado.pos.facturacion.dominio.RepositorioFacturas;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
 import gt.supermercado.pos.pagos.dominio.EmisionDeFactura;
@@ -29,7 +29,7 @@ import java.time.OffsetDateTime;
  *       a contingencia (HU-08.07) y la venta ya está guardada.</li>
  *   <li>Crit. 4: la factura queda asociada a su venta, y por ella a la caja, el turno y el usuario.</li>
  * </ul>
- * Mientras no exista EP-05 toda factura es a Consumidor Final.
+ * La factura va al cliente asignado a la venta (EP-05) o a Consumidor Final ({@link ReceptorDeVenta}).
  */
 @Service
 public class EmisionFacturas implements EmisionDeFactura {
@@ -43,13 +43,15 @@ public class EmisionFacturas implements EmisionDeFactura {
     private final RepositorioFacturas facturas;
     private final CertificadorFel certificador;
     private final GestionConexionFel conexion;
+    private final ReceptorDeVenta receptores;
 
     public EmisionFacturas(GeneracionDte generacion, RepositorioFacturas facturas, CertificadorFel certificador,
-                           GestionConexionFel conexion) {
+                           GestionConexionFel conexion, ReceptorDeVenta receptores) {
         this.generacion = generacion;
         this.facturas = facturas;
         this.certificador = certificador;
         this.conexion = conexion;
+        this.receptores = receptores;
     }
 
     /**
@@ -60,7 +62,7 @@ public class EmisionFacturas implements EmisionDeFactura {
     @Override
     @Transactional
     public void emitir(Venta venta) {
-        DatosDte datos = generacion.datos(venta, Receptor.consumidorFinal(), OffsetDateTime.now());
+        DatosDte datos = generacion.datos(venta, receptores.de(venta.id()), OffsetDateTime.now());
         facturas.registrar(datos, GeneradorDte.generar(datos));
     }
 

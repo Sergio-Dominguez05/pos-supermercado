@@ -36,6 +36,8 @@ public enum AccionSensible {
     VENTA_CANCELADA(Categoria.VENTAS, "ventas"),
     /** El cajero finaliza el cobro: la venta queda registrada con sus pagos (HU-07.08). */
     VENTA_FINALIZADA(Categoria.VENTAS, "pagos"),
+    /** HU-05.05 crit. 4: un cliente nuevo, registrado a mano o con el nombre que dio el certificador (HU-05.04). */
+    CLIENTE_REGISTRADO(Categoria.VENTAS, "clientes"),
 
     // Facturación
     /** Pendiente: HU-08.10. */

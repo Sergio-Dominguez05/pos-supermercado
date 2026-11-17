@@ -38,7 +38,7 @@ class CatalogoAccionesSensiblesTest {
             entry(CATALOGO_CARGADO, "HU-03.05"));
 
     private static final Set<String> MODULOS = Set.of(
-            "seguridad", "catalogo", "ventas", "pagos", "facturacion", "caja", "configuracion");
+            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion");
 
     @Test
     void elCatalogoTieneTodosLosEventosDelCriterio1() {
