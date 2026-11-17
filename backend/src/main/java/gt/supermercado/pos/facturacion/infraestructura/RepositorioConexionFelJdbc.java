@@ -23,21 +23,24 @@ class RepositorioConexionFelJdbc implements RepositorioConexionFel {
         return jdbc.query("SELECT * FROM config_fel WHERE id = 1", (rs, fila) -> new ConfiguracionFel(
                 rs.getString("certificador"), rs.getString("url_servicio"), rs.getString("usuario"),
                 AmbienteFel.valueOf(rs.getString("ambiente")), rs.getInt("timeout_ms"),
-                rs.getObject("modificado_en", OffsetDateTime.class), rs.getBytes("secreto_cifrado")))
+                rs.getObject("modificado_en", OffsetDateTime.class), rs.getBytes("secreto_cifrado"),
+                rs.getString("nit_certificador")))
                 .stream().findFirst();
     }
 
     @Override
-    public void guardar(String certificador, String urlServicio, String usuario, byte[] secretoCifrado,
-                        AmbienteFel ambiente, int timeoutMs, long usuarioId) {
+    public void guardar(String certificador, String nitCertificador, String urlServicio, String usuario,
+                        byte[] secretoCifrado, AmbienteFel ambiente, int timeoutMs, long usuarioId) {
         jdbc.update("""
-                INSERT INTO config_fel (id, certificador, url_servicio, usuario, secreto_cifrado, ambiente, timeout_ms,
-                                        modificado_por)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO config_fel (id, certificador, nit_certificador, url_servicio, usuario, secreto_cifrado,
+                                        ambiente, timeout_ms, modificado_por)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE SET certificador = EXCLUDED.certificador,
+                    nit_certificador = EXCLUDED.nit_certificador,
                     url_servicio = EXCLUDED.url_servicio, usuario = EXCLUDED.usuario,
                     secreto_cifrado = EXCLUDED.secreto_cifrado, ambiente = EXCLUDED.ambiente,
                     timeout_ms = EXCLUDED.timeout_ms, modificado_por = EXCLUDED.modificado_por, modificado_en = now()""",
-                certificador, urlServicio, usuario, secretoCifrado, ambiente.name(), timeoutMs, usuarioId);
+                certificador, nitCertificador, urlServicio, usuario, secretoCifrado, ambiente.name(), timeoutMs,
+                usuarioId);
     }
 }

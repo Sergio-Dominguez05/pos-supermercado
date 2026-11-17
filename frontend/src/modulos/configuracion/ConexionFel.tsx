@@ -53,6 +53,7 @@ function CargaConexionFel() {
 export function FormularioConexionFel({ guardada }: { guardada: ConexionFel }) {
   const clienteConsultas = useQueryClient()
   const [certificador, setCertificador] = useState(guardada.certificador ?? '')
+  const [nitCertificador, setNitCertificador] = useState(guardada.nitCertificador ?? '')
   const [urlServicio, setUrlServicio] = useState(guardada.urlServicio ?? 'https://')
   const [usuario, setUsuario] = useState(guardada.usuario ?? '')
   const [secreto, setSecreto] = useState('')
@@ -62,6 +63,7 @@ export function FormularioConexionFel({ guardada }: { guardada: ConexionFel }) {
 
   const datos = (confirmarProduccion?: boolean): DatosConexionFel => ({
     certificador,
+    nitCertificador,
     urlServicio,
     usuario,
     secreto,
@@ -110,6 +112,17 @@ export function FormularioConexionFel({ guardada }: { guardada: ConexionFel }) {
           value={certificador}
           onChange={(evento) => setCertificador(evento.target.value)}
         />
+      </label>
+      <label>
+        NIT del certificador (opcional)
+        <input
+          name="nitCertificador"
+          maxLength={20}
+          autoComplete="off"
+          value={nitCertificador}
+          onChange={(evento) => setNitCertificador(evento.target.value)}
+        />
+        <small>Aparece en la factura impresa junto al nombre del certificador.</small>
       </label>
       <label>
         Dirección del servicio

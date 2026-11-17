@@ -9,12 +9,12 @@ describe('cajas (HU-12.05)', () => {
   it('crea la caja con un POST y sus datos en el cuerpo', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"id":1}', { status: 201 })))
 
-    await crearCaja({ nombre: 'Caja 1', serieFel: 'A01' })
+    await crearCaja({ nombre: 'Caja 1', serieFel: 'A01', impresoraId: 7 })
 
     const [url, opciones] = vi.mocked(fetch).mock.calls[0]
     expect(url).toBe('/api/cajas')
     expect(opciones?.method).toBe('POST')
-    expect(JSON.parse(opciones?.body as string)).toEqual({ nombre: 'Caja 1', serieFel: 'A01' })
+    expect(JSON.parse(opciones?.body as string)).toEqual({ nombre: 'Caja 1', serieFel: 'A01', impresoraId: 7 })
   })
 
   it('vincular el equipo es un POST con la cookie de sesión; el token no pasa por el frontend', async () => {

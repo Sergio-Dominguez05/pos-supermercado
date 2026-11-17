@@ -32,17 +32,17 @@ public class ConexionFelController {
     }
 
     /** La conexión tal como se muestra: {@code secretoGuardado} dice si hay llave, nunca cuál es (HU-12.15 crit. 2). */
-    public record RespuestaConexionFel(boolean configurada, String certificador, String urlServicio, String usuario,
-                                       boolean secretoGuardado, AmbienteFel ambiente, Integer timeoutMs,
-                                       OffsetDateTime modificadoEn) {
+    public record RespuestaConexionFel(boolean configurada, String certificador, String nitCertificador,
+                                       String urlServicio, String usuario, boolean secretoGuardado,
+                                       AmbienteFel ambiente, Integer timeoutMs, OffsetDateTime modificadoEn) {
 
         static RespuestaConexionFel de(ConfiguracionFel config) {
-            return new RespuestaConexionFel(true, config.certificador(), config.urlServicio(), config.usuario(), true,
-                    config.ambiente(), config.timeoutMs(), config.modificadoEn());
+            return new RespuestaConexionFel(true, config.certificador(), config.nitCertificador(), config.urlServicio(),
+                    config.usuario(), true, config.ambiente(), config.timeoutMs(), config.modificadoEn());
         }
 
         static RespuestaConexionFel sinConfigurar() {
-            return new RespuestaConexionFel(false, null, null, null, false, null, null, null);
+            return new RespuestaConexionFel(false, null, null, null, null, false, null, null, null);
         }
     }
 

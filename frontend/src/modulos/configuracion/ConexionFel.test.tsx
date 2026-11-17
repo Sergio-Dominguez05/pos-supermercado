@@ -18,9 +18,11 @@ import { avisoConexionGuardada, CONFIRMACION_PRODUCCION, segundosAMs, segundosVa
 const ADMIN: Partial<UsuarioSesion> = { rol: 'ADMIN', permisos: ['CONFIGURACION_MODIFICAR'] }
 const SUPERVISOR: Partial<UsuarioSesion> = { rol: 'SUPERVISOR', permisos: ['FACTURA_ANULAR'] }
 
-const SIN_CONFIGURAR: ConexionFel = { configurada: false, certificador: null, urlServicio: null, usuario: null,
+const SIN_CONFIGURAR: ConexionFel = { configurada: false, certificador: null, nitCertificador: null,
+  urlServicio: null, usuario: null,
   secretoGuardado: false, ambiente: null, timeoutMs: null, modificadoEn: null }
-const GUARDADA: ConexionFel = { configurada: true, certificador: 'Certificador S.A.', urlServicio: 'https://fel.test/api',
+const GUARDADA: ConexionFel = { configurada: true, certificador: 'Certificador S.A.', nitCertificador: '12345678',
+  urlServicio: 'https://fel.test/api',
   usuario: 'usuario-fel', secretoGuardado: true, ambiente: 'PRUEBAS', timeoutMs: 8000,
   modificadoEn: '2026-11-17T03:00:00Z' }
 const DATOS: DatosConexionFel = { certificador: 'Certificador S.A.', urlServicio: 'https://fel.test/api',
@@ -45,6 +47,10 @@ describe('conexión con el certificador FEL (HU-08.01, HU-12.03 y HU-12.15)', ()
 
     for (const nombre of ['certificador', 'urlServicio', 'usuario', 'secreto', 'segundos'])
       expect(campo(html, nombre), nombre).not.toBe('')
+    // HU-08.05 crit. 1: el NIT del certificador va en la factura impresa; es opcional.
+    expect(campo(html, 'nitCertificador')).not.toContain('required')
+    expect(campo(renderizar(<FormularioConexionFel guardada={GUARDADA} />), 'nitCertificador'))
+      .toContain('value="12345678"')
     expect(html).toContain('value="PRUEBAS"')
     expect(html).toContain('value="PRODUCCION"')
     expect(campo(html, 'segundos')).toContain('value="8"')

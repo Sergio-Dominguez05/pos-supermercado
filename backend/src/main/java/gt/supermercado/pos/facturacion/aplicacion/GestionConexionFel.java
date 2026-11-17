@@ -5,6 +5,7 @@ import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.CifradorSecretos;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.compartido.dominio.Nit;
 import gt.supermercado.pos.facturacion.dominio.AmbienteFel;
 import gt.supermercado.pos.facturacion.dominio.CertificadorNoDisponibleException;
 import gt.supermercado.pos.facturacion.dominio.ConexionFel;
@@ -58,14 +59,16 @@ public class GestionConexionFel {
     /**
      * Lo que pide el Administrador. {@code secreto} vacío conserva el guardado; {@code timeoutMs} vacío usa 8 s.
      * {@code confirmarProduccion} es la confirmación explícita para pasar a producción (HU-12.03 crit. 3).
+     * {@code nitCertificador} es opcional y va en la factura impresa (HU-08.05 crit. 1).
      */
     public record SolicitudConexionFel(String certificador, String urlServicio, String usuario, String secreto,
-                                       AmbienteFel ambiente, Integer timeoutMs, Boolean confirmarProduccion) {
+                                       AmbienteFel ambiente, Integer timeoutMs, Boolean confirmarProduccion,
+                                       String nitCertificador) {
 
         @Override
         public String toString() {
-            return "SolicitudConexionFel[certificador=%s, urlServicio=%s, usuario=%s, ambiente=%s, timeoutMs=%s]"
-                    .formatted(certificador, urlServicio, usuario, ambiente, timeoutMs);
+            return ("SolicitudConexionFel[certificador=%s, nitCertificador=%s, urlServicio=%s, usuario=%s, ambiente=%s, "
+                    + "timeoutMs=%s]").formatted(certificador, nitCertificador, urlServicio, usuario, ambiente, timeoutMs);
         }
     }
 
@@ -101,8 +104,10 @@ public class GestionConexionFel {
     public ConfiguracionFel guardar(SolicitudConexionFel solicitud, SesionActiva sesion) {
         Optional<ConfiguracionFel> anterior = repositorio.configuracion();
         ConexionFel conexion;
+        String nitCertificador;
         try {
             conexion = validar(solicitud, anterior);
+            nitCertificador = nitCertificador(solicitud.nitCertificador());
             boolean pasaAProduccion = conexion.ambiente() == AmbienteFel.PRODUCCION
                     && anterior.map(ConfiguracionFel::ambiente).orElse(AmbienteFel.PRUEBAS) != AmbienteFel.PRODUCCION;
             if (pasaAProduccion && !Boolean.TRUE.equals(solicitud.confirmarProduccion())) {
@@ -118,9 +123,9 @@ public class GestionConexionFel {
         byte[] secretoCifrado = secretoNuevo
                 ? cifrador.cifrar(conexion.secreto())
                 : anterior.orElseThrow().secretoCifrado();
-        repositorio.guardar(conexion.certificador(), conexion.urlServicio(), conexion.usuario(), secretoCifrado,
-                conexion.ambiente(), conexion.timeoutMs(), sesion.usuarioId());
-        Map<String, Object> cambios = cambios(anterior.orElse(null), conexion, secretoNuevo);
+        repositorio.guardar(conexion.certificador(), nitCertificador, conexion.urlServicio(), conexion.usuario(),
+                secretoCifrado, conexion.ambiente(), conexion.timeoutMs(), sesion.usuarioId());
+        Map<String, Object> cambios = cambios(anterior.orElse(null), conexion, nitCertificador, secretoNuevo);
         bitacora.registrar(evento(sesion, true, "Conexión FEL %s: %s".formatted(
                 anterior.isPresent() ? "modificada" : "configurada", String.join(", ", cambios.keySet())), cambios));
         return repositorio.configuracion().orElseThrow();
@@ -152,6 +157,15 @@ public class GestionConexionFel {
         return new ConexionFel(nombre, url, usuario, secreto, solicitud.ambiente(), timeout);
     }
 
+    /** Opcional: vacío no se guarda; si se escribe, debe ser un NIT válido (módulo 11). */
+    private static String nitCertificador(String valor) {
+        if (vacio(valor)) {
+            return null;
+        }
+        return Nit.validar(valor).orElseThrow(() -> new NegocioException("NIT_CERTIFICADOR_INVALIDO",
+                "El NIT del certificador no es válido: revise los dígitos y el verificador."));
+    }
+
     /** HU-08.01 crit. 2: la comunicación con el certificador va siempre por un canal cifrado. */
     private static String urlSegura(String url) {
         try {
@@ -167,9 +181,15 @@ public class GestionConexionFel {
     }
 
     /** Los campos que cambiaron, con su valor anterior y el nuevo. De la llave solo se dice que cambió ({@link EventoBitacora#MODIFICADO}). */
-    private static Map<String, Object> cambios(ConfiguracionFel antes, ConexionFel despues, boolean secretoNuevo) {
+    private static Map<String, Object> cambios(ConfiguracionFel antes, ConexionFel despues, String nitCertificador,
+                                               boolean secretoNuevo) {
         Map<String, Object> cambios = new LinkedHashMap<>();
         cambio(cambios, "certificador", antes == null ? null : antes.certificador(), despues.certificador());
+        String nitAnterior = antes == null ? null : antes.nitCertificador();
+        if (!Objects.equals(nitAnterior, nitCertificador)) {
+            cambios.put("nitCertificador", EventoBitacora.cambio(nitAnterior == null ? "" : nitAnterior,
+                    nitCertificador == null ? "" : nitCertificador));
+        }
         cambio(cambios, "urlServicio", antes == null ? null : antes.urlServicio(), despues.urlServicio());
         cambio(cambios, "usuario", antes == null ? null : antes.usuario(), despues.usuario());
         cambio(cambios, "ambiente", antes == null ? null : antes.ambiente().name(), despues.ambiente().name());

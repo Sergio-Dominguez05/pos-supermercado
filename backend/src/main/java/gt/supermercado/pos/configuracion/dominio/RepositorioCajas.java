@@ -20,6 +20,9 @@ public interface RepositorioCajas {
 
     void actualizar(long id, String nombre, String serieFel);
 
+    /** HU-12.08: la impresora de la caja; {@code null} la quita. */
+    void asignarImpresora(long id, Long impresoraId);
+
     void cambiarActivo(long id, boolean activo);
 
     /** Reemplaza el equipo vinculado: el anterior, si había, deja de estar asociado a la caja. */

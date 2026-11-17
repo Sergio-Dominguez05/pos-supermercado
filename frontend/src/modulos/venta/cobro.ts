@@ -33,7 +33,11 @@ export const avisoFactura = (factura: FacturaDeVenta) => {
   return factura.motivo ?? 'La factura está pendiente de certificar.'
 }
 
-/** HU-07.08: qué venta se finalizó, cuánto se cobró y cómo quedó su factura; la pantalla ya está en la siguiente. */
+/**
+ * HU-07.08: qué venta se finalizó, cuánto se cobró, cómo quedó su factura y, si no se imprimió, por qué (HU-08.05
+ * crit. 6); la pantalla ya está en la siguiente.
+ */
 export const avisoVentaFinalizada = (venta: VentaFinalizada) =>
   `Venta N.º ${venta.numero} finalizada: ${venta.articulos} ${venta.articulos === 1 ? 'artículo' : 'artículos'}, ` +
-  `${formatoQuetzales(venta.pagado)} cobrados. ${avisoFactura(venta.factura)}`
+  `${formatoQuetzales(venta.pagado)} cobrados. ${avisoFactura(venta.factura)}` +
+  (venta.impresion.mensaje ? ` ${venta.impresion.mensaje}` : '')

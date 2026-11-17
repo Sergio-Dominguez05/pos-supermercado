@@ -14,8 +14,10 @@ class RepositorioCajasJdbc implements RepositorioCajas {
 
     // Nunca se selecciona el hash del token: solo si hay un equipo vinculado.
     private static final String SELECT_CAJA = """
-            SELECT id, nombre, serie_fel, activo, token_equipo_hash IS NOT NULL AS equipo_vinculado
-            FROM caja
+            SELECT c.id, c.nombre, c.serie_fel, c.activo, c.token_equipo_hash IS NOT NULL AS equipo_vinculado,
+                   c.impresora_id, i.nombre AS impresora_nombre
+            FROM caja c
+            LEFT JOIN impresora i ON i.id = c.impresora_id
             """;
 
     private static final RowMapper<Caja> CAJA = (rs, fila) -> new Caja(
@@ -23,7 +25,9 @@ class RepositorioCajasJdbc implements RepositorioCajas {
             rs.getString("nombre"),
             rs.getString("serie_fel"),
             rs.getBoolean("activo"),
-            rs.getBoolean("equipo_vinculado"));
+            rs.getBoolean("equipo_vinculado"),
+            rs.getObject("impresora_id", Long.class),
+            rs.getString("impresora_nombre"));
 
     /** V1 tiene una sola sucursal (HU-13 queda fuera); todas las cajas son de la Matriz. */
     private static final String SUCURSAL_MATRIZ = "(SELECT id FROM sucursal WHERE codigo = 'MATRIZ')";
@@ -36,17 +40,18 @@ class RepositorioCajasJdbc implements RepositorioCajas {
 
     @Override
     public List<Caja> listar() {
-        return jdbc.query(SELECT_CAJA + "ORDER BY lower(nombre)", CAJA);
+        return jdbc.query(SELECT_CAJA + "ORDER BY lower(c.nombre)", CAJA);
     }
 
     @Override
     public Optional<Caja> buscarPorId(long id) {
-        return jdbc.query(SELECT_CAJA + "WHERE id = ?", CAJA, id).stream().findFirst();
+        return jdbc.query(SELECT_CAJA + "WHERE c.id = ?", CAJA, id).stream().findFirst();
     }
 
     @Override
     public Optional<Caja> buscarPorEquipo(byte[] tokenHash) {
-        return jdbc.query(SELECT_CAJA + "WHERE token_equipo_hash = ?", CAJA, (Object) tokenHash).stream().findFirst();
+        return jdbc.query(SELECT_CAJA + "WHERE c.token_equipo_hash = ?", CAJA, (Object) tokenHash).stream()
+                .findFirst();
     }
 
     @Override
@@ -70,6 +75,11 @@ class RepositorioCajasJdbc implements RepositorioCajas {
     @Override
     public void actualizar(long id, String nombre, String serieFel) {
         jdbc.update("UPDATE caja SET nombre = ?, serie_fel = ? WHERE id = ?", nombre, serieFel, id);
+    }
+
+    @Override
+    public void asignarImpresora(long id, Long impresoraId) {
+        jdbc.update("UPDATE caja SET impresora_id = ? WHERE id = ?", impresoraId, id);
     }
 
     @Override

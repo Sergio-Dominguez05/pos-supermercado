@@ -1,4 +1,5 @@
 import type { Caja } from '../../api/cajas'
+import type { Impresora } from '../../api/impresoras'
 
 // Textos de la gestión de cajas (HU-12.05), separados de los componentes para probarlos sin renderizar.
 
@@ -51,3 +52,9 @@ export const DEPARTAMENTOS = [
   'Huehuetenango', 'Izabal', 'Jalapa', 'Jutiapa', 'Petén', 'Quetzaltenango', 'Quiché', 'Retalhuleu',
   'Sacatepéquez', 'San Marcos', 'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa',
 ] as const
+
+// Impresoras (HU-12.08).
+
+export const avisoImpresoraGuardada = (impresora: Impresora, nueva: boolean) =>
+  `Se ${nueva ? 'agregó' : 'actualizó'} la impresora ${impresora.nombre}.` +
+  (nueva ? ' Imprima una página de prueba y asígnela a su caja en Cajas.' : '')

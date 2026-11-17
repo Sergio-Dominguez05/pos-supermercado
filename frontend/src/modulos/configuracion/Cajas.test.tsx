@@ -10,9 +10,12 @@ import { FormularioCaja } from './FormularioCaja'
 import { ListaCajas } from './ListaCajas'
 import { avisoEquipoVinculado, confirmacionDesactivarCaja, confirmacionVincular } from './textos'
 
-const CAJA_1: Caja = { id: 1, nombre: 'Caja 1', serieFel: 'A01', activo: true, equipoVinculado: true }
-const CAJA_2: Caja = { id: 2, nombre: 'Caja 2', serieFel: null, activo: true, equipoVinculado: false }
-const CAJA_3: Caja = { id: 3, nombre: 'Caja 3', serieFel: null, activo: false, equipoVinculado: false }
+const CAJA_1: Caja = { id: 1, nombre: 'Caja 1', serieFel: 'A01', activo: true, equipoVinculado: true,
+  impresoraId: 7, impresoraNombre: 'Térmica caja 1' }
+const CAJA_2: Caja = { id: 2, nombre: 'Caja 2', serieFel: null, activo: true, equipoVinculado: false,
+  impresoraId: null, impresoraNombre: null }
+const CAJA_3: Caja = { id: 3, nombre: 'Caja 3', serieFel: null, activo: false, equipoVinculado: false,
+  impresoraId: null, impresoraNombre: null }
 
 const ADMIN: Partial<UsuarioSesion> = { rol: 'ADMIN', permisos: ['CONFIGURACION_MODIFICAR'] }
 
@@ -34,7 +37,9 @@ describe('lista de cajas (HU-12.05)', () => {
   it('muestra nombre, serie, estado y equipo de cada caja (crit. 2)', () => {
     const html = renderizar(<ListaCajas />)
 
-    for (const columna of ['Caja', 'Serie FEL', 'Estado', 'Equipo']) expect(html).toContain(`<th>${columna}</th>`)
+    for (const columna of ['Caja', 'Serie FEL', 'Impresora', 'Estado', 'Equipo'])
+      expect(html).toContain(`<th>${columna}</th>`)
+    expect(html).toContain('<td>Térmica caja 1</td>')
     expect(html).toContain('<td>A01</td>')
     expect(html).toContain('Inactiva')
     expect(html).toContain('Sin vincular')

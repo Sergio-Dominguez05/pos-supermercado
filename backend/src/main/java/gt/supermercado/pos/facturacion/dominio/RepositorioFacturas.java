@@ -13,6 +13,9 @@ public interface RepositorioFacturas {
 
     Optional<Factura> deLaVenta(long ventaId);
 
+    /** HU-08.05: la factura de la venta con la copia del receptor, del emisor y del establecimiento. */
+    Optional<FacturaImprimible> imprimible(long ventaId);
+
     /*
      * Los cambios de estado solo se aplican a una factura PENDIENTE o en CONTINGENCIA y devuelven false si ya no lo
      * estaba (otro proceso la certificó antes): HU-08.04 crit. 3, una factura certificada no se vuelve a facturar.

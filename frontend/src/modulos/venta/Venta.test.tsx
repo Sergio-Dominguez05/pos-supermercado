@@ -627,7 +627,7 @@ describe('finalizar el cobro (HU-07.08)', () => {
   const CERTIFICADA: FacturaDeVenta = { estado: 'CERTIFICADA', autorizacion: '5b2c1f0e-1a2b-4c3d-9e8f-001122334455',
     serie: 'A1B2C3D4', numero: '123456789', certificadaEn: '2026-11-17T10:00:00-06:00', motivo: null }
   const FINALIZADA: VentaFinalizada = { ventaId: 31, numero: 1042, articulos: 3, total: 15, pagado: 15, pagos: [PAGO],
-    factura: CERTIFICADA }
+    factura: CERTIFICADA, impresion: { impresa: true, mensaje: null } }
 
   it('con el pago completo, finalizar recibe el foco para confirmar con Enter (crit. 1)', () => {
     const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
@@ -652,6 +652,15 @@ describe('finalizar el cobro (HU-07.08)', () => {
       'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. Factura certificada: serie A1B2C3D4, N.º 123456789.',
     )
     expect(avisoVentaFinalizada({ ...FINALIZADA, articulos: 1 })).toContain('1 artículo, Q15.00 cobrados.')
+  })
+
+  it('si la factura no se imprimió, el aviso lo dice y que se puede reimprimir (HU-08.05 crit. 6)', () => {
+    const mensaje = 'No se pudo imprimir: La impresora 192.168.1.50:9100 no respondió. La factura es válida: se puede reimprimir.'
+
+    expect(avisoVentaFinalizada({ ...FINALIZADA, impresion: { impresa: false, mensaje } })).toBe(
+      'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. Factura certificada: serie A1B2C3D4, N.º 123456789. ' +
+        mensaje,
+    )
   })
 
   it('si la factura no se certificó, el aviso dice por qué (HU-08.03 crit. 3)', () => {

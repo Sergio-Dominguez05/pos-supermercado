@@ -11,6 +11,9 @@ spring:
 pos:
   fel:
     modo: ${POS_FEL_MODO}
+  impresion:
+    # red: imprime en la impresora de cada caja. simulado solo para pruebas del servidor.
+    modo: ${POS_IMPRESION_MODO:red}
   seguridad:
     cookie-segura: true
     admin-inicial:

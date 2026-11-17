@@ -9,6 +9,8 @@ export type AmbienteFel = 'PRUEBAS' | 'PRODUCCION'
 export interface ConexionFel {
   configurada: boolean
   certificador: string | null
+  /** HU-08.05 crit. 1: va en la factura impresa. */
+  nitCertificador: string | null
   urlServicio: string | null
   usuario: string | null
   secretoGuardado: boolean
@@ -20,6 +22,8 @@ export interface ConexionFel {
 /** Lo que envía el formulario. `secreto` vacío conserva la llave guardada. */
 export interface DatosConexionFel {
   certificador: string
+  /** Opcional: vacío no se guarda. */
+  nitCertificador?: string
   urlServicio: string
   usuario: string
   secreto: string

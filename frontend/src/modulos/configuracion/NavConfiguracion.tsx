@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 
 const SECCIONES = [
   { ruta: '/configuracion/cajas', etiqueta: 'Cajas' },
+  { ruta: '/configuracion/impresoras', etiqueta: 'Impresoras' },
   { ruta: '/configuracion/emisor', etiqueta: 'Emisor' },
   { ruta: '/configuracion/establecimiento', etiqueta: 'Establecimiento' },
   { ruta: '/configuracion/fel', etiqueta: 'Conexión FEL' },
