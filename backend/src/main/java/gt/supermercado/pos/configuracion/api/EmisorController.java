@@ -2,6 +2,7 @@ package gt.supermercado.pos.configuracion.api;
 
 import gt.supermercado.pos.configuracion.aplicacion.GestionEmisor;
 import gt.supermercado.pos.configuracion.aplicacion.GestionEmisor.SolicitudEmisor;
+import gt.supermercado.pos.configuracion.dominio.AfiliacionIva;
 import gt.supermercado.pos.configuracion.dominio.Emisor;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,15 +27,17 @@ public class EmisorController {
     }
 
     public record RespuestaEmisor(boolean configurado, String nit, String razonSocial, String nombreComercial,
-                                  String direccionFiscal, String telefono, String correo, OffsetDateTime modificadoEn) {
+                                  String direccionFiscal, String telefono, String correo, AfiliacionIva afiliacionIva,
+                                  OffsetDateTime modificadoEn) {
 
         static RespuestaEmisor de(Emisor emisor) {
             return new RespuestaEmisor(true, emisor.nit(), emisor.razonSocial(), emisor.nombreComercial(),
-                    emisor.direccionFiscal(), emisor.telefono(), emisor.correo(), emisor.modificadoEn());
+                    emisor.direccionFiscal(), emisor.telefono(), emisor.correo(), emisor.afiliacionIva(),
+                    emisor.modificadoEn());
         }
 
         static RespuestaEmisor sinConfigurar() {
-            return new RespuestaEmisor(false, null, null, null, null, null, null, null);
+            return new RespuestaEmisor(false, null, null, null, null, null, null, null, null);
         }
     }
 

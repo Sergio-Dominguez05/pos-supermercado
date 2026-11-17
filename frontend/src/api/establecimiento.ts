@@ -6,6 +6,10 @@ export interface Establecimiento {
   codigoSat: string | null
   nombre: string | null
   direccion: string | null
+  /** HU-08.02: la dirección desglosada que el DTE usa como dirección del emisor. */
+  codigoPostal: string | null
+  municipio: string | null
+  departamento: string | null
   modificadoEn: string | null
 }
 
@@ -13,6 +17,9 @@ export interface DatosEstablecimiento {
   codigoSat: string
   nombre: string
   direccion: string
+  codigoPostal: string
+  municipio: string
+  departamento: string
 }
 
 export const CLAVE_ESTABLECIMIENTO = ['configuracion', 'establecimiento'] as const

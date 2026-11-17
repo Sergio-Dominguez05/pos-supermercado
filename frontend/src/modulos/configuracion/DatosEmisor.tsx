@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { CLAVE_EMISOR, guardarEmisor, obtenerEmisor, type Emisor } from '../../api/emisor'
+import { CLAVE_EMISOR, guardarEmisor, obtenerEmisor, type AfiliacionIva, type Emisor } from '../../api/emisor'
 import { nitValido, normalizarNit } from '../clientes/nit'
 import { useSesion } from '../login/sesion'
 import { NavConfiguracion } from './NavConfiguracion'
@@ -45,11 +45,13 @@ export function FormularioEmisor({ guardado }: { guardado: Emisor }) {
   const [direccionFiscal, setDireccionFiscal] = useState(guardado.direccionFiscal ?? '')
   const [telefono, setTelefono] = useState(guardado.telefono ?? '')
   const [correo, setCorreo] = useState(guardado.correo ?? '')
+  const [afiliacionIva, setAfiliacionIva] = useState<AfiliacionIva | undefined>(guardado.afiliacionIva ?? undefined)
   const [aviso, setAviso] = useState<string>()
   const [nitRevisado, setNitRevisado] = useState(false)
 
   const guardadoMut = useMutation({
-    mutationFn: () => guardarEmisor({ nit, razonSocial, nombreComercial, direccionFiscal, telefono, correo }),
+    mutationFn: () =>
+      guardarEmisor({ nit, razonSocial, nombreComercial, direccionFiscal, telefono, correo, afiliacionIva }),
     onMutate: () => setAviso(undefined),
     onSuccess: (actualizado) => {
       clienteConsultas.setQueryData(CLAVE_EMISOR, actualizado)
@@ -148,6 +150,31 @@ export function FormularioEmisor({ guardado }: { guardado: Emisor }) {
           onChange={(evento) => setCorreo(evento.target.value)}
         />
       </label>
+      <fieldset>
+        <legend>Afiliación al IVA</legend>
+        <label>
+          <input
+            type="radio"
+            name="afiliacionIva"
+            value="GEN"
+            required
+            checked={afiliacionIva === 'GEN'}
+            onChange={() => setAfiliacionIva('GEN')}
+          />{' '}
+          Régimen General
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="afiliacionIva"
+            value="PEQ"
+            checked={afiliacionIva === 'PEQ'}
+            onChange={() => setAfiliacionIva('PEQ')}
+          />{' '}
+          Pequeño Contribuyente
+        </label>
+        <small>La pide el documento de la factura. Esta versión factura en el régimen General.</small>
+      </fieldset>
       <p className="pendiente">
         Estos datos aparecen en las facturas. Cada factura guarda una copia al emitirse: un cambio aquí no altera las
         facturas ya emitidas.

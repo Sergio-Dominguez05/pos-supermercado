@@ -11,5 +11,6 @@ public interface RepositorioEstablecimientos {
     Optional<Establecimiento> deLaSucursal(long sucursalId);
 
     /** Crea o reemplaza el establecimiento de la sucursal. Lanza si el código SAT ya es de otra sucursal. */
-    void guardar(long sucursalId, String codigoSat, String nombre, String direccion, long usuarioId);
+    void guardar(long sucursalId, String codigoSat, String nombre, String direccion, String codigoPostal,
+                 String municipio, String departamento, long usuarioId);
 }

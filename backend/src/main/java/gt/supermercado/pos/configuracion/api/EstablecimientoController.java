@@ -29,15 +29,17 @@ public class EstablecimientoController {
     }
 
     public record RespuestaEstablecimiento(boolean configurado, String codigoSat, String nombre, String direccion,
+                                           String codigoPostal, String municipio, String departamento,
                                            OffsetDateTime modificadoEn) {
 
         static RespuestaEstablecimiento de(Establecimiento establecimiento) {
             return new RespuestaEstablecimiento(true, establecimiento.codigoSat(), establecimiento.nombre(),
-                    establecimiento.direccion(), establecimiento.modificadoEn());
+                    establecimiento.direccion(), establecimiento.codigoPostal(), establecimiento.municipio(),
+                    establecimiento.departamento(), establecimiento.modificadoEn());
         }
 
         static RespuestaEstablecimiento sinConfigurar() {
-            return new RespuestaEstablecimiento(false, null, null, null, null);
+            return new RespuestaEstablecimiento(false, null, null, null, null, null, null, null);
         }
     }
 

@@ -1,5 +1,8 @@
 import { pedir } from './cliente'
 
+/** HU-08.02: afiliación al IVA que pide el DTE. GEN es el régimen General; PEQ, Pequeño Contribuyente. */
+export type AfiliacionIva = 'GEN' | 'PEQ'
+
 /** HU-12.01: los datos fiscales de la empresa que aparecen en las facturas. */
 export interface Emisor {
   configurado: boolean
@@ -9,6 +12,7 @@ export interface Emisor {
   direccionFiscal: string | null
   telefono: string | null
   correo: string | null
+  afiliacionIva: AfiliacionIva | null
   modificadoEn: string | null
 }
 
@@ -19,6 +23,7 @@ export interface DatosEmisor {
   direccionFiscal: string
   telefono: string
   correo: string
+  afiliacionIva?: AfiliacionIva
 }
 
 export const CLAVE_EMISOR = ['configuracion', 'emisor'] as const

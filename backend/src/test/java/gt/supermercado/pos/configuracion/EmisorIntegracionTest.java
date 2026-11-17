@@ -86,6 +86,10 @@ class EmisorIntegracionTest {
         assertThat(guardar(base.replace("\"2222-3333\"", "\"22\""), cookieAdmin).body()).contains("TELEFONO_INVALIDO");
         assertThat(guardar(base.replace("\"facturas@delvalle.com\"", "\"facturas\""), cookieAdmin).body())
                 .contains("CORREO_INVALIDO");
+        // HU-08.02: la afiliación al IVA es obligatoria, porque el DTE la pide.
+        assertThat(guardar(base.replace(",\"afiliacionIva\":\"GEN\"", ""), cookieAdmin).body())
+                .contains("AFILIACION_IVA_REQUERIDA");
+        assertThat(guardar(base, cookieAdmin).body()).contains("\"afiliacionIva\":\"GEN\"");
         // Teléfono y correo son opcionales.
         assertThat(guardar(base.replace("\"2222-3333\"", "null").replace("\"facturas@delvalle.com\"", "\"\""),
                 cookieAdmin).body()).contains("\"telefono\":null", "\"correo\":null");
@@ -124,7 +128,7 @@ class EmisorIntegracionTest {
         return """
                 {"nit":"%s","razonSocial":"%s","nombreComercial":"Súper del Valle",\
                 "direccionFiscal":"5a. avenida 10-20, zona 1, Guatemala","telefono":"2222-3333",\
-                "correo":"facturas@delvalle.com"}""".formatted(nit, razonSocial);
+                "correo":"facturas@delvalle.com","afiliacionIva":"GEN"}""".formatted(nit, razonSocial);
     }
 
     private HttpResponse<String> guardar(String cuerpo, String sesion) throws Exception {
