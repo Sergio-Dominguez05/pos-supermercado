@@ -1,6 +1,7 @@
 package gt.supermercado.pos.pagos;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.pagos.dominio.EmisionDeFactura;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,6 +23,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 
 /** HU-07.03 Cobrar con tarjeta, contra PostgreSQL real con las migraciones. */
 @Import(TestcontainersConfiguration.class)
@@ -40,6 +45,10 @@ class PagosIntegracionTest {
 
     @Autowired
     PasswordEncoder codificador;
+
+    /** La emisión real (provisional, sin factura hasta EP-08); una prueba la hace fallar (HU-07.08 crit. 4). */
+    @MockitoSpyBean
+    EmisionDeFactura emision;
 
     @Value("${local.server.port}")
     int puerto;
@@ -286,7 +295,110 @@ class PagosIntegracionTest {
         assertThat(pagar(cajero, pago("15.00")).body()).contains("\"pendiente\":0.00", "\"completo\":true");
     }
 
+    // HU-07.08 Finalizar el cobro
+
+    @Test
+    void alFinalizarLaVentaQuedaRegistradaConSusTotalesYSusPagos() throws Exception {   // crit. 1, 2 y 3
+        Cajero cajero = cajeroConVenta("5.00", 3);   // Q15.00
+        long pago = idDePago(pagar(cajero, pago("15.00")));
+
+        HttpResponse<String> respuesta = finalizar(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"articulos\":3", "\"total\":15.00", "\"pagado\":15.00",
+                "\"facturaEmitida\":false", "\"id\":" + pago);
+        Map<String, Object> venta = jdbc.queryForMap("""
+                SELECT estado, finalizada_en IS NOT NULL AS con_hora, subtotal::text AS subtotal, iva::text AS iva,
+                       total::text AS total
+                FROM venta WHERE usuario_id = ?""", cajero.usuarioId());
+        assertThat(venta).containsEntry("estado", "FINALIZADA").containsEntry("con_hora", true)
+                .containsEntry("subtotal", "13.39").containsEntry("iva", "1.61").containsEntry("total", "15.00");
+        // Crit. 2 y 3: el pago queda con la venta, el turno abierto (que lo suma al resumen) y el usuario.
+        Map<String, Object> asociado = jdbc.queryForMap("""
+                SELECT p.venta_id = v.id AS de_la_venta, p.turno_id = t.id AS del_turno, t.estado AS turno,
+                       t.caja_id = v.caja_id AS de_la_caja, p.usuario_id, p.eliminado_en IS NULL AS vigente
+                FROM pago p JOIN venta v ON v.id = p.venta_id JOIN turno t ON t.id = p.turno_id WHERE p.id = ?""", pago);
+        assertThat(asociado).containsEntry("de_la_venta", true).containsEntry("del_turno", true)
+                .containsEntry("turno", "ABIERTO").containsEntry("de_la_caja", true)
+                .containsEntry("usuario_id", cajero.usuarioId()).containsEntry("vigente", true);
+    }
+
+    @Test
+    void alTerminarLaCajaQuedaListaParaUnaNuevaVenta() throws Exception {   // crit. 5
+        Cajero cajero = cajeroConVenta("5.00", 1);
+        pagar(cajero, pago("5.00"));
+        String finalizada = finalizar(cajero).body();
+
+        assertThat(enviar("/api/ventas/actual/pagos", "GET", null, cajero.sesion()).body())
+                .contains("SIN_VENTA_EN_CURSO");
+        HttpResponse<String> nueva = enviar("/api/ventas", "POST", null, cajero.sesion());
+        assertThat(nueva.statusCode()).isEqualTo(200);
+        assertThat(nueva.body()).contains("\"estado\":\"EN_CURSO\"", "\"lineas\":[]");
+        assertThat(numero(nueva.body())).isGreaterThan(numero(finalizada));
+        // La venta finalizada ya no se toca: ni sus líneas ni sus pagos.
+        assertThat(finalizar(cajero).body()).contains("PAGO_INCOMPLETO");
+    }
+
+    @Test
+    void conElPagoIncompletoNoSeFinaliza() throws Exception {   // crit. 1 y HU-07.07
+        Cajero cajero = cajeroConVenta("5.00", 3);   // Q15.00
+        assertThat(finalizar(cajero).body()).contains("PAGO_INCOMPLETO");
+
+        pagar(cajero, pago("10.00"));
+        HttpResponse<String> respuesta = finalizar(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("PAGO_INCOMPLETO", "Falta cobrar Q5.00");
+        assertThat(estadoDeLaVenta(cajero)).isEqualTo("EN_CURSO");
+    }
+
+    @Test
+    void sinTurnoOSinVentaNoSeFinaliza() throws Exception {
+        assertThat(finalizar(cajeroEnCaja()).body()).contains("CAJA_CERRADA");
+        Cajero conTurno = cajeroConTurnoAbierto();
+        assertThat(finalizar(conTurno).body()).contains("SIN_VENTA_EN_CURSO");
+    }
+
+    @Test
+    void siFallaAlGuardarLaVentaNoQuedaAMediasYSePuedeReintentar() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConVenta("5.00", 2);
+        long pago = idDePago(pagar(cajero, pago("10.00")));
+        doThrow(new IllegalStateException("Falla simulada al emitir la factura")).when(emision).emitir(any());
+
+        assertThat(finalizar(cajero).statusCode()).isEqualTo(500);
+
+        Map<String, Object> venta = jdbc.queryForMap(
+                "SELECT estado, finalizada_en IS NULL AS sin_hora, total IS NULL AS sin_total FROM venta WHERE usuario_id = ?",
+                cajero.usuarioId());
+        assertThat(venta).containsEntry("estado", "EN_CURSO").containsEntry("sin_hora", true)
+                .containsEntry("sin_total", true);
+        assertThat(jdbc.queryForObject("SELECT eliminado_en IS NULL FROM pago WHERE id = ?", Boolean.class, pago))
+                .isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
+                Integer.class, cajero.usuarioId())).isZero();
+
+        doCallRealMethod().when(emision).emitir(any());
+        HttpResponse<String> reintento = finalizar(cajero);
+        assertThat(reintento.statusCode()).isEqualTo(200);
+        assertThat(estadoDeLaVenta(cajero)).isEqualTo("FINALIZADA");
+    }
+
     // Apoyo
+
+    private HttpResponse<String> finalizar(Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/finalizar", "POST", null, cajero.sesion());
+    }
+
+    private String estadoDeLaVenta(Cajero cajero) {
+        return jdbc.queryForObject("SELECT estado FROM venta WHERE usuario_id = ? ORDER BY id DESC LIMIT 1",
+                String.class, cajero.usuarioId());
+    }
+
+    private static long numero(String cuerpo) {
+        int inicio = cuerpo.indexOf("\"numero\":") + 9;
+        return Long.parseLong(cuerpo.substring(inicio, cuerpo.indexOf(',', inicio)));
+    }
 
     private HttpResponse<String> eliminarPago(long pago, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/pagos/" + pago, "DELETE", null, cajero.sesion());

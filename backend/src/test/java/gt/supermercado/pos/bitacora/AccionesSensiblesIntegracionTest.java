@@ -348,6 +348,32 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PAGO_TARJETA_ELIMINADO, false, id));   // ya estaba eliminado
     }
 
+    @Test
+    void finalizacionDeVentaExitosaYRechazada() throws Exception {   // HU-07.08
+        String nombre = "Caja fin " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        enviar("/api/turnos", "POST", null, sesion);
+        String codigo = "AF" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":11.20}".formatted(codigo),
+                cookieAdmin);
+        enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), sesion);
+        long venta = jdbc.queryForObject("SELECT id FROM venta WHERE usuario_id = ?", Long.class, id);
+
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/finalizar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_FINALIZADA, false, id));   // sin pago
+        enviar("/api/ventas/actual/pagos", "POST", "{\"tipoTarjeta\":\"DEBITO\",\"autorizacion\":\"123456\"}", sesion);
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/finalizar", "POST", null, sesion)))
+                .containsExactly(new Registro(VENTA_FINALIZADA, true, id));
+        assertThat(jdbc.queryForObject("""
+                SELECT entidad_id FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
+                Long.class, id)).isEqualTo(venta);
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

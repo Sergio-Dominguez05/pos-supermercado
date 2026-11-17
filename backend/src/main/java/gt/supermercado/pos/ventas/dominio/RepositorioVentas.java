@@ -1,6 +1,7 @@
 package gt.supermercado.pos.ventas.dominio;
 
 import gt.supermercado.pos.impuestos.dominio.LineaCalculada;
+import gt.supermercado.pos.impuestos.dominio.Totales;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,6 +25,12 @@ public interface RepositorioVentas {
      * curso, por ejemplo porque otra petición la canceló al mismo tiempo.
      */
     boolean cancelar(long ventaId);
+
+    /**
+     * Pasa la venta de {@code EN_CURSO} a {@code FINALIZADA} con la hora del servidor y fija sus totales (HU-07.08).
+     * Devuelve {@code false} si ya no estaba en curso.
+     */
+    boolean finalizar(long ventaId, Totales totales);
 
     /**
      * Pasa la venta de {@code EN_CURSO} a {@code SUSPENDIDA} con la hora del servidor (HU-06.12), con todas sus líneas.

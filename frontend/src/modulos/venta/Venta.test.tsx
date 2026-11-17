@@ -14,7 +14,16 @@ import {
   suspenderVenta,
   type Venta as DatosVenta,
 } from '../../api/ventas'
-import { CLAVE_COBRO, eliminarPago, obtenerCobro, registrarPago, type Cobro, type Pago } from '../../api/pagos'
+import {
+  CLAVE_COBRO,
+  eliminarPago,
+  finalizarCobro,
+  obtenerCobro,
+  registrarPago,
+  type Cobro,
+  type Pago,
+  type VentaFinalizada,
+} from '../../api/pagos'
 import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
@@ -29,7 +38,14 @@ import {
   formatoDesglose,
   rotuloSuspendidas,
 } from './textos'
-import { confirmacionEliminarPago, descripcionPago, montoValido, motivoSinFinalizar, soloUltimos4 } from './cobro'
+import {
+  avisoVentaFinalizada,
+  confirmacionEliminarPago,
+  descripcionPago,
+  montoValido,
+  motivoSinFinalizar,
+  soloUltimos4,
+} from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
@@ -599,6 +615,42 @@ describe('validar que el pago cubra el total (HU-07.07)', () => {
       'Para finalizar, los pagos deben cubrir el total: falta cobrar Q26.20.',
     )
     expect(motivoSinFinalizar({ ...COBRO_SIN_PAGOS, pendiente: 0, completo: true })).toBeUndefined()
+  })
+})
+
+describe('finalizar el cobro (HU-07.08)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const FINALIZADA: VentaFinalizada = { ventaId: 31, numero: 1042, articulos: 3, total: 15, pagado: 15, pagos: [PAGO],
+    facturaEmitida: false }
+
+  it('con el pago completo, finalizar recibe el foco para confirmar con Enter (crit. 1)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, completo: true, pagos: [PAGO] })
+    const boton = html.match(/<button[^>]*data-control="finalizar-cobro"[^>]*>[^<]*/)?.[0] ?? ''
+
+    expect(boton).toMatch(/autofocus=""/i)
+    expect(boton).toContain('>Finalizar cobro')
+    expect(html).not.toContain('HU-07.08 (#63)')
+  })
+
+  it('finalizar es un POST sobre la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(FINALIZADA), { status: 200 })))
+
+    await expect(finalizarCobro()).resolves.toMatchObject({ numero: 1042, facturaEmitida: false })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/finalizar')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('avisa qué venta se finalizó y si se emitió la factura (crit. 1 y 5)', () => {
+    expect(avisoVentaFinalizada(FINALIZADA)).toBe(
+      'Venta N.º 1042 finalizada: 3 artículos, Q15.00 cobrados. ' +
+        'La factura se emitirá cuando esté disponible la facturación electrónica (EP-08).',
+    )
+    expect(avisoVentaFinalizada({ ...FINALIZADA, articulos: 1, facturaEmitida: true })).toBe(
+      'Venta N.º 1042 finalizada: 1 artículo, Q15.00 cobrados. Factura emitida.',
+    )
   })
 })
 

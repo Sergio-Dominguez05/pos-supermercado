@@ -34,6 +34,8 @@ public enum AccionSensible {
     LINEA_VENTA_ELIMINADA(Categoria.VENTAS, "ventas"),
     /** Pendiente: HU-06.14. */
     VENTA_CANCELADA(Categoria.VENTAS, "ventas"),
+    /** El cajero finaliza el cobro: la venta queda registrada con sus pagos (HU-07.08). */
+    VENTA_FINALIZADA(Categoria.VENTAS, "pagos"),
 
     // Facturación
     /** Pendiente: HU-08.10. */

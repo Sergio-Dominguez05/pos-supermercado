@@ -51,3 +51,20 @@ export const registrarPago = (solicitud: SolicitudPago) =>
  */
 export const eliminarPago = (pagoId: number) =>
   pedir<Cobro>(`/api/ventas/actual/pagos/${pagoId}`, { method: 'DELETE' })
+
+/** HU-07.08: la venta finalizada, con lo cobrado y si se emitió la factura (EP-08). */
+export interface VentaFinalizada {
+  ventaId: number
+  numero: number
+  articulos: number
+  total: number
+  pagado: number
+  pagos: Pago[]
+  facturaEmitida: boolean
+}
+
+/**
+ * HU-07.08: finaliza el cobro de la venta en curso: queda registrada con sus pagos y se emite la factura. Responde 422
+ * `PAGO_INCOMPLETO` si los pagos no cubren el total. Si falla, la venta sigue en curso y se puede reintentar.
+ */
+export const finalizarCobro = () => pedir<VentaFinalizada>('/api/ventas/actual/finalizar', { method: 'POST' })

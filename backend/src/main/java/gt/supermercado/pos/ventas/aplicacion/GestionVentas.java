@@ -319,6 +319,19 @@ public class GestionVentas {
     }
 
     /**
+     * HU-07.08: finaliza la venta ya cobrada y fija su subtotal, IVA y total. Solo la llama el módulo {@code pagos}
+     * después de bloquear la venta y validar que los pagos cubren el total (HU-07.07), en la misma transacción. Al
+     * terminar, la caja queda lista para otra venta (crit. 5): el turno ya no tiene venta en curso.
+     */
+    @Transactional
+    public Venta finalizarCobrada(Venta venta) {
+        if (!ventas.finalizar(venta.id(), venta.totales())) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        return ventas.buscarPorId(venta.id()).orElseThrow();
+    }
+
+    /**
      * La venta en curso del turno, bloqueada hasta el final de la transacción. La usa el módulo {@code pagos} para
      * eliminar un pago (HU-07.06) sin que la venta cambie mientras tanto; debe correr en la misma transacción.
      */
