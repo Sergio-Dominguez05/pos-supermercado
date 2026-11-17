@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** Sprint 2 completado (`v0.3.0`) — catálogo de productos, cálculo de IVA, apertura de turno de caja y, como adelanto del Sprint 3, la pantalla de venta (agregar productos, totales y cancelar). Aún no incluye clientes, cobro ni certificación FEL real.
+> **Estado:** pantalla de venta completa (`v0.4.0`) — cantidades, quitar líneas, ventas en espera, atajos de teclado y paso al cobro, sobre el catálogo, el IVA y la apertura de caja del Sprint 2. Aún no incluye clientes, registro del pago, cierre de caja ni certificación FEL real.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -33,6 +33,7 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | IVA | IVA del 12 % incluido en el precio; base e IVA con 6 decimales por línea y redondeo HALF_UP solo en los totales ([reglas](docs/arquitectura/calculo-iva.md)) | HU-04.01 a 04.05 | `v0.3.0` |
 | Caja | Abrir el turno en la caja del equipo (uno por caja y por cajero); sin turno abierto no se vende | HU-09.01 a 09.03 | `v0.3.0` |
 | Venta | Pantalla de venta con número interno; agregar con lector, código escrito o búsqueda por descripción (F2); el precio de cada línea se mantiene aunque cambie en el catálogo; totales y desglose de IVA calculados por el servidor; cancelar con confirmación | HU-06.01 a 06.03, 06.09, 06.14 | `v0.3.0` (adelanto del Sprint 3) |
+| Venta | Totales siempre visibles; cantidad con `6*` antes del código o editando la línea, con confirmación por encima del límite configurado; quitar líneas (quedan en la bitácora, sin borrarse); dejar ventas en espera y retomarlas; atajos de teclado con ayuda (F1); pasar al cobro con el total (el registro del pago con tarjeta llega con EP-07) | HU-06.04, 06.07, 06.08, 06.12, 06.13, 06.15, 06.17 | `v0.4.0` |
 
 Las reglas que dependen de módulos futuros (clientes, cobro, facturación, cierre de caja) quedan anotadas en sus Issues y se completan en su sprint.
 
@@ -164,7 +165,7 @@ flowchart TB
 
     subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
         direction LR
-        S3["🔄 Sprint 3<br/>Pantalla de venta y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+        S3["🔄 Sprint 3 · v0.4.0<br/>Pantalla de venta ✅ y clientes<br/>18 HU · Alta"] --> S4["Sprint 4<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
     end
 
     subgraph MEJORAS["Etapa 3 · Reportes y operación"]
@@ -232,4 +233,4 @@ Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](
 
 ---
 
-**Proyecto académico · Guatemala · Entrega del Sprint 2 (`v0.3.0`)**
+**Proyecto académico · Guatemala · Pantalla de venta del Sprint 3 (`v0.4.0`)**
