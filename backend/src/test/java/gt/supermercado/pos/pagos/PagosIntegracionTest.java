@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** HU-07.03 Cobrar con tarjeta, contra PostgreSQL real con las migraciones. */
 @Import(TestcontainersConfiguration.class)
@@ -186,7 +187,102 @@ class PagosIntegracionTest {
         assertThat(enviar("/api/ventas/actual/cobro", "POST", null, cajero.sesion()).statusCode()).isEqualTo(200);
     }
 
+    // HU-07.06 Eliminar un pago antes de finalizar
+
+    @Test
+    void alEliminarElPagoSeRecalculaElPendienteYLaVentaVuelveAModificarse() throws Exception {   // crit. 1 y 2
+        Cajero cajero = cajeroConVenta("5.00", 3);   // Q15.00
+        long pago = idDePago(pagar(cajero, pago("10.00")));
+
+        HttpResponse<String> respuesta = eliminarPago(pago, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"total\":15.00", "\"pagado\":0.00", "\"pendiente\":15.00", "\"pagos\":[]");
+        // La venta ya no tiene pago: se puede modificar y volver a cobrar.
+        assertThat(enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(cajero.codigo()),
+                cajero.sesion()).body()).contains("\"total\":20.00");
+        assertThat(pagar(cajero, pago("20.00")).body()).contains("\"pendiente\":0.00");
+    }
+
+    @Test
+    void elPagoEliminadoNoSeBorraYQuedaEnLaBitacora() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConVenta("11.20", 1);
+        long pago = idDePago(pagar(cajero, "{\"tipoTarjeta\":\"CREDITO\",\"autorizacion\":\"A1B2C3\",\"ultimos4\":\"4321\"}"));
+
+        eliminarPago(pago, cajero);
+
+        Map<String, Object> fila = jdbc.queryForMap(
+                "SELECT monto::text AS monto, eliminado_en IS NOT NULL AS eliminado, eliminado_por FROM pago WHERE id = ?",
+                pago);
+        assertThat(fila).containsEntry("monto", "11.20").containsEntry("eliminado", true)
+                .containsEntry("eliminado_por", cajero.usuarioId());
+        Map<String, Object> registro = jdbc.queryForMap("""
+                SELECT usuario_id, exitoso, descripcion, cambios::text AS cambios FROM bitacora
+                WHERE accion = 'PAGO_TARJETA_ELIMINADO' AND entidad = 'pago' AND entidad_id = ? AND exitoso""", pago);
+        assertThat(registro).containsEntry("usuario_id", cajero.usuarioId());
+        assertThat((String) registro.get("descripcion")).contains("crédito ••••4321", "Q11.20");
+        assertThat((String) registro.get("cambios")).contains("\"ultimos4\": \"4321\"", "\"autorizacion\": \"A1B2C3\"",
+                "\"monto\": 11.20", "\"tipoTarjeta\": \"CREDITO\"");
+    }
+
+    @Test
+    void soloSeEliminanPagosVigentesDeLaVentaEnCursoPropia() throws Exception {   // crit. 1
+        Cajero ana = cajeroConVenta("5.00", 1);
+        Cajero beto = cajeroConVenta("5.00", 1);
+        long deAna = idDePago(pagar(ana, pago("5.00")));
+
+        HttpResponse<String> ajeno = eliminarPago(deAna, beto);
+        assertThat(ajeno.statusCode()).isEqualTo(404);
+        assertThat(ajeno.body()).contains("PAGO_NO_ENCONTRADO");
+        assertThat(pagosDe(ana)).isEqualTo(1);
+
+        eliminarPago(deAna, ana);
+        assertThat(eliminarPago(deAna, ana).statusCode()).isEqualTo(404);   // ya eliminado
+        assertThat(eliminarPago(999_999_999L, ana).statusCode()).isEqualTo(404);
+    }
+
+    @Test
+    void losPagosDeUnaVentaFinalizadaNoSeModifican() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConVenta("5.00", 1);
+        long pago = idDePago(pagar(cajero, pago("5.00")));
+        // Finalizar el cobro llega con HU-07.08 (#63); aquí se deja la venta como la dejará esa historia.
+        jdbc.update("UPDATE venta SET estado = 'FINALIZADA', finalizada_en = now() WHERE usuario_id = ? AND estado = 'EN_CURSO'",
+                cajero.usuarioId());
+
+        HttpResponse<String> respuesta = eliminarPago(pago, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("SIN_VENTA_EN_CURSO");
+        // La base lo impide aunque se intente directamente (trigger de V20).
+        assertThatThrownBy(() -> jdbc.update("UPDATE pago SET eliminado_en = now(), eliminado_por = ? WHERE id = ?",
+                cajero.usuarioId(), pago)).hasMessageContaining("ya no está en curso");
+        assertThat(jdbc.queryForObject("SELECT eliminado_en IS NULL FROM pago WHERE id = ?", Boolean.class, pago))
+                .isTrue();
+    }
+
+    @Test
+    void unPagoEliminadoNoSeVuelveAModificar() throws Exception {
+        Cajero cajero = cajeroConVenta("5.00", 1);
+        long pago = idDePago(pagar(cajero, pago("5.00")));
+        eliminarPago(pago, cajero);
+
+        assertThatThrownBy(() -> jdbc.update("UPDATE pago SET eliminado_en = NULL, eliminado_por = NULL WHERE id = ?",
+                pago)).hasMessageContaining("fue eliminado");
+    }
+
     // Apoyo
+
+    private HttpResponse<String> eliminarPago(long pago, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/pagos/" + pago, "DELETE", null, cajero.sesion());
+    }
+
+    /** El id del último pago de la respuesta del cobro. */
+    private static long idDePago(HttpResponse<String> cobro) {
+        assertThat(cobro.statusCode()).isEqualTo(200);
+        String cuerpo = cobro.body();
+        int inicio = cuerpo.lastIndexOf("{\"id\":") + 6;
+        return Long.parseLong(cuerpo.substring(inicio, cuerpo.indexOf(',', inicio)));
+    }
 
     private static String pago(String monto) {
         return "{\"tipoTarjeta\":\"DEBITO\",\"autorizacion\":\"123456\",\"monto\":%s}".formatted(monto);

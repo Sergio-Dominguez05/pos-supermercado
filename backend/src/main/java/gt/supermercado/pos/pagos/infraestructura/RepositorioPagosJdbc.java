@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 class RepositorioPagosJdbc implements RepositorioPagos {
@@ -42,12 +43,27 @@ class RepositorioPagosJdbc implements RepositorioPagos {
 
     @Override
     public List<Pago> deLaVenta(long ventaId) {
-        return jdbc.query("SELECT * FROM pago WHERE venta_id = ? ORDER BY id", PAGO, ventaId);
+        return jdbc.query("SELECT * FROM pago WHERE venta_id = ? AND eliminado_en IS NULL ORDER BY id", PAGO,
+                ventaId);
     }
 
     @Override
     public boolean tienePagos(long ventaId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM pago WHERE venta_id = ?)", Boolean.class, ventaId));
+                "SELECT EXISTS (SELECT 1 FROM pago WHERE venta_id = ? AND eliminado_en IS NULL)", Boolean.class,
+                ventaId));
+    }
+
+    @Override
+    public Optional<Pago> deLaVenta(long ventaId, long pagoId) {
+        return jdbc.query("SELECT * FROM pago WHERE venta_id = ? AND id = ? AND eliminado_en IS NULL", PAGO, ventaId,
+                pagoId).stream().findFirst();
+    }
+
+    @Override
+    public boolean eliminar(long pagoId, long usuarioId) {
+        return jdbc.update("""
+                UPDATE pago SET eliminado_en = now(), eliminado_por = ?
+                WHERE id = ? AND eliminado_en IS NULL""", usuarioId, pagoId) == 1;
     }
 }

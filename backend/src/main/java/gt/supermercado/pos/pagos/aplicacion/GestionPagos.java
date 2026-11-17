@@ -1,8 +1,12 @@
 package gt.supermercado.pos.pagos.aplicacion;
 
+import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
+import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.caja.aplicacion.GestionTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
 import gt.supermercado.pos.pagos.dominio.Pago;
 import gt.supermercado.pos.pagos.dominio.RepositorioPagos;
 import gt.supermercado.pos.pagos.dominio.TipoTarjeta;
@@ -13,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -32,11 +38,13 @@ public class GestionPagos {
     private final RepositorioPagos pagos;
     private final GestionTurnos turnos;
     private final GestionVentas ventas;
+    private final Bitacora bitacora;
 
-    public GestionPagos(RepositorioPagos pagos, GestionTurnos turnos, GestionVentas ventas) {
+    public GestionPagos(RepositorioPagos pagos, GestionTurnos turnos, GestionVentas ventas, Bitacora bitacora) {
         this.pagos = pagos;
         this.turnos = turnos;
         this.ventas = ventas;
+        this.bitacora = bitacora;
     }
 
     /** Lo que pide el cajero al registrar el pago. {@code monto} vacío es el total pendiente (crit. 2). */
@@ -92,6 +100,60 @@ public class GestionPagos {
         pagos.registrar(venta.id(), turno.id(), sesion.usuarioId(), solicitud.tipoTarjeta(), autorizacion, ultimos4,
                 monto.setScale(2));
         return estado(venta, turno);
+    }
+
+    /**
+     * HU-07.06: quita un pago registrado por error.
+     * <ul>
+     *   <li>Crit. 1: cualquier pago de la venta en curso, mientras no se haya finalizado.</li>
+     *   <li>Crit. 2: devuelve el cobro con el pendiente recalculado; la venta vuelve a poder modificarse.</li>
+     *   <li>Crit. 3: los pagos de una venta finalizada no son de la venta en curso (404); la base de datos además
+     *       impide modificarlos (trigger de V20). Para corregirla hay que anular la factura (EP-08).</li>
+     *   <li>Crit. 4: la eliminación queda en la bitácora con la venta, el tipo, los últimos 4, la autorización y el
+     *       monto; también el intento rechazado (HU-11.01 crit. 3).</li>
+     * </ul>
+     * El pago no se borra: se marca como eliminado (regla de V1).
+     */
+    @Transactional
+    public EstadoCobro eliminar(long pagoId, SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        Venta venta;
+        try {
+            venta = ventas.enCursoBloqueada(turno);
+        } catch (NegocioException error) {
+            throw rechazarEliminacion(sesion, pagoId, error);
+        }
+        Pago pago = pagos.deLaVenta(venta.id(), pagoId).orElseThrow(() -> rechazarEliminacion(sesion, pagoId,
+                new RecursoNoEncontradoException("PAGO_NO_ENCONTRADO", "El pago no está en la venta en curso.")));
+        pagos.eliminar(pago.id(), sesion.usuarioId());
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.PAGO_TARJETA_ELIMINADO, true, "Pago con tarjeta eliminado de la venta N.º %d: %s, Q%s"
+                .formatted(venta.numero(), tarjeta(pago), pago.monto().setScale(2)), "pago", pago.id(),
+                detalle(venta, pago)));
+        return estado(venta, turno);
+    }
+
+    /** El intento rechazado también queda en la bitácora (HU-11.01 crit. 3). */
+    private NegocioException rechazarEliminacion(SesionActiva sesion, long pagoId, NegocioException error) {
+        bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.PAGO_TARJETA_ELIMINADO, false, "Eliminación de pago rechazada: " + error.getMessage(),
+                "pago", pagoId, null));
+        return error;
+    }
+
+    private static String tarjeta(Pago pago) {
+        return (pago.tipoTarjeta() == TipoTarjeta.DEBITO ? "débito" : "crédito")
+                + (pago.ultimos4() == null ? "" : " ••••" + pago.ultimos4());
+    }
+
+    private static Map<String, Object> detalle(Venta venta, Pago pago) {
+        Map<String, Object> detalle = new LinkedHashMap<>();
+        detalle.put("venta", venta.numero());
+        detalle.put("tipoTarjeta", pago.tipoTarjeta().name());
+        detalle.put("ultimos4", pago.ultimos4());
+        detalle.put("autorizacion", pago.autorizacion());
+        detalle.put("monto", pago.monto());
+        return detalle;
     }
 
     private EstadoCobro estado(Venta venta, Turno turno) {

@@ -14,7 +14,7 @@ import {
   suspenderVenta,
   type Venta as DatosVenta,
 } from '../../api/ventas'
-import { CLAVE_COBRO, obtenerCobro, registrarPago, type Cobro, type Pago } from '../../api/pagos'
+import { CLAVE_COBRO, eliminarPago, obtenerCobro, registrarPago, type Cobro, type Pago } from '../../api/pagos'
 import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
@@ -29,7 +29,7 @@ import {
   formatoDesglose,
   rotuloSuspendidas,
 } from './textos'
-import { descripcionPago, montoValido, soloUltimos4 } from './cobro'
+import { confirmacionEliminarPago, descripcionPago, montoValido, soloUltimos4 } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
@@ -528,6 +528,40 @@ describe('cobrar con tarjeta (HU-07.03)', () => {
     expect(opcionesEstado?.method).toBeUndefined()
     expect(rutaPago).toBe('/api/ventas/actual/pagos')
     expect(opcionesPago).toMatchObject({ method: 'POST', body: '{"tipoTarjeta":"DEBITO","autorizacion":"123456","monto":15}' })
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('eliminar un pago antes de finalizar (HU-07.06)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+
+  it('cada pago registrado se puede eliminar (crit. 1)', () => {
+    const html = renderizarCobro(conArroz, { ...COBRO_SIN_PAGOS, pagado: 15, pendiente: 0, pagos: [PAGO] })
+
+    expect(html).toContain('data-control="eliminar-pago"')
+    expect(html).toContain('>Eliminar pago</button>')
+    expect(html).toContain('Para modificar la venta, elimine el pago.')
+  })
+
+  it('sin pagos no hay nada que eliminar', () => {
+    expect(renderizarCobro(conArroz, COBRO_SIN_PAGOS)).not.toContain('Eliminar pago')
+  })
+
+  it('pide confirmación con los datos del pago y recuerda anularlo en la terminal', () => {
+    expect(confirmacionEliminarPago(PAGO)).toBe(
+      '¿Eliminar el pago (Tarjeta de crédito ••••4321 · Aut. A1B2C3 · Q15.00)? Si la terminal ya lo cobró, ' +
+        'anúlelo también en la terminal bancaria.',
+    )
+  })
+
+  it('eliminar es un DELETE del pago en la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(COBRO_SIN_PAGOS), { status: 200 })))
+
+    await expect(eliminarPago(3)).resolves.toMatchObject({ pendiente: 15 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/pagos/3')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
     vi.unstubAllGlobals()
   })
 })

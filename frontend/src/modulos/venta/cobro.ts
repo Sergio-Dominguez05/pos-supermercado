@@ -11,3 +11,7 @@ export const montoValido = (texto: string) => /^\d+(\.\d{1,2})?$/.test(texto.tri
 export const descripcionPago = (pago: Pago) =>
   `Tarjeta de ${pago.tipoTarjeta === 'DEBITO' ? 'débito' : 'crédito'}` +
   `${pago.ultimos4 ? ` ••••${pago.ultimos4}` : ''} · Aut. ${pago.autorizacion} · ${formatoQuetzales(pago.monto)}`
+
+/** HU-07.06: se confirma antes de eliminar un pago, y se recuerda anularlo también en la terminal bancaria. */
+export const confirmacionEliminarPago = (pago: Pago) =>
+  `¿Eliminar el pago (${descripcionPago(pago)})? Si la terminal ya lo cobró, anúlelo también en la terminal bancaria.`
