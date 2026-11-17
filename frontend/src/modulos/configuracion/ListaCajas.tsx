@@ -96,6 +96,7 @@ function TablaCajas({ onAviso }: { onAviso: (aviso?: string) => void }) {
               <tr>
                 <th>Caja</th>
                 <th>Serie FEL</th>
+                <th>Impresora</th>
                 <th>Estado</th>
                 <th>Equipo</th>
                 <th>
@@ -108,6 +109,7 @@ function TablaCajas({ onAviso }: { onAviso: (aviso?: string) => void }) {
                 <tr key={caja.id}>
                   <td>{caja.nombre}</td>
                   <td>{caja.serieFel ?? '—'}</td>
+                  <td>{caja.impresoraNombre ?? '—'}</td>
                   <td>
                     <span className={caja.activo ? 'estado estado-activo' : 'estado estado-inactivo'}>
                       {caja.activo ? 'Activa' : 'Inactiva'}

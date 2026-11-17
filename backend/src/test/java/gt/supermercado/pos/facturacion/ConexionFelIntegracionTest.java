@@ -153,6 +153,16 @@ class ConexionFelIntegracionTest {
                 "%" + llave + "%")).isZero();
     }
 
+    @Test
+    void elNitDelCertificadorEsOpcionalYSeValida() throws Exception {   // HU-08.05 crit. 1: va en la factura impresa
+        String conNit = conexion("PRUEBAS", "llave", 5000).replace("}", ",\"nitCertificador\":\"%s\"}");
+
+        assertThat(guardar(conNit.formatted("576937-0"), cookieAdmin).body()).contains("NIT_CERTIFICADOR_INVALIDO");
+        assertThat(guardar(conNit.formatted(" 576937-k "), cookieAdmin).body())
+                .contains("\"nitCertificador\":\"576937K\"");
+        assertThat(guardar(conexion("PRUEBAS", "", 5000), cookieAdmin).body()).contains("\"nitCertificador\":null");
+    }
+
     // Apoyo
 
     private static String conexion(String ambiente, String llave, int timeoutMs) {

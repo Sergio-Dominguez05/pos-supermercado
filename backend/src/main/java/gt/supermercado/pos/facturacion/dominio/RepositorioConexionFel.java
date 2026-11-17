@@ -8,6 +8,6 @@ public interface RepositorioConexionFel {
     Optional<ConfiguracionFel> configuracion();
 
     /** Crea o reemplaza la configuración; el secreto llega ya cifrado. */
-    void guardar(String certificador, String urlServicio, String usuario, byte[] secretoCifrado, AmbienteFel ambiente,
-                 int timeoutMs, long usuarioId);
+    void guardar(String certificador, String nitCertificador, String urlServicio, String usuario,
+                 byte[] secretoCifrado, AmbienteFel ambiente, int timeoutMs, long usuarioId);
 }

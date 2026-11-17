@@ -1,10 +1,13 @@
 package gt.supermercado.pos.facturacion.infraestructura;
 
+import gt.supermercado.pos.configuracion.dominio.AfiliacionIva;
 import gt.supermercado.pos.configuracion.dominio.Emisor;
 import gt.supermercado.pos.configuracion.dominio.Establecimiento;
 import gt.supermercado.pos.facturacion.dominio.DatosDte;
 import gt.supermercado.pos.facturacion.dominio.EstadoFactura;
 import gt.supermercado.pos.facturacion.dominio.Factura;
+import gt.supermercado.pos.facturacion.dominio.FacturaImprimible;
+import gt.supermercado.pos.facturacion.dominio.Receptor;
 import gt.supermercado.pos.facturacion.dominio.RepositorioFacturas;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -64,6 +67,36 @@ class RepositorioFacturasJdbc implements RepositorioFacturas {
                 rs.getObject("fecha_certificacion", OffsetDateTime.class),
                 rs.getObject("emitida_en", OffsetDateTime.class),
                 rs.getString("xml_enviado")), ventaId).stream().findFirst();
+    }
+
+    @Override
+    public Optional<FacturaImprimible> imprimible(long ventaId) {
+        return deLaVenta(ventaId).flatMap(factura -> jdbc.query("""
+                SELECT receptor_tipo, receptor_id, receptor_nombre, emisor_snapshot::text AS emisor
+                FROM factura WHERE id = ?""", (rs, fila) -> {
+            Map<String, Object> emisor = leer(rs.getString("emisor"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> establecimiento = (Map<String, Object>) emisor.get("establecimiento");
+            return new FacturaImprimible(factura,
+                    new Receptor(Receptor.TipoReceptor.valueOf(rs.getString("receptor_tipo")),
+                            rs.getString("receptor_id"), rs.getString("receptor_nombre")),
+                    new Emisor(texto(emisor, "nit"), texto(emisor, "razonSocial"), texto(emisor, "nombreComercial"),
+                            texto(emisor, "direccionFiscal"), texto(emisor, "telefono"), texto(emisor, "correo"),
+                            AfiliacionIva.valueOf(texto(emisor, "afiliacionIva")), null),
+                    new Establecimiento(0, texto(establecimiento, "codigoSat"), texto(establecimiento, "nombre"),
+                            texto(establecimiento, "direccion"), texto(establecimiento, "codigoPostal"),
+                            texto(establecimiento, "municipio"), texto(establecimiento, "departamento"), null));
+        }, factura.id()).stream().findFirst());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> leer(String copia) {
+        return json.readValue(copia, Map.class);
+    }
+
+    private static String texto(Map<String, Object> datos, String campo) {
+        Object valor = datos.get(campo);
+        return valor == null ? null : valor.toString();
     }
 
     @Override

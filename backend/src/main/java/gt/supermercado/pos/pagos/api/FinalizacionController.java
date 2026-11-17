@@ -3,6 +3,7 @@ package gt.supermercado.pos.pagos.api;
 import gt.supermercado.pos.pagos.aplicacion.GestionPagos;
 import gt.supermercado.pos.pagos.aplicacion.GestionPagos.VentaFinalizada;
 import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
+import gt.supermercado.pos.pagos.dominio.ResultadoImpresion;
 import gt.supermercado.pos.pagos.api.PagosController.RespuestaPago;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,12 +26,14 @@ public class FinalizacionController {
 
     /** La venta finalizada: lo que la pantalla muestra antes de pasar a la siguiente. */
     public record RespuestaVentaFinalizada(long ventaId, long numero, int articulos, BigDecimal total,
-                                           BigDecimal pagado, List<RespuestaPago> pagos, FacturaDeVenta factura) {
+                                           BigDecimal pagado, List<RespuestaPago> pagos, FacturaDeVenta factura,
+                                           ResultadoImpresion impresion) {
 
         static RespuestaVentaFinalizada de(VentaFinalizada finalizada) {
             return new RespuestaVentaFinalizada(finalizada.venta().id(), finalizada.venta().numero(),
                     finalizada.venta().articulos(), finalizada.venta().totales().total(), finalizada.pagado(),
-                    finalizada.pagos().stream().map(RespuestaPago::de).toList(), finalizada.factura());
+                    finalizada.pagos().stream().map(RespuestaPago::de).toList(), finalizada.factura(),
+                    finalizada.impresion());
         }
     }
 
@@ -39,7 +42,7 @@ public class FinalizacionController {
      * {@code PAGO_INCOMPLETO} si los pagos no cubren el total (HU-07.07), {@code SIN_VENTA_EN_CURSO} si no hay venta
      * en curso, y {@code EMISOR_NO_CONFIGURADO} o similar si la factura no se puede armar. Si algo falla, la venta
      * sigue en curso y se puede reintentar (crit. 4). La respuesta dice si la factura quedó certificada, en
-     * contingencia o rechazada.
+     * contingencia o rechazada, y si se imprimió (HU-08.05).
      */
     @PostMapping("/api/ventas/actual/finalizar")
     @PreAuthorize("hasAuthority('PAGO_REGISTRAR')")

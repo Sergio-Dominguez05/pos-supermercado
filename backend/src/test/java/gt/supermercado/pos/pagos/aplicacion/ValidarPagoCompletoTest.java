@@ -45,7 +45,7 @@ class ValidarPagoCompletoTest {
     private final GestionVentas ventas = mock(GestionVentas.class);
     private final SesionActiva sesion = new SesionActiva(1, 20, "ana", "Ana López", Rol.CAJERO, "Cajero", false,
             Set.of("VENTA_REGISTRAR", "PAGO_REGISTRAR"), 1L, "Caja 1");
-    private final GestionPagos gestion = new GestionPagos(pagos, turnos, ventas, null, null, null);
+    private final GestionPagos gestion = new GestionPagos(pagos, turnos, ventas, null, null, null, null);
 
     @BeforeEach
     void ventaEnCurso() {

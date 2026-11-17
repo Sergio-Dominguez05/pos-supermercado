@@ -26,7 +26,8 @@ class GestionCajasTest {
     private final CajasEnMemoria cajas = new CajasEnMemoria();
     private final Set<Long> conTurnoAbierto = new HashSet<>();
     private final List<EventoBitacora> eventos = new ArrayList<>();
-    private final GestionCajas gestion = new GestionCajas(cajas, conTurnoAbierto::contains, new Bitacora(eventos::add));
+    private final GestionCajas gestion = new GestionCajas(cajas, conTurnoAbierto::contains, new Bitacora(eventos::add),
+            null);
     private final SesionActiva admin = new SesionActiva(1, 1, "admin", "Administrador", Rol.ADMIN, "Administrador",
             false, Set.of());
 
@@ -57,7 +58,7 @@ class GestionCajasTest {
         private final Map<Long, Caja> porId = new LinkedHashMap<>();
 
         void agregar(long id, String nombre) {
-            porId.put(id, new Caja(id, nombre, null, true, false));
+            porId.put(id, new Caja(id, nombre, null, true, false, null, null));
         }
 
         @Override
@@ -68,7 +69,8 @@ class GestionCajasTest {
         @Override
         public void cambiarActivo(long id, boolean activo) {
             Caja c = porId.get(id);
-            porId.put(id, new Caja(c.id(), c.nombre(), c.serieFel(), activo, c.equipoVinculado()));
+            porId.put(id, new Caja(c.id(), c.nombre(), c.serieFel(), activo, c.equipoVinculado(), c.impresoraId(),
+                    c.impresoraNombre()));
         }
 
         @Override
@@ -93,6 +95,11 @@ class GestionCajasTest {
 
         @Override
         public void actualizar(long id, String nombre, String serieFel) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void asignarImpresora(long id, Long impresoraId) {
             throw new UnsupportedOperationException();
         }
 

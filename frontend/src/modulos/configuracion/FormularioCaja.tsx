@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { CLAVE_CAJAS, claveCaja, crearCaja, editarCaja, obtenerCaja, type Caja } from '../../api/cajas'
+import { CLAVE_IMPRESORAS, listarImpresoras } from '../../api/impresoras'
 import { useSesion } from '../login/sesion'
 import { avisoCajaGuardada } from './textos'
 
@@ -40,11 +41,16 @@ function CargaCaja({ id }: { id: number }) {
 export function FormularioCaja({ caja }: { caja?: Caja }) {
   const [nombre, setNombre] = useState(caja?.nombre ?? '')
   const [serieFel, setSerieFel] = useState(caja?.serieFel ?? '')
+  const [impresora, setImpresora] = useState(caja?.impresoraId ? String(caja.impresoraId) : '')
+  const impresoras = useQuery({ queryKey: CLAVE_IMPRESORAS, queryFn: listarImpresoras })
   const navegar = useNavigate()
   const clienteConsultas = useQueryClient()
 
   const guardado = useMutation({
-    mutationFn: () => (caja ? editarCaja(caja.id, { nombre, serieFel }) : crearCaja({ nombre, serieFel })),
+    mutationFn: () => {
+      const datos = { nombre, serieFel, impresoraId: impresora ? Number(impresora) : null }
+      return caja ? editarCaja(caja.id, datos) : crearCaja(datos)
+    },
     // Vuelve a la lista ya actualizada con el aviso. Si falla (p. ej. nombre repetido), se queda aquí con el error.
     onSuccess: async (guardada) => {
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_CAJAS })
@@ -84,6 +90,21 @@ export function FormularioCaja({ caja }: { caja?: Caja }) {
           onChange={(evento) => setSerieFel(evento.target.value.toUpperCase())}
         />
         <small>Déjela vacía si la caja no tiene una serie propia.</small>
+      </label>
+      <label>
+        Impresora
+        <select name="impresoraId" value={impresora} onChange={(evento) => setImpresora(evento.target.value)}>
+          <option value="">Sin impresora</option>
+          {impresoras.data?.map((opcion) => (
+            <option key={opcion.id} value={opcion.id}>
+              {opcion.nombre} ({opcion.anchoMm} mm)
+            </option>
+          ))}
+        </select>
+        <small>
+          Donde salen las facturas de esta caja (HU-12.08). Las impresoras se agregan en{' '}
+          <Link to="/configuracion/impresoras">Impresoras</Link>.
+        </small>
       </label>
 
       {guardado.error && (

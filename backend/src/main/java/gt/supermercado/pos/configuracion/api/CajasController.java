@@ -45,7 +45,8 @@ public class CajasController {
     }
 
     /** Las reglas de formato se validan en {@link GestionCajas} para que los rechazos queden en la bitácora. */
-    public record SolicitudCaja(@NotNull @Size(max = 100) String nombre, @Size(max = 40) String serieFel) {}
+    public record SolicitudCaja(@NotNull @Size(max = 100) String nombre, @Size(max = 40) String serieFel,
+                                Long impresoraId) {}
 
     @GetMapping
     @PreAuthorize("hasAuthority('CONFIGURACION_MODIFICAR')")
@@ -70,14 +71,14 @@ public class CajasController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CONFIGURACION_MODIFICAR')")
     public Caja crear(@Valid @RequestBody SolicitudCaja solicitud, @AuthenticationPrincipal SesionActiva actor) {
-        return gestionCajas.crear(solicitud.nombre(), solicitud.serieFel(), actor);
+        return gestionCajas.crear(solicitud.nombre(), solicitud.serieFel(), solicitud.impresoraId(), actor);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('CONFIGURACION_MODIFICAR')")
     public Caja editar(@PathVariable long id, @Valid @RequestBody SolicitudCaja solicitud,
                        @AuthenticationPrincipal SesionActiva actor) {
-        return gestionCajas.editar(id, solicitud.nombre(), solicitud.serieFel(), actor);
+        return gestionCajas.editar(id, solicitud.nombre(), solicitud.serieFel(), solicitud.impresoraId(), actor);
     }
 
     @PostMapping("/{id}/desactivar")

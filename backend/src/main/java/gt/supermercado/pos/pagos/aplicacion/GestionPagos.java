@@ -9,8 +9,10 @@ import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
 import gt.supermercado.pos.pagos.dominio.EmisionDeFactura;
 import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
+import gt.supermercado.pos.pagos.dominio.ImpresionDeFactura;
 import gt.supermercado.pos.pagos.dominio.Pago;
 import gt.supermercado.pos.pagos.dominio.RepositorioPagos;
+import gt.supermercado.pos.pagos.dominio.ResultadoImpresion;
 import gt.supermercado.pos.pagos.dominio.TipoTarjeta;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.ventas.aplicacion.GestionVentas;
@@ -43,20 +45,23 @@ public class GestionPagos {
     private final GestionVentas ventas;
     private final Bitacora bitacora;
     private final EmisionDeFactura facturas;
+    private final ImpresionDeFactura impresion;
     private final TransactionOperations transacciones;
 
     public GestionPagos(RepositorioPagos pagos, GestionTurnos turnos, GestionVentas ventas, Bitacora bitacora,
-                        EmisionDeFactura facturas, TransactionOperations transacciones) {
+                        EmisionDeFactura facturas, ImpresionDeFactura impresion, TransactionOperations transacciones) {
         this.pagos = pagos;
         this.turnos = turnos;
         this.ventas = ventas;
         this.bitacora = bitacora;
         this.facturas = facturas;
+        this.impresion = impresion;
         this.transacciones = transacciones;
     }
 
-    /** HU-07.08: la venta finalizada, sus pagos y cómo quedó su factura (HU-08.03). */
-    public record VentaFinalizada(Venta venta, List<Pago> pagos, BigDecimal pagado, FacturaDeVenta factura) {}
+    /** HU-07.08: la venta finalizada, sus pagos, cómo quedó su factura (HU-08.03) y si se imprimió (HU-08.05). */
+    public record VentaFinalizada(Venta venta, List<Pago> pagos, BigDecimal pagado, FacturaDeVenta factura,
+                                  ResultadoImpresion impresion) {}
 
     /** Lo que pide el cajero al registrar el pago. {@code monto} vacío es el total pendiente (crit. 2). */
     public record SolicitudPago(TipoTarjeta tipoTarjeta, String autorizacion, String ultimos4, BigDecimal monto) {}
@@ -160,11 +165,23 @@ public class GestionPagos {
      * <p>HU-08.03 (Architecture.md §6.2): la venta, sus pagos y la factura pendiente se guardan en una transacción;
      * después del {@code COMMIT} se certifica la factura, con el tiempo límite configurado. Así nunca queda una venta
      * cobrada sin registro, aunque el certificador no responda.
+     *
+     * <p>HU-08.05: por último se imprime la factura certificada. Si la impresora falla, la venta queda igual y se avisa
+     * que la factura se puede reimprimir (crit. 6).
      */
     public VentaFinalizada finalizar(SesionActiva sesion) {
         VentaFinalizada registrada = transacciones.execute(transaccion -> registrarFinalizacion(sesion));
         FacturaDeVenta factura = facturas.certificar(registrada.venta());
-        return new VentaFinalizada(registrada.venta(), registrada.pagos(), registrada.pagado(), factura);
+        return new VentaFinalizada(registrada.venta(), registrada.pagos(), registrada.pagado(), factura,
+                imprimir(registrada, factura));
+    }
+
+    private ResultadoImpresion imprimir(VentaFinalizada registrada, FacturaDeVenta factura) {
+        try {
+            return impresion.imprimir(registrada.venta(), registrada.pagos(), factura);
+        } catch (RuntimeException e) {
+            return ResultadoImpresion.sinImprimir("No se pudo imprimir la factura; se puede reimprimir.");
+        }
     }
 
     private VentaFinalizada registrarFinalizacion(SesionActiva sesion) {
@@ -180,7 +197,7 @@ public class GestionPagos {
         bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), AccionSensible.VENTA_FINALIZADA,
                 true, "Venta N.º %d finalizada: %d artículos, total Q%s".formatted(venta.numero(), venta.articulos(),
                         venta.totales().total()), "venta", venta.id(), detalleFinalizacion(venta, estado)));
-        return new VentaFinalizada(venta, estado.pagos(), estado.pagado(), null);
+        return new VentaFinalizada(venta, estado.pagos(), estado.pagado(), null, null);
     }
 
     private NegocioException rechazarFinalizacion(SesionActiva sesion, NegocioException error) {

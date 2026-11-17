@@ -9,6 +9,7 @@ import { PaginaConexionFel } from './modulos/configuracion/ConexionFel'
 import { PaginaEmisor } from './modulos/configuracion/DatosEmisor'
 import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimiento'
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
+import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
 import { CambioCredencial } from './modulos/login/CambioCredencial'
@@ -102,6 +103,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaConexionFel />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/impresoras"
+            element={
+              <RutaProtegida>
+                <PaginaImpresoras />
               </RutaProtegida>
             }
           />

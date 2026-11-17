@@ -65,6 +65,12 @@ export interface FacturaDeVenta {
   motivo: string | null
 }
 
+/** HU-08.05: si la factura se imprimió; `mensaje` dice por qué no, si hay algo que decir. */
+export interface ResultadoImpresion {
+  impresa: boolean
+  mensaje: string | null
+}
+
 export interface VentaFinalizada {
   ventaId: number
   numero: number
@@ -73,6 +79,7 @@ export interface VentaFinalizada {
   pagado: number
   pagos: Pago[]
   factura: FacturaDeVenta
+  impresion: ResultadoImpresion
 }
 
 /**
