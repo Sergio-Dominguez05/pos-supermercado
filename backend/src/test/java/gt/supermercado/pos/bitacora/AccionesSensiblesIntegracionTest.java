@@ -374,6 +374,17 @@ class AccionesSensiblesIntegracionTest {
                 Long.class, id)).isEqualTo(venta);
     }
 
+    @Test
+    void cambioDeLaConexionFelExitosoYRechazado() throws Exception {   // HU-12.03 y HU-12.15 crit. 4
+        String cuerpo = """
+                {"certificador":"Certificador auditado","urlServicio":"https://certificador.test/api",                "usuario":"usuario-fel","secreto":"llave","ambiente":"PRUEBAS","timeoutMs":%d}""";
+
+        assertThat(registrosDe(() -> enviar("/api/configuracion/fel", "PUT", cuerpo.formatted(8000), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/configuracion/fel", "PUT", cuerpo.formatted(10), cookieAdmin)))
+                .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // tiempo límite inválido
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

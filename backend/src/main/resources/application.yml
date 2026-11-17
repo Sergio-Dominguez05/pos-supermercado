@@ -46,7 +46,8 @@ pos:
       # Si no existe ningún Administrador, se crea 'admin' con esta contraseña temporal (vacía: no se crea).
       contrasena: ''
   fel:
-    # simulado: CertificadorFelSimulado (desarrollo y pruebas). rest: adaptador real (pendiente, Sprint 4).
+    # simulado: CertificadorFelSimulado (desarrollo y pruebas). rest: CertificadorFelRest, con la conexión que
+    # el Administrador guarda en Configuración > Conexión FEL (HU-12.03). El certificador aún no se elige.
     modo: simulado
     simulador:
       # ACEPTAR, RECHAZAR o SIN_CONEXION, para probar certificación, rechazos y contingencia.

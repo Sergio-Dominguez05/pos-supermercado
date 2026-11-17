@@ -1,0 +1,5 @@
+# Perfil de las pruebas automáticas. La base de datos la da Testcontainers (TestcontainersConfiguration).
+pos:
+  seguridad:
+    # HU-12.15: llave AES-256 solo para pruebas.
+    llave-maestra: 7Z+e2IQC85+vIMKzN3T+b45ZhrtilmldiFcUq0bNwwI=

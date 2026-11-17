@@ -1,9 +1,11 @@
 package gt.supermercado.pos.facturacion.aplicacion;
 
 import gt.supermercado.pos.facturacion.dominio.CertificadorNoDisponibleException;
+import gt.supermercado.pos.facturacion.dominio.ConexionFel;
 import gt.supermercado.pos.facturacion.dominio.Contribuyente;
 import gt.supermercado.pos.facturacion.dominio.ResultadoAnulacion;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
+import gt.supermercado.pos.facturacion.dominio.ResultadoPruebaConexion;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -32,5 +34,9 @@ public interface CertificadorFel {
 
     void solicitarEnvioCorreo(UUID autorizacion, String correo);
 
-    void probarConexion();
+    /**
+     * HU-08.01 crit. 3 y HU-12.03 crit. 2: prueba la conexión con los datos indicados, que pueden no estar guardados
+     * todavía, sin emitir ninguna factura. Lanza {@link CertificadorNoDisponibleException} si no hay respuesta.
+     */
+    ResultadoPruebaConexion probarConexion(ConexionFel conexion);
 }

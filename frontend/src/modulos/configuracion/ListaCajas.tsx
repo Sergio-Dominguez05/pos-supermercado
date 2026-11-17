@@ -27,7 +27,7 @@ export function ListaCajas() {
     <main className="pagina pagina-ancha">
       <h1>Cajas</h1>
       <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Configuración · Cajas
+        <Link to="/inicio">Inicio</Link> · Configuración · Cajas · <Link to="/configuracion/fel">Conexión FEL</Link>
       </p>
       {aviso && (
         <p className="tarjeta exito" role="status">

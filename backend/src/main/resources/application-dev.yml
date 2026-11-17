@@ -14,3 +14,5 @@ pos:
   seguridad:
     admin-inicial:
       contrasena: ${POS_ADMIN_PASSWORD_INICIAL:admin_dev_2026}
+    # HU-12.15: llave AES-256 para cifrar las credenciales FEL. Solo desarrollo: producción la exige por entorno.
+    llave-maestra: ${POS_LLAVE_MAESTRA:aHNAsjT0INRlE9CtTeGQ3zur+OhgHoIa1dW7uL1aDeE=}
