@@ -1,10 +1,13 @@
 package gt.supermercado.pos.facturacion.infraestructura.fel;
 
 import gt.supermercado.pos.facturacion.aplicacion.CertificadorFel;
+import gt.supermercado.pos.facturacion.dominio.AmbienteFel;
 import gt.supermercado.pos.facturacion.dominio.CertificadorNoDisponibleException;
+import gt.supermercado.pos.facturacion.dominio.ConexionFel;
 import gt.supermercado.pos.facturacion.dominio.Contribuyente;
 import gt.supermercado.pos.facturacion.dominio.ResultadoAnulacion;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
+import gt.supermercado.pos.facturacion.dominio.ResultadoPruebaConexion;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -85,9 +88,15 @@ public class CertificadorFelSimulado implements CertificadorFel {
         verificarConexion();
     }
 
+    /** ACEPTAR: conexión exitosa; RECHAZAR: credenciales rechazadas; SIN_CONEXION: sin respuesta. */
     @Override
-    public void probarConexion() {
+    public ResultadoPruebaConexion probarConexion(ConexionFel conexion) {
         verificarConexion();
+        if (escenario == Escenario.RECHAZAR) {
+            return ResultadoPruebaConexion.fallida("El certificador rechazó el usuario o la llave (simulado).");
+        }
+        return ResultadoPruebaConexion.exitosa("Conexión exitosa con el certificador simulado, ambiente %s."
+                .formatted(conexion.ambiente() == AmbienteFel.PRODUCCION ? "de producción" : "de pruebas"));
     }
 
     private void verificarConexion() {

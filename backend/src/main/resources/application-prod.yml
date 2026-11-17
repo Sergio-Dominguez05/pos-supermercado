@@ -16,3 +16,5 @@ pos:
     admin-inicial:
       # Solo se usa la primera vez, mientras no exista ningún Administrador.
       contrasena: ${POS_ADMIN_PASSWORD_INICIAL:}
+    # HU-12.15: llave AES-256 (32 bytes en Base64) que cifra las credenciales FEL. Sin valor por defecto.
+    llave-maestra: ${POS_LLAVE_MAESTRA}
