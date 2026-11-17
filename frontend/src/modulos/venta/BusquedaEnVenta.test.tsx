@@ -21,6 +21,7 @@ const TURNO = { id: 7, cajaId: 1, cajaNombre: 'Caja 1', usuarioNombre: 'Ana Lóp
   abiertoEn: '2026-11-16T14:05:00Z', propio: true } as Turno
 
 const VENTA = { id: 31, numero: 1042, estado: 'EN_CURSO', cajaNombre: 'Caja 1', creadaEn: '2026-11-16T15:00:00Z',
+  suspendidaEn: null,
   lineas: [], articulos: 0, subtotal: 0, iva: 0, total: 0 } as DatosVenta
 
 const pantalla = (turno: Turno | null) => {

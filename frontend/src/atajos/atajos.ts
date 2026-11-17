@@ -34,6 +34,24 @@ export const ATAJOS: readonly Atajo[] = [
   { tecla: 'F12', accion: 'cobrar', descripcion: 'Cobrar' },
 ]
 
+/**
+ * Acciones del mapa cuya pantalla todavía no existe, con la historia que la trae. Su tecla ya está reservada: al
+ * presionarla la caja avisa con qué historia llega, y la ayuda (F1) la muestra como pendiente. Cuando la historia
+ * registre su manejador en la pantalla de venta, pasa de aquí a `ACCIONES_DE_LA_VENTA` (lo exige `teclado.test.ts`).
+ */
+export const ACCIONES_PENDIENTES: Partial<Record<AccionCaja, string>> = {
+  consultarPrecio: 'HU-03.10 (#28)',
+  asignarCliente: 'HU-05.08 (#44)',
+  reimprimirUltima: 'HU-08.12 (#74)',
+}
+
+/** Nombre de la tecla para mostrarlo en pantalla: el teclado en español rotula "Supr" a la tecla Delete. */
+export const rotuloDeTecla = (tecla: string) => (tecla === 'Delete' ? 'Supr' : tecla)
+
 export function accionDeTecla(tecla: string): AccionCaja | undefined {
   return ATAJOS.find((atajo) => atajo.tecla === tecla)?.accion
 }
+
+/** El aviso al presionar el atajo de una acción que todavía no existe. */
+export const avisoPendiente = (atajo: Atajo) =>
+  `${atajo.descripcion} (${rotuloDeTecla(atajo.tecla)}) estará disponible con ${ACCIONES_PENDIENTES[atajo.accion]}.`

@@ -300,6 +300,29 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(VENTA_CANCELADA, false, id));   // ya no hay venta en curso
     }
 
+    @Test
+    void eliminacionDeLineaExitosaYRechazada() throws Exception {   // HU-06.07 crit. 3
+        String nombre = "Caja linea " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        long id = idDeUsuario(cajero);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        enviar("/api/turnos", "POST", null, sesion);
+        String codigo = "AL" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"Producto auditado\",\"precio\":11.20}".formatted(codigo),
+                cookieAdmin);
+        enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), sesion);
+        long linea = jdbc.queryForObject("""
+                SELECT l.id FROM venta_linea l JOIN venta v ON v.id = l.venta_id WHERE v.usuario_id = ?""", Long.class, id);
+
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/lineas/" + linea, "DELETE", null, sesion)))
+                .containsExactly(new Registro(LINEA_VENTA_ELIMINADA, true, id));
+        assertThat(registrosDe(() -> enviar("/api/ventas/actual/lineas/" + linea, "DELETE", null, sesion)))
+                .containsExactly(new Registro(LINEA_VENTA_ELIMINADA, false, id));   // ya estaba eliminada
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

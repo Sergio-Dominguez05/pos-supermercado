@@ -25,6 +25,7 @@ const venta = (lineas: LineaVenta[], total = 0): Venta => ({
   estado: 'EN_CURSO',
   cajaNombre: 'Caja 1',
   creadaEn: '2026-11-16T15:00:00Z',
+  suspendidaEn: null,
   lineas,
   articulos: lineas.reduce((suma, linea) => suma + linea.cantidad, 0),
   subtotal: 0,

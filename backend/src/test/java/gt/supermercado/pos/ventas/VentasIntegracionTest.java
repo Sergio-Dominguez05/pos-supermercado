@@ -1,6 +1,9 @@
 package gt.supermercado.pos.ventas;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.caja.dominio.VerificadorVentasSuspendidas;
+import gt.supermercado.pos.ventas.dominio.RepositorioVentas;
+import gt.supermercado.pos.ventas.dominio.Venta;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +54,13 @@ class VentasIntegracionTest {
 
     @Autowired
     PasswordEncoder codificador;
+
+    /** El puerto de {@code caja} que implementa ventas (HU-06.12 crit. 4). */
+    @Autowired
+    VerificadorVentasSuspendidas verificadorSuspendidas;
+
+    @Autowired
+    RepositorioVentas repositorioVentas;
 
     @Value("${local.server.port}")
     int puerto;
@@ -251,6 +261,24 @@ class VentasIntegracionTest {
         // HU-04.03 crit. 3: la venta entrega el desglose de cada línea, con sus 6 decimales, para mostrarlo.
         assertThat(respuesta.body()).contains("\"subtotalConIva\":15.000000", "\"baseImponible\":13.392857",
                 "\"iva\":1.607143");
+    }
+
+    @Test
+    void cadaProductoAgregadoDevuelveLosTotalesActualizados() throws Exception {   // HU-06.08 crit. 1 y 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        Producto agua = nuevoProducto("Agua 600 ml", "11.20");
+
+        // Q5.00: IVA = 5.00 - 5.00 / 1.12 = 0.535714, que da Q0.54.
+        assertThat(escanear(arroz.codigo(), cajero).body())
+                .contains("\"articulos\":1", "\"subtotal\":4.46", "\"iva\":0.54", "\"total\":5.00");
+        assertThat(escanear(agua.codigo(), cajero).body())
+                .contains("\"articulos\":2", "\"subtotal\":14.46", "\"iva\":1.74", "\"total\":16.20");
+        assertThat(escanear(arroz.codigo(), cajero).body())
+                .contains("\"articulos\":3", "\"subtotal\":18.93", "\"iva\":2.27", "\"total\":21.20");
+        // Al volver a la pantalla (o recargarla) se ven los mismos totales.
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body())
+                .contains("\"articulos\":3", "\"subtotal\":18.93", "\"iva\":2.27", "\"total\":21.20");
     }
 
     @Test
@@ -560,7 +588,598 @@ class VentasIntegracionTest {
         assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
     }
 
+    // HU-06.04 Indicar la cantidad de un producto
+
+    @Test
+    void conElMultiplicadorSeAgreganVariasUnidadesDeUnaVez() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        HttpResponse<String> respuesta = escanear(arroz.codigo(), 6, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"cantidad\":6", "\"articulos\":6", "\"total\":30.00");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+        // Sin multiplicador vuelve a ser una unidad, que se suma a la misma línea (HU-06.02 crit. 2).
+        assertThat(escanear(arroz.codigo(), cajero).body()).contains("\"cantidad\":7", "\"total\":35.00");
+    }
+
+    @Test
+    void elMultiplicadorSeSumaALaLineaYTambienValeEnLaBusqueda() throws Exception {   // crit. 1 y HU-06.03
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto agua = nuevoProducto("Agua 600 ml", "11.20");
+        escanear(agua.codigo(), cajero);
+
+        HttpResponse<String> respuesta = enviar("/api/ventas/actual/lineas", "POST",
+                "{\"productoId\":%d,\"cantidad\":3}".formatted(agua.id()), cajero.sesion());
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"cantidad\":4", "\"articulos\":4", "\"total\":44.80");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+    }
+
+    @Test
+    void laCantidadDebeSerUnEnteroMayorQueCero() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        for (String cantidad : List.of("0", "-2", "10000")) {
+            HttpResponse<String> respuesta = enviar("/api/ventas/actual/lineas", "POST",
+                    "{\"codigo\":\"%s\",\"cantidad\":%s,\"confirmada\":true}".formatted(arroz.codigo(), cantidad),
+                    cajero.sesion());
+            assertThat(respuesta.statusCode()).as("cantidad " + cantidad).isEqualTo(422);
+            assertThat(respuesta.body()).contains("CANTIDAD_INVALIDA");
+        }
+        for (String cantidad : List.of("2.5", "\"seis\"")) {
+            HttpResponse<String> respuesta = enviar("/api/ventas/actual/lineas", "POST",
+                    "{\"codigo\":\"%s\",\"cantidad\":%s}".formatted(arroz.codigo(), cantidad), cajero.sesion());
+            assertThat(respuesta.statusCode()).as("cantidad " + cantidad).isBetween(400, 422);
+        }
+        assertThat(lineasEnCurso(cajero)).isZero();
+    }
+
+    @Test
+    void unaCantidadMayorAlLimiteSePideConfirmarAntesDeAgregarla() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+
+        HttpResponse<String> sinConfirmar = escanear(arroz.codigo(), 51, cajero);
+
+        assertThat(sinConfirmar.statusCode()).isEqualTo(422);
+        assertThat(sinConfirmar.body()).contains("CANTIDAD_POR_CONFIRMAR", "51", "50");
+        assertThat(lineasEnCurso(cajero)).isZero();
+
+        HttpResponse<String> confirmada = enviar("/api/ventas/actual/lineas", "POST",
+                "{\"codigo\":\"%s\",\"cantidad\":51,\"confirmada\":true}".formatted(arroz.codigo()), cajero.sesion());
+        assertThat(confirmada.statusCode()).isEqualTo(200);
+        assertThat(confirmada.body()).contains("\"cantidad\":51", "\"total\":255.00");
+    }
+
+    @Test
+    void elLimiteEsElConfiguradoYHastaElNoSePideConfirmacion() throws Exception {   // crit. 4 y HU-12.13
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        assertThat(escanear(arroz.codigo(), 50, cajero).statusCode()).isEqualTo(200);
+
+        String anterior = jdbc.queryForObject("SELECT valor::text FROM parametro WHERE clave = 'cantidad_max_linea'",
+                String.class);
+        jdbc.update("UPDATE parametro SET valor = '10' WHERE clave = 'cantidad_max_linea'");
+        try {
+            assertThat(escanear(arroz.codigo(), 10, cajero).statusCode()).isEqualTo(200);
+            assertThat(escanear(arroz.codigo(), 11, cajero).body()).contains("CANTIDAD_POR_CONFIRMAR");
+        } finally {
+            jdbc.update("UPDATE parametro SET valor = ?::jsonb WHERE clave = 'cantidad_max_linea'", anterior);
+        }
+    }
+
+    @Test
+    void sePuedeCambiarLaCantidadDeUnaLineaConSuPropioPrecio() throws Exception {   // crit. 2 y HU-04.04 crit. 6
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        cambiarPrecio(arroz, "6.00");   // la línea conserva Q5.00 (HU-06.09)
+
+        HttpResponse<String> respuesta = cambiarCantidad(lineaDe(cajero, arroz), 5, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        // 5 x Q5.00 = Q25.00: IVA = 25.00 - 25.00 / 1.12 = 2.678571, que da Q2.68.
+        assertThat(respuesta.body()).contains("\"cantidad\":5", "\"precioUnitario\":5.00", "\"articulos\":5",
+                "\"subtotal\":22.32", "\"iva\":2.68", "\"total\":25.00");
+        // También se puede bajar la cantidad.
+        assertThat(cambiarCantidad(lineaDe(cajero, arroz), 2, cajero).body())
+                .contains("\"cantidad\":2", "\"total\":10.00");
+        assertThat(lineasEnCurso(cajero)).isEqualTo(1);
+    }
+
+    @Test
+    void alCambiarLaCantidadSeAplicanLasMismasReglas() throws Exception {   // crit. 2, 3 y 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        long linea = lineaDe(cajero, arroz);
+
+        assertThat(cambiarCantidad(linea, 0, cajero).body()).contains("CANTIDAD_INVALIDA");
+        assertThat(cambiarCantidad(linea, 80, cajero).body()).contains("CANTIDAD_POR_CONFIRMAR");
+        assertThat(enviar("/api/ventas/actual/lineas/" + linea + "/cantidad", "PUT", "{}", cajero.sesion()).statusCode())
+                .isEqualTo(400);
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body()).contains("\"cantidad\":1");
+
+        HttpResponse<String> confirmada = enviar("/api/ventas/actual/lineas/" + linea + "/cantidad", "PUT",
+                "{\"cantidad\":80,\"confirmada\":true}", cajero.sesion());
+        assertThat(confirmada.statusCode()).isEqualTo(200);
+        assertThat(confirmada.body()).contains("\"cantidad\":80");
+    }
+
+    @Test
+    void noSePuedeCambiarUnaLineaDeOtraVenta() throws Exception {   // crit. 2: solo la venta en curso propia
+        Cajero ana = cajeroConTurnoAbierto();
+        Cajero beto = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), ana);
+        escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), beto);
+
+        HttpResponse<String> respuesta = cambiarCantidad(lineaDe(ana, arroz), 9, beto);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        assertThat(respuesta.body()).contains("LINEA_NO_ENCONTRADA");
+        assertThat(enviar("/api/ventas/actual", "GET", null, ana.sesion()).body()).contains("\"cantidad\":1");
+    }
+
+    @Test
+    void sinTurnoAbiertoNoSeCambiaLaCantidad() throws Exception {
+        Cajero cajero = cajeroEnCaja();
+
+        HttpResponse<String> respuesta = cambiarCantidad(1, 2, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("CAJA_CERRADA");
+    }
+
+    // HU-06.07 Modificar o eliminar una línea
+
+    @Test
+    void alEliminarUnaLineaLosTotalesSeRecalculanDeInmediato() throws Exception {   // crit. 1, 2 y 4
+        Cajero cajero = cajeroConTurnoAbierto();   // un cajero, sin supervisor (crit. 2)
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        Producto agua = nuevoProducto("Agua 600 ml", "11.20");
+        escanear(arroz.codigo(), 3, cajero);
+        escanear(agua.codigo(), cajero);
+
+        HttpResponse<String> respuesta = eliminar(lineaDe(cajero, arroz), cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).doesNotContain("Arroz 1 lb")
+                .contains("Agua 600 ml", "\"articulos\":1", "\"subtotal\":10.00", "\"iva\":1.20", "\"total\":11.20");
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body())
+                .doesNotContain("Arroz 1 lb").contains("\"total\":11.20");
+    }
+
+    @Test
+    void laLineaEliminadaNoSeBorraYQuedaEnLaBitacora() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        long linea = lineaDe(cajero, arroz);
+
+        eliminar(linea, cajero);
+
+        Map<String, Object> fila = jdbc.queryForMap(
+                "SELECT cantidad, eliminada_en IS NOT NULL AS eliminada, eliminada_por FROM venta_linea WHERE id = ?",
+                linea);
+        assertThat(fila).containsEntry("cantidad", 3).containsEntry("eliminada", true)
+                .containsEntry("eliminada_por", cajero.usuarioId());
+        Map<String, Object> registro = jdbc.queryForMap("""
+                SELECT usuario_id, exitoso, descripcion, cambios::text AS cambios FROM bitacora
+                WHERE accion = 'LINEA_VENTA_ELIMINADA' AND entidad = 'venta_linea' AND entidad_id = ?""", linea);
+        assertThat(registro).containsEntry("usuario_id", cajero.usuarioId()).containsEntry("exitoso", true);
+        assertThat((String) registro.get("descripcion")).contains("3 x Arroz 1 lb", "Q15.00");
+        assertThat((String) registro.get("cambios")).contains(arroz.codigo(), "\"cantidad\": 3", "Arroz 1 lb");
+    }
+
+    @Test
+    void volverAEscanearUnProductoEliminadoCreaUnaLineaNueva() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        long eliminada = lineaDe(cajero, arroz);
+        eliminar(eliminada, cajero);
+
+        HttpResponse<String> respuesta = escanear(arroz.codigo(), cajero);
+
+        assertThat(respuesta.body()).contains("\"cantidad\":1", "\"articulos\":1", "\"total\":5.00");
+        assertThat(lineaDe(cajero, arroz)).isNotEqualTo(eliminada);
+        assertThat(jdbc.queryForObject("SELECT cantidad FROM venta_linea WHERE id = ?", Integer.class, eliminada))
+                .isEqualTo(3);
+    }
+
+    @Test
+    void unaLineaEliminadaNoSeVuelveAEliminarNiSeModifica() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        long linea = lineaDe(cajero, arroz);
+        eliminar(linea, cajero);
+
+        HttpResponse<String> otraVez = eliminar(linea, cajero);
+        assertThat(otraVez.statusCode()).isEqualTo(404);
+        assertThat(otraVez.body()).contains("LINEA_NO_ENCONTRADA");
+        assertThat(cambiarCantidad(linea, 5, cajero).statusCode()).isEqualTo(404);
+        // La base lo impide aunque se intente directamente (trigger de V17).
+        assertThatThrownBy(() -> jdbc.update("UPDATE venta_linea SET cantidad = 9 WHERE id = ?", linea))
+                .hasMessageContaining("fue eliminada");
+        assertThatThrownBy(() -> jdbc.update("UPDATE venta_linea SET eliminada_en = NULL, eliminada_por = NULL WHERE id = ?",
+                linea)).hasMessageContaining("fue eliminada");
+    }
+
+    @Test
+    void noSePuedeEliminarUnaLineaDeOtraVenta() throws Exception {   // crit. 1: solo la venta en curso propia
+        Cajero ana = cajeroConTurnoAbierto();
+        Cajero beto = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), ana);
+        escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), beto);
+
+        HttpResponse<String> respuesta = eliminar(lineaDe(ana, arroz), beto);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        assertThat(enviar("/api/ventas/actual", "GET", null, ana.sesion()).body()).contains("Arroz 1 lb");
+    }
+
+    @Test
+    void sinLineasVigentesLaVentaNoImpideCerrarSesion() throws Exception {   // HU-01.16 crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(409);
+
+        eliminar(lineaDe(cajero, arroz), cajero);
+
+        assertThat(enviar("/api/auth/logout", "POST", null, cajero.sesion()).statusCode()).isEqualTo(204);
+    }
+
+    @Test
+    void sinTurnoAbiertoNoSeEliminaUnaLinea() throws Exception {
+        HttpResponse<String> respuesta = eliminar(1, cajeroEnCaja());
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("CAJA_CERRADA");
+    }
+
+    // HU-06.12 Suspender una venta
+
+    @Test
+    void alSuspenderLaVentaSeGuardaConSusLineasYLaCajaQuedaListaParaOtra() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 3, cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long suspendida = ventaEnCurso(cajero);
+
+        HttpResponse<String> respuesta = suspender(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"estado\":\"SUSPENDIDA\"", "Arroz 1 lb", "Agua 600 ml",
+                "\"articulos\":4", "\"total\":26.20");
+        Map<String, Object> fila = jdbc.queryForMap(
+                "SELECT estado, suspendida_en IS NOT NULL AS con_hora FROM venta WHERE id = ?", suspendida);
+        assertThat(fila).containsEntry("estado", "SUSPENDIDA").containsEntry("con_hora", true);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM venta_linea WHERE venta_id = ? AND eliminada_en IS NULL",
+                Integer.class, suspendida)).isEqualTo(2);
+        // Lista para una venta nueva: no hay venta en curso, y la siguiente es otra, vacía, con otro número.
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).statusCode()).isEqualTo(204);
+        HttpResponse<String> nueva = enviar("/api/ventas", "POST", null, cajero.sesion());
+        assertThat(idDe(nueva)).isNotEqualTo(suspendida);
+        assertThat(nueva.body()).contains("\"estado\":\"EN_CURSO\"", "\"lineas\":[]");
+        assertThat(numeroDe(idDe(nueva))).isEqualTo(numeroDe(suspendida) + 1);
+    }
+
+    @Test
+    void unaCajaPuedeTenerVariasVentasSuspendidas() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        for (int i = 0; i < 3; i++) {
+            escanear(arroz.codigo(), cajero);
+            assertThat(suspender(cajero).statusCode()).isEqualTo(200);
+        }
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM venta WHERE usuario_id = ? AND estado = 'SUSPENDIDA'",
+                Integer.class, cajero.usuarioId())).isEqualTo(3);
+    }
+
+    @Test
+    void unaVentaSuspendidaNoSeModificaNiSeCancelaComoEnCurso() throws Exception {   // crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        long linea = lineaDe(cajero, arroz);
+        long suspendida = ventaEnCurso(cajero);
+        suspender(cajero);
+
+        assertThat(cambiarCantidad(linea, 4, cajero).statusCode()).isGreaterThanOrEqualTo(400);
+        assertThat(eliminar(linea, cajero).statusCode()).isGreaterThanOrEqualTo(400);
+        assertThat(enviar("/api/ventas/actual/cancelar", "POST", null, cajero.sesion()).statusCode()).isEqualTo(422);
+        // Escanear empieza otra venta; la suspendida no cambia.
+        escanear(arroz.codigo(), cajero);
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, suspendida))
+                .isEqualTo("SUSPENDIDA");
+        assertThat(jdbc.queryForObject("SELECT cantidad FROM venta_linea WHERE id = ?", Integer.class, linea))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void sinProductosNoHayNadaQueSuspender() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        enviar("/api/ventas", "POST", null, cajero.sesion());
+
+        HttpResponse<String> respuesta = suspender(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("VENTA_VACIA");
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body()).contains("\"estado\":\"EN_CURSO\"");
+    }
+
+    @Test
+    void sinVentaEnCursoOSinTurnoNoSeSuspende() throws Exception {
+        assertThat(suspender(cajeroConTurnoAbierto()).body()).contains("SIN_VENTA_EN_CURSO");
+        assertThat(suspender(cajeroEnCaja()).body()).contains("CAJA_CERRADA");
+    }
+
+    @Test
+    void lasVentasSuspendidasImpidenCerrarLaCaja() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        long turno = jdbc.queryForObject("SELECT id FROM turno WHERE usuario_id = ? AND estado = 'ABIERTO'",
+                Long.class, cajero.usuarioId());
+        assertThat(verificadorSuspendidas.suspendidasDelTurno(turno)).isZero();
+
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), cajero);
+        suspender(cajero);
+        escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), cajero);
+        suspender(cajero);
+
+        assertThat(verificadorSuspendidas.suspendidasDelTurno(turno)).isEqualTo(2);
+    }
+
+    // HU-06.13 Retomar una venta suspendida
+
+    @Test
+    void listaLasSuspendidasDeLaCajaConSuHoraArticulosYTotal() throws Exception {   // crit. 1
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), 3, cajero);
+        long primera = ventaEnCurso(cajero);
+        suspender(cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long segunda = ventaEnCurso(cajero);
+        suspender(cajero);
+
+        HttpResponse<String> lista = suspendidas(cajero);
+
+        assertThat(lista.statusCode()).isEqualTo(200);
+        String cuerpo = lista.body();
+        assertThat(cuerpo).contains("\"numero\":" + numeroDe(primera), "\"numero\":" + numeroDe(segunda),
+                "\"articulos\":3", "\"total\":15.00", "\"articulos\":1", "\"total\":11.20", "\"estado\":\"SUSPENDIDA\"");
+        assertThat(cuerpo).doesNotContain("\"suspendidaEn\":null");
+        assertThat(cuerpo.indexOf("\"id\":" + primera)).isLessThan(cuerpo.indexOf("\"id\":" + segunda));
+    }
+
+    @Test
+    void alRetomarlaSeCargaComoVentaEnCursoConTodasSusLineas() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), 3, cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long suspendida = ventaEnCurso(cajero);
+        suspender(cajero);
+        long vacia = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));   // la pantalla inicia la siguiente
+
+        HttpResponse<String> respuesta = retomar(suspendida, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"id\":" + suspendida, "\"estado\":\"EN_CURSO\"", "Arroz 1 lb",
+                "Agua 600 ml", "\"articulos\":4", "\"total\":26.20");
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).body()).contains("\"id\":" + suspendida);
+        // La venta vacía que tenía la pantalla no tenía nada que perder: se cancela.
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, vacia))
+                .isEqualTo("CANCELADA");
+        assertThat(suspendidas(cajero).body()).isEqualTo("[]");
+        // Se puede seguir vendiendo sobre ella y ya no impide cerrar la caja (HU-06.12 crit. 4).
+        assertThat(escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), cajero).body()).contains("\"articulos\":5");
+        long turno = jdbc.queryForObject("SELECT turno_id FROM venta WHERE id = ?", Long.class, suspendida);
+        assertThat(verificadorSuspendidas.suspendidasDelTurno(turno)).isZero();
+    }
+
+    @Test
+    void lasLineasRetomadasConservanElPrecioConElQueSeAgregaron() throws Exception {   // crit. 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), 2, cajero);
+        long suspendida = ventaEnCurso(cajero);
+        suspender(cajero);
+        cambiarPrecio(arroz, "6.00");
+
+        HttpResponse<String> respuesta = retomar(suspendida, cajero);
+
+        assertThat(respuesta.body()).contains("\"precioUnitario\":5.00", "\"total\":10.00");
+        // Lo que se escanee después entra con el precio nuevo, en otra línea (HU-06.09 crit. 3).
+        escanear(arroz.codigo(), cajero);
+        assertThat(precioDeLineas(cajero, arroz)).containsExactly("5.00", "6.00");
+    }
+
+    @Test
+    void soloSeRetomanLasVentasSuspendidasDeLaCajaPropia() throws Exception {   // crit. 3
+        Cajero ana = cajeroConTurnoAbierto();
+        Cajero beto = cajeroConTurnoAbierto();   // otra caja
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), ana);
+        long deAna = ventaEnCurso(ana);
+        suspender(ana);
+
+        assertThat(suspendidas(beto).body()).isEqualTo("[]");
+        HttpResponse<String> respuesta = retomar(deAna, beto);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        assertThat(respuesta.body()).contains("VENTA_SUSPENDIDA_NO_ENCONTRADA");
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, deAna))
+                .isEqualTo("SUSPENDIDA");
+    }
+
+    @Test
+    void conOtraVentaConProductosEnCursoPideSuspenderlaOCancelarlaAntes() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), cajero);
+        long suspendida = ventaEnCurso(cajero);
+        suspender(cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long enCurso = ventaEnCurso(cajero);
+
+        HttpResponse<String> respuesta = retomar(suspendida, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("VENTA_EN_CURSO_CON_PRODUCTOS");
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, suspendida))
+                .isEqualTo("SUSPENDIDA");
+        assertThat(ventaEnCurso(cajero)).isEqualTo(enCurso);
+    }
+
+    @Test
+    void unaVentaQueNoEstaSuspendidaNoSeRetomaYNoSePierdeLaVentaVacia() throws Exception {
+        Cajero cajero = cajeroConTurnoAbierto();
+        long vacia = idDe(enviar("/api/ventas", "POST", null, cajero.sesion()));
+
+        HttpResponse<String> respuesta = retomar(999_999_999L, cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(404);
+        // La cancelación de la venta vacía se deshace junto con el intento.
+        assertThat(jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, vacia))
+                .isEqualTo("EN_CURSO");
+    }
+
+    @Test
+    void sinTurnoAbiertoNoSeListanNiSeRetoman() throws Exception {
+        Cajero cajero = cajeroEnCaja();
+
+        assertThat(suspendidas(cajero).body()).contains("CAJA_CERRADA");
+        assertThat(retomar(1, cajero).body()).contains("CAJA_CERRADA");
+    }
+
+    // HU-06.15 Finalizar la venta y pasar al cobro
+
+    @Test
+    void conProductosPasaAlCobroConElTotalYLaVentaSigueEnCurso() throws Exception {   // crit. 1 y 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), 3, cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long venta = ventaEnCurso(cajero);
+
+        HttpResponse<String> respuesta = pasarAlCobro(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"id\":" + venta, "\"estado\":\"EN_CURSO\"", "\"articulos\":4",
+                "\"total\":26.20");
+        // Crit. 4: al regresar a la venta se siguen agregando y quitando productos.
+        assertThat(escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), cajero).body()).contains("\"total\":29.20");
+        assertThat(pasarAlCobro(cajero).body()).contains("\"total\":29.20");
+    }
+
+    @Test
+    void sinProductosNoSePasaAlCobro() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        enviar("/api/ventas", "POST", null, cajero.sesion());
+
+        HttpResponse<String> vacia = pasarAlCobro(cajero);
+
+        assertThat(vacia.statusCode()).isEqualTo(422);
+        assertThat(vacia.body()).contains("VENTA_VACIA");
+        // Tampoco si se quitaron todas las líneas (HU-06.07).
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        eliminar(lineaDe(cajero, arroz), cajero);
+        assertThat(pasarAlCobro(cajero).body()).contains("VENTA_VACIA");
+    }
+
+    @Test
+    void sinVentaOSinTurnoNoSePasaAlCobro() throws Exception {
+        assertThat(pasarAlCobro(cajeroConTurnoAbierto()).body()).contains("SIN_VENTA_EN_CURSO");
+        assertThat(pasarAlCobro(cajeroEnCaja()).body()).contains("CAJA_CERRADA");
+        // Sin caja vinculada (el Administrador desde su equipo) tampoco: cobrar exige el turno propio (HU-09.02).
+        assertThat(enviar("/api/ventas/actual/cobro", "POST", null, cookieAdmin).body()).contains("CAJA_CERRADA");
+    }
+
+    @Test
+    void alFinalizarLaVentaLaCajaQuedaListaParaLaSiguiente() throws Exception {   // pendiente de HU-06.01 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), cajero);
+        long venta = ventaEnCurso(cajero);
+        // Finalizar el cobro llega con HU-07.08 (#63); aquí se deja la venta como la dejará esa historia.
+        jdbc.update("UPDATE venta SET estado = 'FINALIZADA', finalizada_en = now() WHERE id = ?", venta);
+
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).statusCode()).isEqualTo(204);
+        HttpResponse<String> siguiente = enviar("/api/ventas", "POST", null, cajero.sesion());
+        assertThat(idDe(siguiente)).isNotEqualTo(venta);
+        assertThat(siguiente.body()).contains("\"estado\":\"EN_CURSO\"", "\"lineas\":[]");
+        assertThat(numeroDe(idDe(siguiente))).isEqualTo(numeroDe(venta) + 1);
+    }
+
+    @Test
+    void unaVentaFinalizadaConservaLaDescripcionYElPrecioDeUnProductoDesactivado() throws Exception {   // HU-03.09 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto galleta = nuevoProducto("Galleta de prueba", "4.50");
+        escanear(galleta.codigo(), 2, cajero);
+        long venta = ventaEnCurso(cajero);
+        jdbc.update("UPDATE venta SET estado = 'FINALIZADA', finalizada_en = now() WHERE id = ?", venta);
+
+        enviar("/api/productos/" + galleta.id() + "/desactivar", "POST", null, cookieAdmin);
+        cambiarPrecio(galleta, "9.99");
+
+        Venta finalizada = repositorioVentas.buscarPorId(venta).orElseThrow();
+        assertThat(finalizada.lineas()).singleElement().satisfies(linea -> {
+            assertThat(linea.descripcion()).isEqualTo("Galleta de prueba");
+            assertThat(linea.precioUnitario()).isEqualByComparingTo("4.50");
+            assertThat(linea.cantidad()).isEqualTo(2);
+        });
+        assertThat(finalizada.totales().total()).isEqualByComparingTo("9.00");
+    }
+
     // Apoyo
+
+    private HttpResponse<String> pasarAlCobro(Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/cobro", "POST", null, cajero.sesion());
+    }
+
+    private HttpResponse<String> suspendidas(Cajero cajero) throws Exception {
+        return enviar("/api/ventas/suspendidas", "GET", null, cajero.sesion());
+    }
+
+    private HttpResponse<String> retomar(long venta, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/suspendidas/" + venta + "/retomar", "POST", null, cajero.sesion());
+    }
+
+    private HttpResponse<String> suspender(Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/suspender", "POST", null, cajero.sesion());
+    }
+
+    private long ventaEnCurso(Cajero cajero) {
+        return jdbc.queryForObject("SELECT id FROM venta WHERE usuario_id = ? AND estado = 'EN_CURSO'", Long.class,
+                cajero.usuarioId());
+    }
+
+    private HttpResponse<String> eliminar(long linea, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas/" + linea, "DELETE", null, cajero.sesion());
+    }
+
+    private HttpResponse<String> escanear(String codigo, int cantidad, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas", "POST",
+                "{\"codigo\":\"%s\",\"cantidad\":%d}".formatted(codigo, cantidad), cajero.sesion());
+    }
+
+    private HttpResponse<String> cambiarCantidad(long linea, int cantidad, Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/lineas/" + linea + "/cantidad", "PUT",
+                "{\"cantidad\":%d}".formatted(cantidad), cajero.sesion());
+    }
+
+    private long lineaDe(Cajero cajero, Producto producto) {
+        return jdbc.queryForObject("""
+                SELECT l.id FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.producto_id = ? AND l.eliminada_en IS NULL""",
+                Long.class, cajero.usuarioId(), producto.id());
+    }
 
     private HttpResponse<String> escanear(String codigo, Cajero cajero) throws Exception {
         return enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(codigo), cajero.sesion());
@@ -591,7 +1210,8 @@ class VentasIntegracionTest {
     private int lineasEnCurso(Cajero cajero) {
         return jdbc.queryForObject("""
                 SELECT count(*) FROM venta_linea l JOIN venta v ON v.id = l.venta_id
-                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO'""", Integer.class, cajero.usuarioId());
+                WHERE v.usuario_id = ? AND v.estado = 'EN_CURSO' AND l.eliminada_en IS NULL""", Integer.class,
+                cajero.usuarioId());
     }
 
     record Producto(long id, String codigo, String descripcion, BigDecimal precio) {}

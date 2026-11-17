@@ -7,12 +7,16 @@ import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.Venta;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,12 +41,13 @@ public class VentasController {
 
     /** La venta con sus totales ya calculados por el servidor: la pantalla nunca calcula montos (§6.1). */
     public record RespuestaVenta(long id, long numero, EstadoVenta estado, String cajaNombre, OffsetDateTime creadaEn,
-                                 List<LineaVenta> lineas, int articulos, BigDecimal subtotal, BigDecimal iva,
+                                 OffsetDateTime suspendidaEn, List<LineaVenta> lineas, int articulos, BigDecimal subtotal, BigDecimal iva,
                                  BigDecimal total) {
 
         static RespuestaVenta de(Venta venta) {
             var totales = venta.totales();
             return new RespuestaVenta(venta.id(), venta.numero(), venta.estado(), venta.cajaNombre(), venta.creadaEn(),
+                    venta.suspendidaEn(),
                     venta.lineas(), venta.articulos(), totales.subtotal(), totales.iva(), totales.total());
         }
     }
@@ -67,25 +72,104 @@ public class VentasController {
      * crit. 1; el servidor lo normaliza), o el id del producto elegido en la búsqueda por descripción (HU-06.03
      * crit. 2). Exactamente uno de los dos.
      */
-    public record SolicitudLinea(@Size(max = 100) String codigo, Long productoId) {
+    public record SolicitudLinea(@Size(max = 100) String codigo, Long productoId, Integer cantidad,
+                                 Boolean confirmada) {
 
         @AssertTrue(message = "indique el código o el producto, pero no ambos")
         public boolean isUnaReferencia() {
             return (codigo != null && !codigo.isBlank()) != (productoId != null);
         }
+
+        /** HU-06.04: sin cantidad se agrega una unidad (HU-06.02 crit. 1); sin {@code confirmada}, no se confirmó. */
+        int unidades() {
+            return cantidad == null ? 1 : cantidad;
+        }
+
+        boolean confirmo() {
+            return Boolean.TRUE.equals(confirmada);
+        }
     }
 
     /**
-     * HU-06.02 y HU-06.03: agrega el producto a la venta en curso (la inicia si hace falta) y devuelve la venta con
-     * los totales recalculados. 404 si el código o el producto no existen (HU-03.08), 422 si el producto está
-     * inactivo (HU-03.09).
+     * HU-06.02, HU-06.03 y HU-06.04: agrega el producto a la venta en curso (la inicia si hace falta) y devuelve la
+     * venta con los totales recalculados. 404 si el código o el producto no existen (HU-03.08), 422 si el producto
+     * está inactivo (HU-03.09), si la cantidad no es válida ({@code CANTIDAD_INVALIDA}) o si hay que confirmarla
+     * ({@code CANTIDAD_POR_CONFIRMAR}: se reenvía con {@code confirmada}).
      */
     @PostMapping("/actual/lineas")
     @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
     public RespuestaVenta agregar(@Valid @RequestBody SolicitudLinea solicitud, @AuthenticationPrincipal SesionActiva sesion) {
         return RespuestaVenta.de(solicitud.productoId() != null
-                ? gestionVentas.agregarProducto(solicitud.productoId(), sesion)
-                : gestionVentas.agregarPorCodigo(solicitud.codigo(), sesion));
+                ? gestionVentas.agregarProducto(solicitud.productoId(), solicitud.unidades(), solicitud.confirmo(), sesion)
+                : gestionVentas.agregarPorCodigo(solicitud.codigo(), solicitud.unidades(), solicitud.confirmo(), sesion));
+    }
+
+    /** La cantidad nueva de la línea (HU-06.04 crit. 2) y si el cajero ya confirmó una cantidad alta (crit. 4). */
+    public record SolicitudCantidad(@NotNull Integer cantidad, Boolean confirmada) {
+
+        boolean confirmo() {
+            return Boolean.TRUE.equals(confirmada);
+        }
+    }
+
+    /**
+     * HU-06.04 crit. 2: cambia la cantidad de una línea de la venta en curso y devuelve la venta recalculada. 404 si
+     * la línea no es de la venta en curso del turno; 422 si la cantidad no es válida o hay que confirmarla.
+     */
+    @PutMapping("/actual/lineas/{lineaId}/cantidad")
+    @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
+    public RespuestaVenta cambiarCantidad(@PathVariable long lineaId, @Valid @RequestBody SolicitudCantidad solicitud,
+                                          @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.cambiarCantidad(lineaId, solicitud.cantidad(), solicitud.confirmo(), sesion));
+    }
+
+    /**
+     * HU-06.07: quita la línea de la venta en curso y devuelve la venta con los totales recalculados (crit. 4). Sin
+     * autorización de un supervisor (crit. 2). 404 si la línea no es de la venta en curso del turno.
+     */
+    @DeleteMapping("/actual/lineas/{lineaId}")
+    @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
+    public RespuestaVenta eliminarLinea(@PathVariable long lineaId, @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.eliminarLinea(lineaId, sesion));
+    }
+
+    /**
+     * HU-06.12: deja en espera la venta en curso y devuelve la venta suspendida, con todas sus líneas. La pantalla
+     * inicia después la siguiente venta (crit. 1). 422 {@code VENTA_VACIA} si no tiene productos.
+     */
+    @PostMapping("/actual/suspender")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public RespuestaVenta suspender(@AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.suspender(sesion));
+    }
+
+    /** HU-06.13 crit. 1 y 3: las ventas suspendidas de la caja propia, con su hora, artículos y total. */
+    @GetMapping("/suspendidas")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public List<RespuestaVenta> suspendidas(@AuthenticationPrincipal SesionActiva sesion) {
+        return gestionVentas.suspendidas(sesion).stream().map(RespuestaVenta::de).toList();
+    }
+
+    /**
+     * HU-06.13 crit. 2: retoma la venta suspendida como venta en curso, con todas sus líneas y sus precios. 404 si no
+     * está suspendida en la caja propia (crit. 3); 422 {@code VENTA_EN_CURSO_CON_PRODUCTOS} si hay otra venta en curso
+     * con productos.
+     */
+    @PostMapping("/suspendidas/{ventaId}/retomar")
+    @PreAuthorize("hasAuthority('VENTA_SUSPENDER_CANCELAR')")
+    public RespuestaVenta retomar(@PathVariable long ventaId, @AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.retomar(ventaId, sesion));
+    }
+
+    /**
+     * HU-06.15: valida que la venta en curso puede pasar al cobro y la devuelve con el total a cobrar. 422
+     * {@code VENTA_VACIA} sin productos (crit. 2) o el motivo de EP-05 si el cliente no cumple sus reglas (crit. 3).
+     * No cambia la venta: desde el cobro se puede regresar a modificarla (crit. 4).
+     */
+    @PostMapping("/actual/cobro")
+    @PreAuthorize("hasAuthority('PAGO_REGISTRAR')")
+    public RespuestaVenta pasarAlCobro(@AuthenticationPrincipal SesionActiva sesion) {
+        return RespuestaVenta.de(gestionVentas.pasarAlCobro(sesion));
     }
 
     /** HU-06.14: cancela la venta en curso; devuelve la venta cancelada. Sin autorización de supervisor (crit. 2). */

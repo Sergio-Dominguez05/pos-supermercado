@@ -429,12 +429,18 @@ kbd {
 }
 
 /* Totales de la venta: Subtotal, IVA y TOTAL en ese orden (HU-04.04); el TOTAL en letra grande (HU-06.08). */
+/* HU-06.08 crit. 1: los totales quedan fijos al pie de la pantalla aunque la lista de productos sea larga. */
 .totales {
   display: grid;
   grid-template-columns: auto auto;
   justify-content: end;
   gap: 4px 24px;
   margin: 0;
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0;
+  background: var(--superficie);
+  border-top: 1px solid var(--borde);
 }
 
 .totales dt {
@@ -447,9 +453,23 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* HU-06.08 crit. 2: el TOTAL en letra grande. */
 .totales dd.total {
   font-size: 2rem;
   font-weight: 700;
+}
+
+/* Cantidad editable de cada línea de la venta (HU-06.04 crit. 2). */
+.cantidad-linea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.cantidad-linea input {
+  width: 5em;
+  text-align: right;
 }
 
 /* Desglose de IVA por línea de la venta (HU-04.03 crit. 3). */
@@ -460,4 +480,36 @@ kbd {
 
 .desglose[open] summary {
   margin-bottom: 8px;
+}
+
+/* HU-06.17: la línea sobre la que actúan F4 y Supr. */
+.tabla tr.seleccionada td {
+  background: color-mix(in srgb, var(--texto) 10%, transparent);
+}
+
+.tabla tr.seleccionada td:first-child {
+  box-shadow: inset 3px 0 0 var(--texto);
+}
+
+/* HU-06.17 crit. 2: ayuda rápida de atajos (F1). */
+.ayuda-atajos .atajos li.pendiente {
+  color: var(--texto-suave);
+}
+
+/* HU-06.13: lista de ventas en espera (F8). */
+.lista-suspendidas {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.lista-suspendidas li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
 }

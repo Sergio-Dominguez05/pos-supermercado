@@ -1,14 +1,36 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_TURNO_ACTUAL, type Turno } from '../../api/turnos'
-import { CLAVE_VENTA_EN_CURSO, type Venta as DatosVenta } from '../../api/ventas'
+import {
+  CLAVE_VENTA_EN_CURSO,
+  CLAVE_VENTAS_SUSPENDIDAS,
+  eliminarLinea,
+  listarSuspendidas,
+  pasarAlCobro,
+  retomarVenta,
+  suspenderVenta,
+  type Venta as DatosVenta,
+} from '../../api/ventas'
+import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { confirmacionCancelarVenta, formatoDesglose } from './textos'
+import { SuspenderVenta } from './SuspenderVenta'
+import {
+  avisoVentaRetomada,
+  avisoVentaSuspendida,
+  confirmacionCancelarVenta,
+  confirmacionQuitarLinea,
+  descripcionSuspendida,
+  formatoDesglose,
+  rotuloSuspendidas,
+} from './textos'
+import { PasoDeCobro } from './PasoDeCobro'
+import { VentasSuspendidas } from './VentasSuspendidas'
+import { AyudaAtajos } from './AyudaAtajos'
 import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
 
 const CAJERO = {
@@ -35,6 +57,7 @@ const VENTA_VACIA: DatosVenta = {
   estado: 'EN_CURSO',
   cajaNombre: 'Caja 1',
   creadaEn: '2026-11-16T15:00:00Z',
+  suspendidaEn: null,
   lineas: [],
   articulos: 0,
   subtotal: 0,
@@ -42,8 +65,14 @@ const VENTA_VACIA: DatosVenta = {
   total: 0,
 }
 
-const renderizar = (sesion: UsuarioSesion, turno: Turno | null, venta: DatosVenta | null = VENTA_VACIA) => {
+const renderizar = (
+  sesion: UsuarioSesion,
+  turno: Turno | null,
+  venta: DatosVenta | null = VENTA_VACIA,
+  suspendidas: DatosVenta[] = [],
+) => {
   const cliente = new QueryClient()
+  cliente.setQueryData(CLAVE_VENTAS_SUSPENDIDAS, suspendidas)
   cliente.setQueryData(CLAVE_SESION, sesion)
   cliente.setQueryData(CLAVE_TURNO_ACTUAL, turno)
   if (venta) cliente.setQueryData(CLAVE_VENTA_EN_CURSO, venta)
@@ -140,6 +169,289 @@ describe('iniciar una venta (HU-06.01)', () => {
     expect(html).toContain('<dd class="total">Q15.00</dd>')
     expect(html).toContain('<dd>Q13.39</dd>')
     expect(html).toContain('<dd>Q1.61</dd>')
+  })
+})
+
+describe('ver totales en tiempo real (HU-06.08)', () => {
+  it('con la venta vacía ya se ven los artículos y los totales en cero (crit. 1)', () => {
+    const html = renderizar(CAJERO, TURNO)
+
+    const orden = ['Artículos', 'Subtotal', 'IVA', 'TOTAL'].map((rotulo) => html.indexOf(`<dt>${rotulo}</dt>`))
+    expect(orden.every((posicion) => posicion >= 0)).toBe(true)
+    expect(orden).toEqual([...orden].sort((a, b) => a - b))
+    expect(html).toContain('<dd class="total">Q0.00</dd>')
+  })
+
+  it('el TOTAL se distingue con su propia clase para la letra grande (crit. 2)', () => {
+    const html = renderToString(<DetalleVenta venta={{ ...VENTA_VACIA, articulos: 2, total: 26.2 }} />)
+
+    expect(html).toContain('<dd class="total">Q26.20</dd>')
+    expect(html.match(/class="total"/g)).toHaveLength(1)
+  })
+
+  it('muestra los montos tal como los redondea el servidor, sin recalcularlos (crit. 3)', () => {
+    const html = renderToString(
+      <DetalleVenta venta={{ ...VENTA_VACIA, articulos: 4, subtotal: 23.39, iva: 2.81, total: 26.2 }} />,
+    ).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<dd>4</dd>')
+    expect(html).toContain('<dd>Q23.39</dd>')
+    expect(html).toContain('<dd>Q2.81</dd>')
+  })
+})
+
+describe('cambiar la cantidad de una línea (HU-06.04 crit. 2)', () => {
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [
+    { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+      subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 },
+  ] }
+
+  it('en la pantalla de venta cada línea tiene su cantidad editable', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz)
+
+    expect(html).toMatch(/<input[^>]*name="cantidad"/)
+    expect(html).toContain('aria-label="Cantidad de Arroz 1 lb"')
+    expect(html).toContain('value="3"')
+  })
+
+  it('el detalle de solo lectura muestra la cantidad sin campo', () => {
+    expect(renderToString(<DetalleVenta venta={conArroz} />)).not.toContain('name="cantidad"')
+  })
+
+  it('el campo del código explica el multiplicador (crit. 1)', () => {
+    expect(renderizar(CAJERO, TURNO)).toContain('6* antes para 6 unidades')
+  })
+})
+
+describe('eliminar una línea (HU-06.07)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+
+  it('cada línea de la venta se puede quitar (crit. 1)', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz)
+
+    expect(html).toContain('<th>Acciones</th>')
+    expect(html).toMatch(/<button[^>]*aria-label="Quitar Arroz 1 lb"[^>]*>Quitar<\/button>/)
+  })
+
+  it('el detalle de solo lectura no ofrece quitar líneas', () => {
+    const html = renderToString(<DetalleVenta venta={conArroz} />)
+
+    expect(html).not.toContain('Quitar')
+    expect(html).not.toContain('Acciones')
+  })
+
+  it('pide confirmación con la cantidad, el producto y el subtotal', () => {
+    expect(confirmacionQuitarLinea(ARROZ)).toBe('¿Quitar 3 x Arroz 1 lb (Q15.00) de la venta?')
+  })
+
+  it('quitar es un DELETE de la línea en la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(VENTA_VACIA), { status: 200 })))
+
+    await expect(eliminarLinea(9)).resolves.toMatchObject({ total: 0 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/lineas/9')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('operar con atajos de teclado (HU-06.17)', () => {
+  const linea = (id: number) => ({ id, productoId: id, codigoBarras: `74${id}`, descripcion: `Producto ${id}`,
+    cantidad: 1, precioUnitario: 5, subtotalConIva: 5, baseImponible: 4.464286, iva: 0.535714 })
+  const conDos: DatosVenta = { ...VENTA_VACIA, articulos: 2, total: 10, lineas: [linea(1), linea(2)] }
+
+  it('la pantalla indica que F1 abre los atajos (crit. 2)', () => {
+    expect(renderizar(CAJERO, TURNO)).toContain('<kbd>F1</kbd> Atajos de teclado')
+  })
+
+  it('la ayuda rápida lista todo el mapa y marca lo que llega con otras historias (crit. 1 y 2)', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    for (const atajo of ATAJOS) expect(html).toContain(atajo.descripcion)
+    expect(html).toContain('<kbd>Supr</kbd> Eliminar línea')
+    expect(html).toContain('<kbd>6*</kbd> antes del código')
+    expect(html).toContain('Consultar precio<small> (llega con HU-03.10 (#28))</small>')
+    expect(html).not.toContain('Cancelar venta<small>')
+  })
+
+  it('la última línea agregada queda seleccionada para F4 y Supr', () => {
+    const html = renderizar(CAJERO, TURNO, conDos)
+
+    expect(html).toMatch(/<tr data-linea="2" class="seleccionada" aria-selected="true">/)
+    expect(html).toMatch(/<tr data-linea="1" aria-selected="false">/)
+    expect(html).toContain('data-control="cantidad"')
+    expect(html).toContain('data-control="quitar"')
+  })
+
+  it('el botón de cancelar muestra su atajo F10', () => {
+    const html = renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <CancelarVenta venta={conDos} />
+      </QueryClientProvider>,
+    ).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('data-control="cancelar-venta"')
+    expect(html).toContain('Cancelar venta <kbd>F10</kbd>')
+  })
+})
+
+describe('suspender una venta (HU-06.12)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
+  const renderizarSuspender = (venta: DatosVenta) =>
+    renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <SuspenderVenta venta={venta} />
+      </QueryClientProvider>,
+    ).replaceAll('<!-- -->', '')
+
+  it('con productos ofrece suspender la venta con su atajo F7 (crit. 1 y HU-06.17)', () => {
+    const html = renderizarSuspender(conArroz)
+
+    expect(html).toContain('data-control="suspender-venta"')
+    expect(html).toContain('Suspender venta <kbd>F7</kbd>')
+  })
+
+  it('una venta sin productos no tiene nada que suspender', () => {
+    expect(renderizarSuspender(VENTA_VACIA)).toBe('')
+    expect(renderizar(CAJERO, TURNO)).not.toContain('Suspender venta')
+  })
+
+  it('la pantalla de venta muestra suspender junto a cancelar', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz)
+
+    expect(html.indexOf('Suspender venta')).toBeGreaterThan(-1)
+    expect(html.indexOf('Suspender venta')).toBeLessThan(html.indexOf('Cancelar venta'))
+  })
+
+  it('avisa qué venta quedó en espera (crit. 1)', () => {
+    expect(avisoVentaSuspendida({ ...conArroz, numero: 1042 })).toBe(
+      'Venta N.º 1042 en espera: 3 artículos (Q15.00). Ya puede atender al siguiente cliente.',
+    )
+    expect(avisoVentaSuspendida({ ...conArroz, articulos: 1, total: 5 })).toContain('1 artículo (Q5.00)')
+  })
+
+  it('suspender es un POST sobre la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(conArroz), { status: 200 })))
+
+    await expect(suspenderVenta()).resolves.toMatchObject({ total: 15 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/suspender')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('F7 ya no figura como pendiente en la ayuda', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<kbd>F7</kbd> Suspender venta</li>')
+  })
+})
+
+describe('retomar una venta suspendida (HU-06.13)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const enEspera = (id: number, numero: number, suspendidaEn: string): DatosVenta => ({
+    ...VENTA_VACIA, id, numero, estado: 'SUSPENDIDA', suspendidaEn, articulos: 3, total: 15, lineas: [ARROZ],
+  })
+  const DOS = [enEspera(40, 1040, '2026-11-16T23:47:00Z'), enEspera(41, 1041, '2026-11-16T23:52:00Z')]
+  const renderizarLista = (suspendidas: DatosVenta[]) =>
+    renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <VentasSuspendidas suspendidas={suspendidas} onCerrar={() => {}} onRetomada={() => {}} />
+      </QueryClientProvider>,
+    ).replaceAll('<!-- -->', '')
+
+  it('cada venta en espera muestra su número, hora, artículos y total (crit. 1)', () => {
+    expect(descripcionSuspendida(DOS[0])).toBe('N.º 1040 · 17:47 · 3 artículos · Q15.00')
+    expect(descripcionSuspendida({ ...DOS[0], articulos: 1, total: 5 })).toBe('N.º 1040 · 17:47 · 1 artículo · Q5.00')
+  })
+
+  it('la lista ofrece retomar cada una y el primer botón recibe el foco (crit. 2 y HU-06.17)', () => {
+    const html = renderizarLista(DOS)
+
+    expect(html).toContain('N.º 1040 · 17:47')
+    expect(html).toContain('N.º 1041 · 17:52')
+    expect(html.match(/>Retomar<\/button>/g)).toHaveLength(2)
+    expect(html.match(/autofocus=""/gi)).toHaveLength(1)
+  })
+
+  it('sin ventas en espera lo dice', () => {
+    expect(renderizarLista([])).toContain('No hay ventas en espera en esta caja.')
+  })
+
+  it('la pantalla muestra cuántas hay en espera, con su atajo F8', () => {
+    expect(renderizar(CAJERO, TURNO, VENTA_VACIA, DOS)).toContain(`${rotuloSuspendidas(2)} <kbd>F8</kbd>`)
+    expect(rotuloSuspendidas(2)).toBe('Ventas en espera (2)')
+    expect(renderizar(CAJERO, TURNO)).not.toContain('Ventas en espera')
+    expect(renderizar(CAJERO, null, null, DOS)).not.toContain('Ventas en espera')
+  })
+
+  it('avisa qué venta se retomó', () => {
+    expect(avisoVentaRetomada({ ...DOS[0], estado: 'EN_CURSO' })).toBe('Venta N.º 1040 retomada: 3 artículos (Q15.00).')
+  })
+
+  it('listar es un GET y retomar un POST sobre la venta suspendida', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('[]', { status: 200 }))))
+
+    await listarSuspendidas()
+    await retomarVenta(40)
+    const [[rutaLista, opcionesLista], [rutaRetomar, opcionesRetomar]] = vi.mocked(fetch).mock.calls
+    expect(rutaLista).toBe('/api/ventas/suspendidas')
+    expect(opcionesLista?.method).toBeUndefined()
+    expect(rutaRetomar).toBe('/api/ventas/suspendidas/40/retomar')
+    expect(opcionesRetomar).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('F8 ya no figura como pendiente en la ayuda', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<kbd>F8</kbd> Retomar venta</li>')
+  })
+})
+
+describe('pasar al cobro (HU-06.15)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, subtotal: 13.39, iva: 1.61, total: 15, lineas: [ARROZ] }
+
+  it('con productos ofrece cobrar con su atajo F12, antes de suspender y cancelar (crit. 1)', () => {
+    const html = renderizar(CAJERO, TURNO, conArroz).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('data-control="cobrar"')
+    expect(html).toContain('Cobrar <kbd>F12</kbd>')
+    expect(html.indexOf('data-control="cobrar"')).toBeLessThan(html.indexOf('data-control="suspender-venta"'))
+  })
+
+  it('sin productos no se ofrece cobrar (crit. 2)', () => {
+    expect(renderizar(CAJERO, TURNO)).not.toContain('data-control="cobrar"')
+  })
+
+  it('el cobro muestra el total a cobrar y permite regresar a la venta (crit. 1 y 4)', () => {
+    const html = renderToString(<PasoDeCobro venta={conArroz} onRegresar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<dt>Total a cobrar</dt><dd class="total">Q15.00</dd>')
+    expect(html).toContain('<dd>3</dd>')
+    expect(html).toMatch(/<button[^>]*data-control="regresar-a-la-venta"[^>]*autofocus=""/i)
+    expect(html).toContain('Regresar a la venta <kbd>Esc</kbd>')
+    expect(html).toContain('HU-07.03 (#60)')
+  })
+
+  it('pasar al cobro es un POST de validación sobre la venta en curso', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(conArroz), { status: 200 })))
+
+    await expect(pasarAlCobro()).resolves.toMatchObject({ total: 15 })
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/ventas/actual/cobro')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('F12 ya no figura como pendiente en la ayuda (HU-06.17 crit. 3)', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<kbd>F12</kbd> Cobrar</li>')
   })
 })
 
