@@ -11,6 +11,7 @@ export const ACCIONES_DE_LA_VENTA = [
   'cambiarCantidad',
   'eliminarLinea',
   'suspenderVenta',
+  'retomarVenta',
   'cancelarVenta',
 ] as const satisfies readonly AccionCaja[]
 

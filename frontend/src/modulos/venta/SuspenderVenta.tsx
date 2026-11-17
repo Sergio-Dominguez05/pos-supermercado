@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CLAVE_VENTA_EN_CURSO, suspenderVenta, type Venta } from '../../api/ventas'
+import { CLAVE_VENTA_EN_CURSO, CLAVE_VENTAS_SUSPENDIDAS, suspenderVenta, type Venta } from '../../api/ventas'
 import { avisoSonoro } from '../catalogo/sonido'
 
 /**
@@ -13,6 +13,7 @@ export function SuspenderVenta({ venta, onSuspendida }: { venta: Venta; onSuspen
     mutationFn: () => suspenderVenta(),
     onSuccess: (suspendida) => {
       onSuspendida?.(suspendida)
+      void clienteConsultas.invalidateQueries({ queryKey: CLAVE_VENTAS_SUSPENDIDAS })
       return clienteConsultas.invalidateQueries({ queryKey: CLAVE_VENTA_EN_CURSO })
     },
     onError: () => avisoSonoro(),

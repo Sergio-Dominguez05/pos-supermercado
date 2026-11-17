@@ -21,6 +21,7 @@ const venta = (...lineas: LineaVenta[]): Venta => ({
   estado: 'EN_CURSO',
   cajaNombre: 'Caja 1',
   creadaEn: '2026-11-16T15:00:00Z',
+  suspendidaEn: null,
   lineas,
   articulos: 0,
   subtotal: 0,

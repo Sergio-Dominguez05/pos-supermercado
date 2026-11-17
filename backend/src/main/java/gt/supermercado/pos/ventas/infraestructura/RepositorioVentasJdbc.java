@@ -19,7 +19,7 @@ class RepositorioVentasJdbc implements RepositorioVentas {
 
     private static final String SELECT_VENTA = """
             SELECT v.id, v.numero, v.turno_id, v.caja_id, c.nombre AS caja_nombre, v.usuario_id, v.estado, v.tasa_iva,
-                   v.creada_en
+                   v.creada_en, v.suspendida_en
             FROM venta v
             JOIN caja c ON c.id = v.caja_id
             """;
@@ -96,6 +96,26 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
+    public List<Venta> suspendidasDeLaCaja(long cajaId) {
+        List<Long> ids = jdbc.queryForList("""
+                SELECT id FROM venta WHERE caja_id = ? AND estado = 'SUSPENDIDA' ORDER BY suspendida_en, id""",
+                Long.class, cajaId);
+        return ids.stream().map(id -> buscarPorId(id).orElseThrow()).toList();
+    }
+
+    @Override
+    public void bloquearTurno(long turnoId) {
+        jdbc.queryForList("SELECT id FROM turno WHERE id = ? FOR UPDATE", Long.class, turnoId);
+    }
+
+    @Override
+    public boolean retomar(long ventaId, long cajaId, long turnoId, long usuarioId) {
+        return jdbc.update("""
+                UPDATE venta SET estado = 'EN_CURSO', turno_id = ?, usuario_id = ?
+                WHERE id = ? AND caja_id = ? AND estado = 'SUSPENDIDA'""", turnoId, usuarioId, ventaId, cajaId) == 1;
+    }
+
+    @Override
     public int suspendidasDelTurno(long turnoId) {
         return jdbc.queryForObject("SELECT count(*) FROM venta WHERE turno_id = ? AND estado = 'SUSPENDIDA'",
                 Integer.class, turnoId);
@@ -165,6 +185,7 @@ class RepositorioVentasJdbc implements RepositorioVentas {
                     EstadoVenta.valueOf(rs.getString("estado")),
                     rs.getBigDecimal("tasa_iva"),
                     rs.getObject("creada_en", OffsetDateTime.class),
+                    rs.getObject("suspendida_en", OffsetDateTime.class),
                     lineas(id));
         }, parametros).stream().findFirst();
     }

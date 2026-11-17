@@ -4,13 +4,30 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import { CLAVE_TURNO_ACTUAL, type Turno } from '../../api/turnos'
-import { CLAVE_VENTA_EN_CURSO, eliminarLinea, suspenderVenta, type Venta as DatosVenta } from '../../api/ventas'
+import {
+  CLAVE_VENTA_EN_CURSO,
+  CLAVE_VENTAS_SUSPENDIDAS,
+  eliminarLinea,
+  listarSuspendidas,
+  retomarVenta,
+  suspenderVenta,
+  type Venta as DatosVenta,
+} from '../../api/ventas'
 import { ATAJOS } from '../../atajos/atajos'
 import { puedeVender } from '../caja/turno'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
 import { SuspenderVenta } from './SuspenderVenta'
-import { avisoVentaSuspendida, confirmacionCancelarVenta, confirmacionQuitarLinea, formatoDesglose } from './textos'
+import {
+  avisoVentaRetomada,
+  avisoVentaSuspendida,
+  confirmacionCancelarVenta,
+  confirmacionQuitarLinea,
+  descripcionSuspendida,
+  formatoDesglose,
+  rotuloSuspendidas,
+} from './textos'
+import { VentasSuspendidas } from './VentasSuspendidas'
 import { AyudaAtajos } from './AyudaAtajos'
 import { CancelarVenta, DesgloseIva, DetalleVenta, Venta } from './Venta'
 
@@ -38,6 +55,7 @@ const VENTA_VACIA: DatosVenta = {
   estado: 'EN_CURSO',
   cajaNombre: 'Caja 1',
   creadaEn: '2026-11-16T15:00:00Z',
+  suspendidaEn: null,
   lineas: [],
   articulos: 0,
   subtotal: 0,
@@ -45,8 +63,14 @@ const VENTA_VACIA: DatosVenta = {
   total: 0,
 }
 
-const renderizar = (sesion: UsuarioSesion, turno: Turno | null, venta: DatosVenta | null = VENTA_VACIA) => {
+const renderizar = (
+  sesion: UsuarioSesion,
+  turno: Turno | null,
+  venta: DatosVenta | null = VENTA_VACIA,
+  suspendidas: DatosVenta[] = [],
+) => {
   const cliente = new QueryClient()
+  cliente.setQueryData(CLAVE_VENTAS_SUSPENDIDAS, suspendidas)
   cliente.setQueryData(CLAVE_SESION, sesion)
   cliente.setQueryData(CLAVE_TURNO_ACTUAL, turno)
   if (venta) cliente.setQueryData(CLAVE_VENTA_EN_CURSO, venta)
@@ -320,6 +344,69 @@ describe('suspender una venta (HU-06.12)', () => {
     const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
 
     expect(html).toContain('<kbd>F7</kbd> Suspender venta</li>')
+  })
+})
+
+describe('retomar una venta suspendida (HU-06.13)', () => {
+  const ARROZ = { id: 1, productoId: 5, codigoBarras: '7401', descripcion: 'Arroz 1 lb', cantidad: 3, precioUnitario: 5,
+    subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
+  const enEspera = (id: number, numero: number, suspendidaEn: string): DatosVenta => ({
+    ...VENTA_VACIA, id, numero, estado: 'SUSPENDIDA', suspendidaEn, articulos: 3, total: 15, lineas: [ARROZ],
+  })
+  const DOS = [enEspera(40, 1040, '2026-11-16T23:47:00Z'), enEspera(41, 1041, '2026-11-16T23:52:00Z')]
+  const renderizarLista = (suspendidas: DatosVenta[]) =>
+    renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <VentasSuspendidas suspendidas={suspendidas} onCerrar={() => {}} onRetomada={() => {}} />
+      </QueryClientProvider>,
+    ).replaceAll('<!-- -->', '')
+
+  it('cada venta en espera muestra su número, hora, artículos y total (crit. 1)', () => {
+    expect(descripcionSuspendida(DOS[0])).toBe('N.º 1040 · 17:47 · 3 artículos · Q15.00')
+    expect(descripcionSuspendida({ ...DOS[0], articulos: 1, total: 5 })).toBe('N.º 1040 · 17:47 · 1 artículo · Q5.00')
+  })
+
+  it('la lista ofrece retomar cada una y el primer botón recibe el foco (crit. 2 y HU-06.17)', () => {
+    const html = renderizarLista(DOS)
+
+    expect(html).toContain('N.º 1040 · 17:47')
+    expect(html).toContain('N.º 1041 · 17:52')
+    expect(html.match(/>Retomar<\/button>/g)).toHaveLength(2)
+    expect(html.match(/autofocus=""/gi)).toHaveLength(1)
+  })
+
+  it('sin ventas en espera lo dice', () => {
+    expect(renderizarLista([])).toContain('No hay ventas en espera en esta caja.')
+  })
+
+  it('la pantalla muestra cuántas hay en espera, con su atajo F8', () => {
+    expect(renderizar(CAJERO, TURNO, VENTA_VACIA, DOS)).toContain(`${rotuloSuspendidas(2)} <kbd>F8</kbd>`)
+    expect(rotuloSuspendidas(2)).toBe('Ventas en espera (2)')
+    expect(renderizar(CAJERO, TURNO)).not.toContain('Ventas en espera')
+    expect(renderizar(CAJERO, null, null, DOS)).not.toContain('Ventas en espera')
+  })
+
+  it('avisa qué venta se retomó', () => {
+    expect(avisoVentaRetomada({ ...DOS[0], estado: 'EN_CURSO' })).toBe('Venta N.º 1040 retomada: 3 artículos (Q15.00).')
+  })
+
+  it('listar es un GET y retomar un POST sobre la venta suspendida', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('[]', { status: 200 }))))
+
+    await listarSuspendidas()
+    await retomarVenta(40)
+    const [[rutaLista, opcionesLista], [rutaRetomar, opcionesRetomar]] = vi.mocked(fetch).mock.calls
+    expect(rutaLista).toBe('/api/ventas/suspendidas')
+    expect(opcionesLista?.method).toBeUndefined()
+    expect(rutaRetomar).toBe('/api/ventas/suspendidas/40/retomar')
+    expect(opcionesRetomar).toMatchObject({ method: 'POST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('F8 ya no figura como pendiente en la ayuda', () => {
+    const html = renderToString(<AyudaAtajos onCerrar={() => {}} />).replaceAll('<!-- -->', '')
+
+    expect(html).toContain('<kbd>F8</kbd> Retomar venta</li>')
   })
 })
 
