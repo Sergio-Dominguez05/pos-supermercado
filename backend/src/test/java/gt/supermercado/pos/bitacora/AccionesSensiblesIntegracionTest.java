@@ -2,6 +2,7 @@ package gt.supermercado.pos.bitacora;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
+import gt.supermercado.pos.facturacion.FacturacionDePrueba;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -350,6 +351,7 @@ class AccionesSensiblesIntegracionTest {
 
     @Test
     void finalizacionDeVentaExitosaYRechazada() throws Exception {   // HU-07.08
+        FacturacionDePrueba.configurarEmisorYEstablecimiento(jdbc);
         String nombre = "Caja fin " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
         long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
         String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
