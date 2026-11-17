@@ -12,6 +12,7 @@ import {
   type Caja,
 } from '../../api/cajas'
 import { useSesion } from '../login/sesion'
+import { NavConfiguracion } from './NavConfiguracion'
 import { avisoEquipoVinculado, avisoEstadoCaja, confirmacionDesactivarCaja, confirmacionVincular } from './textos'
 
 /** HU-12.05: cajas del supermercado, con el equipo físico vinculado a cada una. */
@@ -26,9 +27,7 @@ export function ListaCajas() {
   return (
     <main className="pagina pagina-ancha">
       <h1>Cajas</h1>
-      <p className="subtitulo">
-        <Link to="/inicio">Inicio</Link> · Configuración · Cajas · <Link to="/configuracion/fel">Conexión FEL</Link>
-      </p>
+      <NavConfiguracion actual="Cajas" />
       {aviso && (
         <p className="tarjeta exito" role="status">
           {aviso}

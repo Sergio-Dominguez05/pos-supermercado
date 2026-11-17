@@ -19,8 +19,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
-  // La configuración abre en las cajas (HU-12.05); desde ahí se llega a la conexión FEL (HU-12.03). El resto de EP-12
-  // se agrega a esas pantallas.
+  // La configuración abre en las cajas (HU-12.05); desde ahí se llega al emisor (HU-12.01) y a la conexión FEL
+  // (HU-12.03). El resto de EP-12 se agrega a NavConfiguracion.
   { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR', ruta: '/configuracion/cajas' },
 ]
 
