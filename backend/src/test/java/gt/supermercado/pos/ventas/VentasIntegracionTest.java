@@ -2,6 +2,8 @@ package gt.supermercado.pos.ventas;
 
 import gt.supermercado.pos.TestcontainersConfiguration;
 import gt.supermercado.pos.caja.dominio.VerificadorVentasSuspendidas;
+import gt.supermercado.pos.ventas.dominio.RepositorioVentas;
+import gt.supermercado.pos.ventas.dominio.Venta;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +58,9 @@ class VentasIntegracionTest {
     /** El puerto de {@code caja} que implementa ventas (HU-06.12 crit. 4). */
     @Autowired
     VerificadorVentasSuspendidas verificadorSuspendidas;
+
+    @Autowired
+    RepositorioVentas repositorioVentas;
 
     @Value("${local.server.port}")
     int puerto;
@@ -1054,7 +1059,89 @@ class VentasIntegracionTest {
         assertThat(retomar(1, cajero).body()).contains("CAJA_CERRADA");
     }
 
+    // HU-06.15 Finalizar la venta y pasar al cobro
+
+    @Test
+    void conProductosPasaAlCobroConElTotalYLaVentaSigueEnCurso() throws Exception {   // crit. 1 y 4
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), 3, cajero);
+        escanear(nuevoProducto("Agua 600 ml", "11.20").codigo(), cajero);
+        long venta = ventaEnCurso(cajero);
+
+        HttpResponse<String> respuesta = pasarAlCobro(cajero);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.body()).contains("\"id\":" + venta, "\"estado\":\"EN_CURSO\"", "\"articulos\":4",
+                "\"total\":26.20");
+        // Crit. 4: al regresar a la venta se siguen agregando y quitando productos.
+        assertThat(escanear(nuevoProducto("Sal 1 lb", "3.00").codigo(), cajero).body()).contains("\"total\":29.20");
+        assertThat(pasarAlCobro(cajero).body()).contains("\"total\":29.20");
+    }
+
+    @Test
+    void sinProductosNoSePasaAlCobro() throws Exception {   // crit. 2
+        Cajero cajero = cajeroConTurnoAbierto();
+        enviar("/api/ventas", "POST", null, cajero.sesion());
+
+        HttpResponse<String> vacia = pasarAlCobro(cajero);
+
+        assertThat(vacia.statusCode()).isEqualTo(422);
+        assertThat(vacia.body()).contains("VENTA_VACIA");
+        // Tampoco si se quitaron todas las líneas (HU-06.07).
+        Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
+        escanear(arroz.codigo(), cajero);
+        eliminar(lineaDe(cajero, arroz), cajero);
+        assertThat(pasarAlCobro(cajero).body()).contains("VENTA_VACIA");
+    }
+
+    @Test
+    void sinVentaOSinTurnoNoSePasaAlCobro() throws Exception {
+        assertThat(pasarAlCobro(cajeroConTurnoAbierto()).body()).contains("SIN_VENTA_EN_CURSO");
+        assertThat(pasarAlCobro(cajeroEnCaja()).body()).contains("CAJA_CERRADA");
+        // Sin caja vinculada (el Administrador desde su equipo) tampoco: cobrar exige el turno propio (HU-09.02).
+        assertThat(enviar("/api/ventas/actual/cobro", "POST", null, cookieAdmin).body()).contains("CAJA_CERRADA");
+    }
+
+    @Test
+    void alFinalizarLaVentaLaCajaQuedaListaParaLaSiguiente() throws Exception {   // pendiente de HU-06.01 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        escanear(nuevoProducto("Arroz 1 lb", "5.00").codigo(), cajero);
+        long venta = ventaEnCurso(cajero);
+        // Finalizar el cobro llega con HU-07.08 (#63); aquí se deja la venta como la dejará esa historia.
+        jdbc.update("UPDATE venta SET estado = 'FINALIZADA', finalizada_en = now() WHERE id = ?", venta);
+
+        assertThat(enviar("/api/ventas/actual", "GET", null, cajero.sesion()).statusCode()).isEqualTo(204);
+        HttpResponse<String> siguiente = enviar("/api/ventas", "POST", null, cajero.sesion());
+        assertThat(idDe(siguiente)).isNotEqualTo(venta);
+        assertThat(siguiente.body()).contains("\"estado\":\"EN_CURSO\"", "\"lineas\":[]");
+        assertThat(numeroDe(idDe(siguiente))).isEqualTo(numeroDe(venta) + 1);
+    }
+
+    @Test
+    void unaVentaFinalizadaConservaLaDescripcionYElPrecioDeUnProductoDesactivado() throws Exception {   // HU-03.09 crit. 3
+        Cajero cajero = cajeroConTurnoAbierto();
+        Producto galleta = nuevoProducto("Galleta de prueba", "4.50");
+        escanear(galleta.codigo(), 2, cajero);
+        long venta = ventaEnCurso(cajero);
+        jdbc.update("UPDATE venta SET estado = 'FINALIZADA', finalizada_en = now() WHERE id = ?", venta);
+
+        enviar("/api/productos/" + galleta.id() + "/desactivar", "POST", null, cookieAdmin);
+        cambiarPrecio(galleta, "9.99");
+
+        Venta finalizada = repositorioVentas.buscarPorId(venta).orElseThrow();
+        assertThat(finalizada.lineas()).singleElement().satisfies(linea -> {
+            assertThat(linea.descripcion()).isEqualTo("Galleta de prueba");
+            assertThat(linea.precioUnitario()).isEqualByComparingTo("4.50");
+            assertThat(linea.cantidad()).isEqualTo(2);
+        });
+        assertThat(finalizada.totales().total()).isEqualByComparingTo("9.00");
+    }
+
     // Apoyo
+
+    private HttpResponse<String> pasarAlCobro(Cajero cajero) throws Exception {
+        return enviar("/api/ventas/actual/cobro", "POST", null, cajero.sesion());
+    }
 
     private HttpResponse<String> suspendidas(Cajero cajero) throws Exception {
         return enviar("/api/ventas/suspendidas", "GET", null, cajero.sesion());

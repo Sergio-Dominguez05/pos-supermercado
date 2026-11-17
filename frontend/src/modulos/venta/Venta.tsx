@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import { ErrorDeApi } from '../../api/cliente'
 import {
   cancelarVenta,
   CLAVE_VENTA_EN_CURSO,
   CLAVE_VENTAS_SUSPENDIDAS,
   iniciarVenta,
   listarSuspendidas,
+  pasarAlCobro,
   type Venta as DatosVenta,
 } from '../../api/ventas'
 import { ACCIONES_PENDIENTES, ATAJOS, avisoPendiente } from '../../atajos/atajos'
@@ -14,6 +16,7 @@ import { EstadoTurno } from '../caja/EstadoTurno'
 import { puedeVender, useTurnoActual } from '../caja/turno'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
+import { avisoSonoro } from '../catalogo/sonido'
 import { AyudaAtajos } from './AyudaAtajos'
 import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { CantidadLinea } from './CantidadLinea'
@@ -21,6 +24,7 @@ import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
+import { PasoDeCobro } from './PasoDeCobro'
 import { type AccionDeLaVenta, lineaSeleccionada, moverSeleccion, supresionEsParaLaLinea } from './teclado'
 import {
   avisoVentaRetomada,
@@ -33,6 +37,9 @@ import {
 /** Lleva el foco a un campo de la pantalla de venta por su nombre (`codigo` o `descripcion`). */
 const enfocar = (campo: 'codigo' | 'descripcion') =>
   document.querySelector<HTMLInputElement>(`main input[name="${campo}"]`)?.focus()
+
+/** HU-06.15 crit. 2: el servidor rechazó el cobro porque la venta no tenía productos. */
+const esVentaVacia = (error: Error) => error instanceof ErrorDeApi && error.codigo === 'VENTA_VACIA'
 
 /** El control de una acción en la fila de la línea (`cantidad` o `quitar`). */
 const controlDeLinea = (lineaId: number, control: string) =>
@@ -67,6 +74,28 @@ export function Venta() {
   const [ayudaVisible, setAyudaVisible] = useState(false)
   const [aviso, setAviso] = useState<string>()
 
+  // HU-06.15: "Cobrar" (F12) pide al servidor validar la venta (crit. 2 y 3) y, si puede cobrarse, la pantalla pasa al
+  // cobro. La venta sigue en curso: al regresar se pueden agregar o quitar productos (crit. 4).
+  const clienteConsultas = useQueryClient()
+  const [enCobro, setEnCobro] = useState(false)
+  const cobro = useMutation({
+    mutationFn: () => pasarAlCobro(),
+    onSuccess: (lista) => {
+      clienteConsultas.setQueryData(CLAVE_VENTA_EN_CURSO, lista)
+      setAviso(undefined)
+      setEnCobro(true)
+    },
+    onError: () => avisoSonoro(),
+  })
+  const cobrar = cobro.mutate
+  // Si la venta deja de tener productos (por ejemplo, se canceló desde otra pestaña), no hay nada que cobrar.
+  if (enCobro && !venta?.lineas.length) setEnCobro(false)
+  const regresarALaVenta = () => {
+    setEnCobro(false)
+    cobro.reset()
+    enfocar('codigo')
+  }
+
   // HU-06.17 crit. 1: cada atajo del mapa central (Architecture.md §7.6) con su acción en la venta. Los de acciones
   // que todavía no existen avisan con qué historia llegan. HU-06.03 crit. 4: F2 abre la búsqueda por descripción.
   const manejadores = useMemo<Manejadores>(() => {
@@ -87,6 +116,7 @@ export function Venta() {
       suspenderVenta: () => document.querySelector<HTMLElement>('main [data-control="suspender-venta"]')?.click(),
       retomarVenta: () => setListaVisible((visible) => !visible),
       cancelarVenta: () => document.querySelector<HTMLElement>('main [data-control="cancelar-venta"]')?.click(),
+      cobrar: () => cobrar(),
     }
     const pendientes: Manejadores = Object.fromEntries(
       ATAJOS.filter((atajo) => ACCIONES_PENDIENTES[atajo.accion]).map((atajo) => [
@@ -94,8 +124,9 @@ export function Venta() {
         () => setAviso(avisoPendiente(atajo)),
       ]),
     )
-    return habilitada ? { ...pendientes, ...disponibles } : { ayuda: disponibles.ayuda }
-  }, [habilitada, seleccionada])
+    // En el cobro solo queda la ayuda; Escape regresa a la venta (PasoDeCobro).
+    return habilitada && !enCobro ? { ...pendientes, ...disponibles } : { ayuda: disponibles.ayuda }
+  }, [habilitada, seleccionada, enCobro, cobrar])
   useAtajos(manejadores)
 
   // HU-06.17: en el campo del código, las flechas arriba y abajo eligen la línea (el campo es de una sola línea).
@@ -156,44 +187,65 @@ export function Venta() {
             {aviso}
           </p>
         )}
-        <fieldset disabled={!habilitada || !venta}>
-          {/* HU-06.02: el lector de código de barras (o el código escrito a mano) agrega el producto. */}
-          {/* Se reinicia con cada venta, para que no quede el aviso del último escaneo de la anterior. */}
-          <EscanerVenta key={venta?.id} onBuscarPorDescripcion={() => enfocar('descripcion')} />
-          {/* HU-06.03 crit. 2: buscar por descripción, elegir y agregar. */}
-          <section
-            aria-label="Buscar por descripción"
-            onKeyDown={(evento) => {
-              if (evento.key === 'Escape') enfocar('codigo')
-            }}
-          >
-            <h3>
-              Buscar por descripción <kbd>F2</kbd>
-            </h3>
-            <BusquedaEnVenta key={venta?.id} onTerminado={() => enfocar('codigo')} />
-          </section>
-        </fieldset>
-        {!habilitada && <p className="pendiente">La venta está deshabilitada: abra su turno en una caja para vender.</p>}
-        {habilitada && error && (
+        {/* El aviso de venta vacía deja de tener sentido en cuanto la venta tiene productos. */}
+        {cobro.error && !(esVentaVacia(cobro.error) && venta?.lineas.length) && (
           <p className="error" role="alert">
-            {error.message}
+            {cobro.error.message}
           </p>
         )}
-        {habilitada && venta && (
-          <DetalleVenta
-            venta={venta}
-            editable
-            seleccionada={seleccionada}
-            onSeleccionar={(id) => setSeleccion((actual) => ({ ...actual, id }))}
-            onTerminado={() => enfocar('codigo')}
-          />
-        )}
-        {habilitada && venta && venta.lineas.length > 0 && (
-          <div className="acciones">
-            {/* HU-06.12: suspender avisa qué venta quedó en espera; el aviso queda aunque llegue la venta nueva. */}
-            <SuspenderVenta venta={venta} onSuspendida={(suspendida) => setAviso(avisoVentaSuspendida(suspendida))} />
-            <CancelarVenta venta={venta} />
-          </div>
+        {habilitada && venta && enCobro ? (
+          <>
+            <PasoDeCobro venta={venta} onRegresar={regresarALaVenta} />
+            <DetalleVenta venta={venta} />
+          </>
+        ) : (
+          <>
+            <fieldset disabled={!habilitada || !venta}>
+              {/* HU-06.02: el lector de código de barras (o el código escrito a mano) agrega el producto. */}
+              {/* Se reinicia con cada venta, para que no quede el aviso del último escaneo de la anterior. */}
+              <EscanerVenta key={venta?.id} onBuscarPorDescripcion={() => enfocar('descripcion')} />
+              {/* HU-06.03 crit. 2: buscar por descripción, elegir y agregar. */}
+              <section
+                aria-label="Buscar por descripción"
+                onKeyDown={(evento) => {
+                  if (evento.key === 'Escape') enfocar('codigo')
+                }}
+              >
+                <h3>
+                  Buscar por descripción <kbd>F2</kbd>
+                </h3>
+                <BusquedaEnVenta key={venta?.id} onTerminado={() => enfocar('codigo')} />
+              </section>
+            </fieldset>
+            {!habilitada && (
+              <p className="pendiente">La venta está deshabilitada: abra su turno en una caja para vender.</p>
+            )}
+            {habilitada && error && (
+              <p className="error" role="alert">
+                {error.message}
+              </p>
+            )}
+            {habilitada && venta && (
+              <DetalleVenta
+                venta={venta}
+                editable
+                seleccionada={seleccionada}
+                onSeleccionar={(id) => setSeleccion((actual) => ({ ...actual, id }))}
+                onTerminado={() => enfocar('codigo')}
+              />
+            )}
+            {habilitada && venta && venta.lineas.length > 0 && (
+              <div className="acciones">
+                {/* HU-06.15 crit. 1 y 2: con al menos un producto se puede pasar al cobro. */}
+                <button type="button" data-control="cobrar" disabled={cobro.isPending} onClick={() => cobrar()}>
+                  {cobro.isPending ? 'Validando…' : 'Cobrar'} <kbd>F12</kbd>
+                </button>
+                {/* HU-06.12: suspender avisa qué venta quedó en espera; el aviso queda aunque llegue la venta nueva. */}
+                <SuspenderVenta venta={venta} onSuspendida={(suspendida) => setAviso(avisoVentaSuspendida(suspendida))} />
+                <CancelarVenta venta={venta} />
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>

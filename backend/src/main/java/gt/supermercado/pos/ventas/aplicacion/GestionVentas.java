@@ -15,6 +15,7 @@ import gt.supermercado.pos.impuestos.dominio.TasaIva;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.ventas.dominio.LineaVenta;
 import gt.supermercado.pos.ventas.dominio.RepositorioVentas;
+import gt.supermercado.pos.ventas.dominio.ValidadorClienteDeVenta;
 import gt.supermercado.pos.ventas.dominio.Venta;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,14 +43,16 @@ public class GestionVentas {
     private final GestionTurnos turnos;
     private final GestionProductos productos;
     private final Parametros parametros;
+    private final ValidadorClienteDeVenta clientes;
     private final Bitacora bitacora;
 
     public GestionVentas(RepositorioVentas ventas, GestionTurnos turnos, GestionProductos productos,
-                         Parametros parametros, Bitacora bitacora) {
+                         Parametros parametros, ValidadorClienteDeVenta clientes, Bitacora bitacora) {
         this.ventas = ventas;
         this.turnos = turnos;
         this.productos = productos;
         this.parametros = parametros;
+        this.clientes = clientes;
         this.bitacora = bitacora;
     }
 
@@ -273,6 +276,27 @@ public class GestionVentas {
                     "La venta no está suspendida en esta caja.");
         }
         return ventas.buscarPorId(ventaId).orElseThrow();
+    }
+
+    /**
+     * HU-06.15: el cajero terminó de registrar productos y pasa al cobro. El servidor valida antes de que la pantalla
+     * abra el cobro con tarjeta (EP-07) y devuelve la venta con el total a cobrar.
+     * <ul>
+     *   <li>Crit. 2: una venta sin productos no pasa al cobro ({@code VENTA_VACIA}).</li>
+     *   <li>Crit. 3: el cliente asignado debe cumplir las reglas de EP-05 ({@link ValidadorClienteDeVenta}).</li>
+     *   <li>Crit. 4: la venta sigue en curso: desde el cobro se puede regresar a agregar o quitar productos.</li>
+     * </ul>
+     */
+    @Transactional(readOnly = true)
+    public Venta pasarAlCobro(SesionActiva sesion) {
+        Turno turno = turnos.exigirTurnoAbierto(sesion);
+        Venta venta = ventas.enCursoDelTurno(turno.id())
+                .orElseThrow(() -> new NegocioException("SIN_VENTA_EN_CURSO", "No hay ninguna venta en curso."));
+        if (venta.lineas().isEmpty()) {
+            throw new NegocioException("VENTA_VACIA", "La venta no tiene productos: agregue al menos uno para cobrar.");
+        }
+        clientes.validar(venta);
+        return venta;
     }
 
     /**

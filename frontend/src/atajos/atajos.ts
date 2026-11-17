@@ -43,7 +43,6 @@ export const ACCIONES_PENDIENTES: Partial<Record<AccionCaja, string>> = {
   consultarPrecio: 'HU-03.10 (#28)',
   asignarCliente: 'HU-05.08 (#44)',
   reimprimirUltima: 'HU-08.12 (#74)',
-  cobrar: 'HU-06.15 (#58)',
 }
 
 /** Nombre de la tecla para mostrarlo en pantalla: el teclado en español rotula "Supr" a la tecla Delete. */
