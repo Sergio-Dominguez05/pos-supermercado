@@ -64,3 +64,20 @@ export const avisoBusqueda = (busqueda: BusquedaNit) => {
       )
   }
 }
+
+/** HU-05.09 crit. 2: la identificación del cliente, que se muestra pero no se edita. */
+export const identificacionDe = (cliente: Pick<Cliente, 'nit' | 'tipoIdentificacion'>) =>
+  cliente.tipoIdentificacion === 'CUI' ? `CUI ${cliente.nit}` : `NIT ${nitConGuion(cliente.nit)}`
+
+export const IDENTIFICACION_NO_EDITABLE =
+  'El NIT o CUI no se puede modificar. Si está mal, registre al cliente de nuevo con el correcto.'
+
+/** HU-05.09: el cliente de la lista con la forma de `Cliente`, para editarlo. */
+export const clienteDeLista = (cliente: ClienteListado): Cliente => ({
+  id: cliente.id,
+  nit: cliente.identificacion,
+  nombre: cliente.nombre,
+  direccion: cliente.direccion,
+  correo: cliente.correo,
+  tipoIdentificacion: cliente.tipoIdentificacion,
+})

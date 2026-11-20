@@ -42,7 +42,7 @@ import java.util.regex.Pattern;
  * </ul>
  * HU-05.06: sin NIT, el cliente se busca y se registra con su CUI (13 dígitos), cuyo nombre también se consulta al
  * certificador; si la consulta falla, el cajero escribe el nombre. El límite para CF (HU-05.07) lo aplica
- * {@code LimiteConsumidorFinal}. La edición de clientes (HU-05.09) llega después.
+ * {@code LimiteConsumidorFinal}. La edición de los datos del cliente es HU-05.09 ({@link #editar}).
  */
 @Service
 public class GestionClientes {
@@ -229,6 +229,66 @@ public class GestionClientes {
             ventas.corregirCliente(ventaId, clienteId);
         });
         return reenvio.certificar(ventaId, sesion);
+    }
+
+    /** HU-05.09: los datos que se pueden corregir; el NIT o CUI no está porque no se modifica (crit. 2). */
+    public record SolicitudEdicion(String nombre, String direccion, String correo) {}
+
+    /**
+     * HU-05.09 Editar los datos de un cliente.
+     * <ul>
+     *   <li>Crit. 1: el nombre, la dirección y el correo, con las mismas reglas que al registrarlo (HU-05.05), también
+     *       durante la venta: la factura de la venta en curso saldrá con los datos nuevos.</li>
+     *   <li>Crit. 2: la identificación no se modifica; si está mal, se registra un cliente nuevo.</li>
+     *   <li>Crit. 3: las facturas emitidas no cambian, porque guardan los datos del receptor al emitirse.</li>
+     *   <li>Crit. 4: queda en la bitácora con el valor anterior y el nuevo de cada campo cambiado (HU-11.03); si no
+     *       cambió nada, no se registra. El intento rechazado también queda.</li>
+     * </ul>
+     */
+    @Transactional
+    public Cliente editar(long clienteId, SolicitudEdicion solicitud, SesionActiva sesion) {
+        Cliente actual = clientes.porId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException(
+                "CLIENTE_NO_ENCONTRADO", "El cliente no existe."));
+        String nombre;
+        String direccion;
+        String correo;
+        try {
+            nombre = texto(solicitud.nombre());
+            if (nombre.isEmpty() || nombre.length() > 200) {
+                throw new NegocioException("NOMBRE_CLIENTE_REQUERIDO", "Escriba el nombre del cliente (hasta 200 caracteres).");
+            }
+            direccion = texto(solicitud.direccion());
+            if (direccion.isEmpty()) {
+                direccion = Cliente.DIRECCION_POR_OMISION;
+            } else if (direccion.length() > 300) {
+                throw new NegocioException("DIRECCION_CLIENTE_INVALIDA", "La dirección admite hasta 300 caracteres.");
+            }
+            correo = Correo.opcional(solicitud.correo(), "CORREO_INVALIDO").orElse(null);
+        } catch (NegocioException error) {
+            bitacora.registrarIntentoFallido(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                    AccionSensible.CLIENTE_EDITADO, false, "Edición del cliente %s %s rechazada: %s".formatted(
+                            actual.tipoIdentificacion(), actual.nit(), error.getMessage()), "cliente", clienteId, null));
+            throw error;
+        }
+        Map<String, Object> cambios = new LinkedHashMap<>();
+        if (!nombre.equals(actual.nombre())) {
+            cambios.put("nombre", EventoBitacora.cambio(actual.nombre(), nombre));
+        }
+        if (!direccion.equals(actual.direccion())) {
+            cambios.put("direccion", EventoBitacora.cambio(actual.direccion(), direccion));
+        }
+        if (!java.util.Objects.equals(correo, actual.correo())) {
+            cambios.put("correo", EventoBitacora.cambio(actual.correo() == null ? "" : actual.correo(),
+                    correo == null ? "" : correo));
+        }
+        if (cambios.isEmpty()) {
+            return actual;
+        }
+        clientes.editar(clienteId, nombre, direccion, correo);
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(), AccionSensible.CLIENTE_EDITADO,
+                true, "Cliente %s %s editado: %s".formatted(actual.tipoIdentificacion(), actual.nit(),
+                        String.join(", ", cambios.keySet())), "cliente", clienteId, cambios));
+        return clientes.porId(clienteId).orElseThrow();
     }
 
     private Cliente registrar(String tipo, String nit, String nombre, String direccion, String correo,

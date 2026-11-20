@@ -4,6 +4,7 @@ import gt.supermercado.pos.clientes.aplicacion.GestionClientes;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.ClienteYCorreo;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.BusquedaNit;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.SolicitudCliente;
+import gt.supermercado.pos.clientes.aplicacion.GestionClientes.SolicitudEdicion;
 import gt.supermercado.pos.clientes.dominio.Cliente;
 import gt.supermercado.pos.clientes.dominio.FiltroClientes;
 import gt.supermercado.pos.clientes.dominio.PaginaClientes;
@@ -78,6 +79,17 @@ public class ClientesController {
     @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     public Cliente registrar(@RequestBody SolicitudCliente solicitud, @AuthenticationPrincipal SesionActiva sesion) {
         return gestion.registrar(solicitud, sesion);
+    }
+
+    /**
+     * HU-05.09: corrige el nombre, la dirección y el correo del cliente, también durante la venta. El NIT o CUI no se
+     * modifica (si viene en la solicitud, se ignora). 404 si el cliente no existe; 422 con datos inválidos.
+     */
+    @PutMapping("/api/clientes/{clienteId}")
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
+    public Cliente editar(@PathVariable long clienteId, @RequestBody SolicitudEdicion solicitud,
+                          @AuthenticationPrincipal SesionActiva sesion) {
+        return gestion.editar(clienteId, solicitud, sesion);
     }
 
     @GetMapping("/api/ventas/actual/cliente")
