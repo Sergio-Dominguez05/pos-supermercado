@@ -12,6 +12,12 @@ public interface RepositorioReportes {
      */
     List<VentasDelDia> ventasPorDia(FiltrosReporte filtros);
 
+    /** HU-10.03 crit. 1: el resumen de cada cajero con actividad en el período (ver {@link ReporteVentasPorCajero}). */
+    List<ReporteVentasPorCajero.Fila> ventasPorCajero(FiltrosReporte filtros);
+
+    /** HU-10.03 crit. 2: las ventas finalizadas y canceladas del cajero de los filtros, en orden cronológico. */
+    List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros);
+
     /** Todas las cajas, también las inactivas: puede haber ventas de una caja que ya no se usa. */
     List<OpcionesDeFiltro.Opcion> cajas();
 

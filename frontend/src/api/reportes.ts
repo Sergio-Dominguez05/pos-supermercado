@@ -72,6 +72,55 @@ export const consultaDe = (filtros: Record<string, string>) => {
   return consulta.toString()
 }
 
+/** HU-10.03 crit. 1: una fila por cajero con actividad, o la de totales (`cajeroId` nulo). */
+export interface FilaVentasCajero {
+  cajeroId: number | null
+  cajero: string
+  cantidadVentas: number
+  totalVendido: number
+  ventasCanceladas: number
+  lineasEliminadas: number
+  facturasAnuladas: number
+  montoAnulado: number
+}
+
+export interface ReporteVentasPorCajero {
+  encabezado: EncabezadoReporte
+  filas: FilaVentasCajero[]
+  totales: FilaVentasCajero
+}
+
+/** HU-10.03 crit. 2: una venta finalizada o cancelada del cajero. */
+export interface VentaDeCajero {
+  ventaId: number
+  numero: number
+  fecha: string
+  caja: string
+  estado: 'FINALIZADA' | 'CANCELADA'
+  /** Nulo en una venta cancelada: no llegó a fijar sus totales. */
+  total: number | null
+  estadoFactura: string | null
+  factura: string | null
+  lineasEliminadas: number
+}
+
+export interface DetalleVentasCajero {
+  encabezado: EncabezadoReporte
+  ventas: VentaDeCajero[]
+}
+
+/** Los filtros de los reportes sin agrupación. */
+const sinAgrupacion = ({ desde, hasta, cajaId, cajeroId }: FiltrosVentas) => ({ desde, hasta, cajaId, cajeroId })
+
+export const generarReporteCajeros = (filtros: FiltrosVentas) =>
+  pedir<ReporteVentasPorCajero>(`/api/reportes/cajeros?${consultaDe(sinAgrupacion(filtros))}`)
+
+/** El detalle usa las fechas y la caja del resumen; el cajero es el de la fila elegida. */
+export const generarDetalleCajero = (cajeroId: number, filtros: FiltrosVentas) =>
+  pedir<DetalleVentasCajero>(
+    `/api/reportes/cajeros/${cajeroId}/ventas?${consultaDe({ ...sinAgrupacion(filtros), cajeroId: '' })}`,
+  )
+
 /** Cada generación queda en la bitácora (HU-10.15 crit. 3). */
 export const generarReporteVentas = (filtros: FiltrosVentas) =>
   pedir<ReporteVentasPeriodo>(`/api/reportes/ventas?${consultaDe({ ...filtros })}`)

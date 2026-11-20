@@ -604,3 +604,8 @@ kbd {
   font-weight: 700;
   border-top: 2px solid var(--borde);
 }
+
+/* EP-10: una pestaña por reporte; se acomodan a medida que se agregan reportes. */
+.pestanas-reportes {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
