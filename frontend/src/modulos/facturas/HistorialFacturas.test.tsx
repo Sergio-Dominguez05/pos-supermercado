@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import {
+  enviarFacturaPorCorreo,
   FILTROS_HISTORIAL_VACIOS,
   rutaHistorial,
   type DetalleFactura,
@@ -215,4 +216,31 @@ describe('detalle de una factura (HU-08.14)', () => {
     expect(anulada).not.toContain('>Reimprimir</button>')
     expect(anulada).not.toContain('Anular la factura')
   })
+
+  it('reenvía por correo una factura certificada cuyo cliente tiene correo (HU-08.15 crit. 4)', async () => {
+    const conCorreo = { ...DETALLE, receptor: { ...DETALLE.receptor, correo: 'nandu@cliente.test' } }
+    expect(renderizar(<VistaDetalleFactura factura={conCorreo} permisos={SUPERVISOR.permisos ?? []} />)).toContain(
+      'Enviar por correo a nandu@cliente.test</button>',
+    )
+    expect(renderizar(<VistaDetalleFactura factura={DETALLE} permisos={SUPERVISOR.permisos ?? []} />)).not.toContain(
+      'Enviar por correo',
+    )
+    expect(
+      renderizar(
+        <VistaDetalleFactura factura={{ ...conCorreo, estado: 'ANULADA' }} permisos={SUPERVISOR.permisos ?? []} />,
+      ),
+    ).not.toContain('Enviar por correo')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => new Response('{"enviado":true,"mensaje":"ok"}')),
+    )
+    await enviarFacturaPorCorreo(77)
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/facturas/77/correo')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'POST' })
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })

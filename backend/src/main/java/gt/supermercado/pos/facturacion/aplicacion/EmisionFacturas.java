@@ -59,10 +59,11 @@ public class EmisionFacturas implements EmisionDeFactura {
     private final ReceptorDeVenta receptores;
     private final GestionVentas ventas;
     private final Bitacora bitacora;
+    private final EnvioFacturas correos;
 
     public EmisionFacturas(GeneracionDte generacion, RepositorioFacturas facturas, CertificadorFel certificador,
                            GestionConexionFel conexion, ReceptorDeVenta receptores, GestionVentas ventas,
-                           Bitacora bitacora) {
+                           Bitacora bitacora, EnvioFacturas correos) {
         this.generacion = generacion;
         this.facturas = facturas;
         this.certificador = certificador;
@@ -70,6 +71,7 @@ public class EmisionFacturas implements EmisionDeFactura {
         this.receptores = receptores;
         this.ventas = ventas;
         this.bitacora = bitacora;
+        this.correos = correos;
     }
 
     /**
@@ -81,7 +83,7 @@ public class EmisionFacturas implements EmisionDeFactura {
     @Transactional
     public void emitir(Venta venta) {
         DatosDte datos = generacion.datos(venta, receptores.de(venta.id()), OffsetDateTime.now());
-        facturas.registrar(datos, GeneradorDte.generar(datos));
+        facturas.registrar(datos, GeneradorDte.generar(datos), receptores.correoDeFactura(venta.id()).orElse(null));
     }
 
     /** Envía la factura pendiente al certificador, después del {@code COMMIT}. Nunca lanza por una falla del envío. */
@@ -125,6 +127,8 @@ public class EmisionFacturas implements EmisionDeFactura {
             if (!facturas.certificada(factura.id(), resultado)) {
                 return actual(facturaDe(factura.ventaId()));
             }
+            // HU-08.15 crit. 1: si la venta tiene correo, la factura sale por correo sin hacer esperar a la venta.
+            correos.alCertificar(factura.id());
             return new FacturaDeVenta(EstadoFactura.CERTIFICADA.name(), resultado.autorizacion(), resultado.serie(),
                     resultado.numero(), resultado.fechaCertificacion(), null, false);
         }

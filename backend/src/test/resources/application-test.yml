@@ -6,3 +6,7 @@ pos:
   contingencia:
     # HU-08.08: el proceso automático no corre en las pruebas, para que no certifique mientras se prueba la contingencia.
     automatica: false
+  correo:
+    # HU-08.15: el proceso automático no corre y el envío inmediato termina antes de responder, para comprobarlo.
+    automatico: false
+    envio-inmediato: sincrono

@@ -6,6 +6,7 @@ const SECCIONES = [
   { ruta: '/configuracion/emisor', etiqueta: 'Emisor' },
   { ruta: '/configuracion/establecimiento', etiqueta: 'Establecimiento' },
   { ruta: '/configuracion/fel', etiqueta: 'Conexión FEL' },
+  { ruta: '/configuracion/correo', etiqueta: 'Correo' },
   { ruta: '/configuracion/parametros', etiqueta: 'Caja y venta' },
 ] as const
 

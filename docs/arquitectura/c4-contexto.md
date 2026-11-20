@@ -7,9 +7,11 @@ C4Context
     Person(admin, "Administrador", "Administra y consulta reportes")
     System(pos, "Sistema POS", "Ventas, caja y facturacion del supermercado")
     System_Ext(fel, "Certificador FEL", "Servicio de certificacion electronica")
+    System_Ext(smtp, "Servidor de correo", "Entrega las facturas a los clientes")
     Rel(cajero, pos, "Opera ventas y cobros")
     Rel(admin, pos, "Administra usuarios, catalogo y reportes")
     Rel(pos, fel, "Envia DTE y consulta estados", "HTTPS")
+    Rel(pos, smtp, "Envia la factura en PDF y XML", "SMTP")
 ```
 
 **Límite del sistema:** el POS pertenece al supermercado. El certificador es un sistema externo y solo está disponible si hay conexión a internet. No incluye integración directa con un procesador bancario ni con inventario externo en la V1.

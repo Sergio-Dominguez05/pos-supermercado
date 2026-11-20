@@ -90,6 +90,16 @@ export const reimprimirUltima = () => pedir<ResultadoImpresion>('/api/facturas/u
 export const reimprimirFactura = (facturaId: number) =>
   pedir<ResultadoImpresion>(`/api/facturas/${facturaId}/reimprimir`, { method: 'POST' })
 
+/** HU-08.15 crit. 4: si se envió y, si falló, por qué (queda programada para reintentarla). */
+export interface ResultadoEnvioCorreo {
+  enviado: boolean
+  mensaje: string
+}
+
+/** HU-08.15 crit. 4: reenvía la factura certificada al correo de su receptor. */
+export const enviarFacturaPorCorreo = (facturaId: number) =>
+  pedir<ResultadoEnvioCorreo>(`/api/facturas/${facturaId}/correo`, { method: 'POST' })
+
 /** HU-08.07 crit. 3: si hay comprobantes en contingencia, para el aviso de la pantalla de venta. */
 export interface EstadoContingencia {
   enContingencia: boolean
@@ -224,6 +234,8 @@ export type TipoEventoFactura =
   | 'REIMPRESA'
   | 'ANULADA'
   | 'ANULACION_RECHAZADA'
+  | 'CORREO_ENVIADO'
+  | 'CORREO_FALLIDO'
 
 /** HU-08.14 crit. 1 y 2: la factura completa, con su historial. */
 export interface DetalleFactura {

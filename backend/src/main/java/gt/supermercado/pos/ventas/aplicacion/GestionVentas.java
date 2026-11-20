@@ -366,6 +366,25 @@ public class GestionVentas {
     }
 
     /**
+     * HU-05.11: el correo al que se enviará la factura de la venta en curso (HU-08.15); {@code null} no la envía. Lo
+     * llama el módulo {@code clientes} con el correo ya validado. Como el cliente, se puede cambiar con un pago.
+     */
+    @Transactional
+    public Venta asignarCorreoFactura(SesionActiva sesion, String correo) {
+        Venta venta = enCursoBloqueada(turnos.exigirTurnoAbierto(sesion));
+        if (!ventas.asignarCorreoFactura(venta.id(), correo)) {
+            throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
+        }
+        return venta;
+    }
+
+    /** HU-05.11: el correo para la factura de la venta, si tiene. */
+    @Transactional(readOnly = true)
+    public Optional<String> correoFactura(long ventaId) {
+        return ventas.correoFactura(ventaId);
+    }
+
+    /**
      * La venta en curso del turno, bloqueada hasta el final de la transacción. La usa el módulo {@code pagos} para
      * eliminar un pago (HU-07.06) sin que la venta cambie mientras tanto; debe correr en la misma transacción.
      */
