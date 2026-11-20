@@ -4,6 +4,7 @@ import {
   generarDetalleTarjeta,
   generarReporteTarjetas,
   type DetallePagosTarjeta,
+  type Exportacion,
   type FilaTarjeta,
   type FiltrosVentas,
   type OpcionesDeFiltro,
@@ -39,12 +40,22 @@ export function ReporteDeTarjetas({ opciones }: { opciones: OpcionesDeFiltro }) 
       {generacion.data && filtros && (
         <TablaTarjetas
           reporte={generacion.data}
+          exportacion={{ codigo: 'TARJETAS', filtros }}
           cargandoDetalle={detalle.isPending}
           onVerDetalle={(tipo) => detalle.mutate({ tipo, filtros })}
         />
       )}
       <ErrorDeReporte error={detalle.error} />
-      {detalle.data && <TablaDetalleTarjeta detalle={detalle.data} />}
+      {detalle.data && detalle.variables && (
+        <TablaDetalleTarjeta
+          detalle={detalle.data}
+          exportacion={{
+            codigo: 'DETALLE_TARJETA',
+            filtros: detalle.variables.filtros,
+            tipoTarjeta: detalle.variables.tipo,
+          }}
+        />
+      )}
     </>
   )
 }
@@ -52,10 +63,12 @@ export function ReporteDeTarjetas({ opciones }: { opciones: OpcionesDeFiltro }) 
 /** HU-10.06 crit. 1 y 2: débito y crédito; los pagos de facturas anuladas, aparte. */
 export function TablaTarjetas({
   reporte,
+  exportacion,
   cargandoDetalle = false,
   onVerDetalle,
 }: {
   reporte: ReporteTarjetas
+  exportacion?: Exportacion
   cargandoDetalle?: boolean
   onVerDetalle: (tipo: TipoTarjeta) => void
 }) {
@@ -69,7 +82,7 @@ export function TablaTarjetas({
   )
   return (
     <section aria-label="Ingresos por tipo de tarjeta">
-      <EncabezadoDeReporte encabezado={reporte.encabezado} />
+      <EncabezadoDeReporte encabezado={reporte.encabezado} exportacion={exportacion} />
       <div className="tabla-contenedor">
         <table className="tabla">
           <thead>
@@ -133,10 +146,16 @@ export function TablaTarjetas({
 }
 
 /** HU-10.06 crit. 3: cada transacción con su número de autorización, para buscarla en el banco. */
-export function TablaDetalleTarjeta({ detalle }: { detalle: DetallePagosTarjeta }) {
+export function TablaDetalleTarjeta({
+  detalle,
+  exportacion,
+}: {
+  detalle: DetallePagosTarjeta
+  exportacion?: Exportacion
+}) {
   return (
     <section aria-label="Detalle de transacciones con tarjeta">
-      <EncabezadoDeReporte encabezado={detalle.encabezado} />
+      <EncabezadoDeReporte encabezado={detalle.encabezado} exportacion={exportacion} />
       {detalle.pagos.length === 0 ? (
         <p className="tarjeta">No hay transacciones con estos filtros.</p>
       ) : (

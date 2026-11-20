@@ -628,3 +628,31 @@ kbd {
   min-width: 220px;
   white-space: normal;
 }
+
+/* HU-10.13 y HU-10.14: el título del reporte con los botones de exportar a la derecha. */
+.encabezado-reporte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.encabezado-reporte h2 {
+  margin: 0;
+}
+
+.exportar .acciones button {
+  font: inherit;
+  padding: 6px 12px;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.exportar .acciones button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

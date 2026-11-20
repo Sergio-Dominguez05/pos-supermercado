@@ -5,6 +5,7 @@ import {
   generarReporteIva,
   type DetalleFacturasIva,
   type DiaIva,
+  type Exportacion,
   type FiltrosVentas,
   type OpcionesDeFiltro,
   type ReporteIva as DatosReporteIva,
@@ -36,12 +37,15 @@ export function ReporteIva({ opciones }: { opciones: OpcionesDeFiltro }) {
       {generacion.data && filtros && (
         <TablaIva
           reporte={generacion.data}
+          exportacion={{ codigo: 'IVA', filtros }}
           cargandoDetalle={detalle.isPending}
           onVerFacturas={() => detalle.mutate(filtros)}
         />
       )}
       <ErrorDeReporte error={detalle.error} />
-      {detalle.data && <TablaFacturasIva detalle={detalle.data} />}
+      {detalle.data && detalle.variables && (
+        <TablaFacturasIva detalle={detalle.data} exportacion={{ codigo: 'DETALLE_IVA', filtros: detalle.variables }} />
+      )}
     </>
   )
 }
@@ -58,16 +62,18 @@ const celdas = (fila: DiaIva) => (
 /** HU-10.07 crit. 1, 2 y 4: base imponible, IVA y total de las facturas certificadas, sin las anuladas. */
 export function TablaIva({
   reporte,
+  exportacion,
   cargandoDetalle = false,
   onVerFacturas,
 }: {
   reporte: DatosReporteIva
+  exportacion?: Exportacion
   cargandoDetalle?: boolean
   onVerFacturas: () => void
 }) {
   return (
     <section aria-label="IVA cobrado">
-      <EncabezadoDeReporte encabezado={reporte.encabezado} />
+      <EncabezadoDeReporte encabezado={reporte.encabezado} exportacion={exportacion} />
       {reporte.sinCertificar.facturas > 0 && (
         <p className="tarjeta pendiente" role="status">
           {reporte.sinCertificar.facturas === 1
@@ -120,10 +126,10 @@ export function TablaIva({
 }
 
 /** HU-10.07 crit. 3: cada factura certificada con su serie, número, autorización y montos. */
-export function TablaFacturasIva({ detalle }: { detalle: DetalleFacturasIva }) {
+export function TablaFacturasIva({ detalle, exportacion }: { detalle: DetalleFacturasIva; exportacion?: Exportacion }) {
   return (
     <section aria-label="Detalle de IVA por factura">
-      <EncabezadoDeReporte encabezado={detalle.encabezado} />
+      <EncabezadoDeReporte encabezado={detalle.encabezado} exportacion={exportacion} />
       {detalle.facturas.length === 0 ? (
         <p className="tarjeta">No hay facturas certificadas con estos filtros.</p>
       ) : (

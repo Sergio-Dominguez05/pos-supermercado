@@ -2,6 +2,13 @@ package gt.supermercado.pos.reportes.api;
 
 import gt.supermercado.pos.reportes.aplicacion.GeneracionReportes;
 import gt.supermercado.pos.reportes.dominio.Agrupacion;
+import gt.supermercado.pos.reportes.dominio.CodigoReporte;
+import gt.supermercado.pos.reportes.dominio.FormatoExportacion;
+import gt.supermercado.pos.reportes.dominio.ParametrosReporte;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
 import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
@@ -129,6 +136,34 @@ public class ReportesController {
             @RequestParam(required = false) Long cajeroId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.facturasDelIva(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /**
+     * HU-10.13 y HU-10.14: cualquier reporte o detalle ({@link CodigoReporte}) como PDF o Excel, con los mismos filtros
+     * que en pantalla. 422 con filtros inválidos (en JSON, como los demás errores).
+     */
+    @GetMapping("/api/reportes/exportar/{codigo}")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ResponseEntity<byte[]> exportar(
+            @PathVariable CodigoReporte codigo,
+            @RequestParam FormatoExportacion formato,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @RequestParam(required = false) TipoTarjetaReporte tipoTarjeta,
+            @RequestParam(required = false) Agrupacion agrupacion,
+            @RequestParam(defaultValue = "false") boolean soloConDiferencias,
+            @RequestParam(required = false) Long anuladaPorId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        ParametrosReporte parametros = new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion,
+                soloConDiferencias, anuladaPorId);
+        GeneracionReportes.ArchivoReporte archivo = reportes.exportar(codigo, parametros, formato, sesion);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(archivo.tipoContenido()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(archivo.nombre()).build().toString())
+                .body(archivo.contenido());
     }
 
     /** HU-10.08: los cierres de caja del período; {@code soloConDiferencias=true} deja solo los que tienen diferencia. */

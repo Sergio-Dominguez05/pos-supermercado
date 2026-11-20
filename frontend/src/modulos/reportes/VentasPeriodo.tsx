@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import {
   generarReporteVentas,
+  type Exportacion,
   type FilaVentasPeriodo,
   type OpcionesDeFiltro,
   type ReporteVentasPeriodo,
@@ -21,7 +22,12 @@ export function ReporteDeVentas({ opciones }: { opciones: OpcionesDeFiltro }) {
         onGenerar={generacion.mutate}
       />
       <ErrorDeReporte error={generacion.error} />
-      {generacion.data && <TablaVentasPeriodo reporte={generacion.data} />}
+      {generacion.data && generacion.variables && (
+        <TablaVentasPeriodo
+          reporte={generacion.data}
+          exportacion={{ codigo: 'VENTAS_PERIODO', filtros: generacion.variables }}
+        />
+      )}
     </>
   )
 }
@@ -37,10 +43,16 @@ const celdas = (fila: FilaVentasPeriodo) => (
 )
 
 /** HU-10.02 crit. 1 a 3: por período, sin las facturas anuladas, con la fila de totales. */
-export function TablaVentasPeriodo({ reporte }: { reporte: ReporteVentasPeriodo }) {
+export function TablaVentasPeriodo({
+  reporte,
+  exportacion,
+}: {
+  reporte: ReporteVentasPeriodo
+  exportacion?: Exportacion
+}) {
   return (
     <section aria-label="Ventas por período">
-      <EncabezadoDeReporte encabezado={reporte.encabezado} />
+      <EncabezadoDeReporte encabezado={reporte.encabezado} exportacion={exportacion} />
       {reporte.totales.cantidadVentas === 0 && <p className="tarjeta">No hay ventas con estos filtros.</p>}
       <div className="tabla-contenedor">
         <table className="tabla">

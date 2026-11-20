@@ -51,6 +51,9 @@ public interface RepositorioReportes {
     /** Los usuarios que pueden anular facturas o que ya anularon alguna (HU-10.09 crit. 2). */
     List<OpcionesDeFiltro.Opcion> anuladores();
 
+    /** HU-10.13 crit. 2: el emisor y el establecimiento de la sucursal principal, si ya se configuraron. */
+    DatosEmpresa empresa();
+
     /** Todas las cajas, también las inactivas: puede haber ventas de una caja que ya no se usa. */
     List<OpcionesDeFiltro.Opcion> cajas();
 

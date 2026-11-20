@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { generarReporteCierres, type OpcionesDeFiltro, type ReporteCierres } from '../../api/reportes'
+import { generarReporteCierres, type Exportacion, type OpcionesDeFiltro, type ReporteCierres } from '../../api/reportes'
 import { formatoQuetzales } from '../catalogo/textos'
 import { EncabezadoDeReporte, ErrorDeReporte, FormularioFiltros } from './ComunesReporte'
 import { fechaHora, textoDiferencia } from './filtros'
@@ -16,16 +16,18 @@ export function ReporteDeCierres({ opciones }: { opciones: OpcionesDeFiltro }) {
         onGenerar={generacion.mutate}
       />
       <ErrorDeReporte error={generacion.error} />
-      {generacion.data && <TablaCierres reporte={generacion.data} />}
+      {generacion.data && generacion.variables && (
+        <TablaCierres reporte={generacion.data} exportacion={{ codigo: 'CIERRES', filtros: generacion.variables }} />
+      )}
     </>
   )
 }
 
 /** HU-10.08 crit. 1 y 2: cada cierre con sus totales, la diferencia y su justificación. */
-export function TablaCierres({ reporte }: { reporte: ReporteCierres }) {
+export function TablaCierres({ reporte, exportacion }: { reporte: ReporteCierres; exportacion?: Exportacion }) {
   return (
     <section aria-label="Cierres de caja">
-      <EncabezadoDeReporte encabezado={reporte.encabezado} />
+      <EncabezadoDeReporte encabezado={reporte.encabezado} exportacion={exportacion} />
       <dl className="tarjeta resumen" aria-label="Faltantes y sobrantes">
         <dt>Cierres</dt>
         <dd>{reporte.cierres.length}</dd>
