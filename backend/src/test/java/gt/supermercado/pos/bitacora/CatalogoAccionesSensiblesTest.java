@@ -32,7 +32,6 @@ class CatalogoAccionesSensiblesTest {
             entry(PERMISOS_MODIFICADOS, "HU-01.10"),
             entry(FACTURA_ANULADA, "HU-08.10"),
             entry(FACTURA_REIMPRESA, "HU-08.12"),
-            entry(FACTURA_RECHAZADA_CERTIFICADOR, "HU-08.06"),
             entry(TURNO_CERRADO, "HU-09.08"),
             entry(TURNO_CERRADO_POR_SUPERVISOR, "HU-09.12"),
             entry(CATALOGO_CARGADO, "HU-03.05"));

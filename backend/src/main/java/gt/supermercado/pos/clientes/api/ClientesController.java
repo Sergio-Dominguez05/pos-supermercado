@@ -4,6 +4,7 @@ import gt.supermercado.pos.clientes.aplicacion.GestionClientes;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.BusquedaNit;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.SolicitudCliente;
 import gt.supermercado.pos.clientes.dominio.Cliente;
+import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -60,6 +61,17 @@ public class ClientesController {
     @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
     public ClienteDeVenta deLaVenta(@AuthenticationPrincipal SesionActiva sesion) {
         return ClienteDeVenta.de(gestion.deLaVentaActual(sesion));
+    }
+
+    /**
+     * HU-08.06 crit. 2: corrige el cliente de una venta ya cobrada cuya factura se rechazó por el receptor y la reenvía.
+     * Solo el cajero de esa venta, en su turno abierto; 422 si el rechazo no se corrige en caja.
+     */
+    @PostMapping("/api/ventas/{ventaId}/factura/reenviar")
+    @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
+    public FacturaDeVenta reenviarFactura(@PathVariable long ventaId, @RequestBody SolicitudAsignacion solicitud,
+                                          @AuthenticationPrincipal SesionActiva sesion) {
+        return gestion.reenviarFactura(ventaId, solicitud.clienteId(), sesion);
     }
 
     /** Asigna el cliente a la venta en curso; {@code clienteId} vacío vuelve a Consumidor Final. */

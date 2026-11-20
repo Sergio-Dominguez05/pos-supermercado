@@ -60,6 +60,24 @@ public class GestionVentas {
         this.bitacora = bitacora;
     }
 
+    /** Una venta por su id, en cualquier estado. La usa la facturación para reenviar una factura (HU-08.06). */
+    @Transactional(readOnly = true)
+    public Venta porId(long ventaId) {
+        return ventas.buscarPorId(ventaId).orElseThrow(() -> new RecursoNoEncontradoException("VENTA_NO_ENCONTRADA",
+                "La venta no existe."));
+    }
+
+    /**
+     * HU-08.06 crit. 2: el cliente corregido de una venta ya finalizada cuya factura fue rechazada. Lo llama el módulo
+     * {@code clientes} en la misma transacción que reabre la factura.
+     */
+    @Transactional
+    public void corregirCliente(long ventaId, Long clienteId) {
+        if (!ventas.corregirCliente(ventaId, clienteId)) {
+            throw new NegocioException("VENTA_NO_FINALIZADA", "Solo se corrige el cliente de una venta finalizada.");
+        }
+    }
+
     /** La venta en curso del turno del cajero, si tiene una. */
     @Transactional(readOnly = true)
     public Optional<Venta> actual(SesionActiva sesion) {

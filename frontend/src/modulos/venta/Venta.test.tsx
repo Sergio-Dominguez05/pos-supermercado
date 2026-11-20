@@ -625,7 +625,8 @@ describe('finalizar el cobro (HU-07.08)', () => {
     subtotalConIva: 15, baseImponible: 13.392857, iva: 1.607143 }
   const conArroz: DatosVenta = { ...VENTA_VACIA, articulos: 3, total: 15, lineas: [ARROZ] }
   const CERTIFICADA: FacturaDeVenta = { estado: 'CERTIFICADA', autorizacion: '5b2c1f0e-1a2b-4c3d-9e8f-001122334455',
-    serie: 'A1B2C3D4', numero: '123456789', certificadaEn: '2026-11-17T10:00:00-06:00', motivo: null }
+    serie: 'A1B2C3D4', numero: '123456789', certificadaEn: '2026-11-17T10:00:00-06:00', motivo: null,
+    corregible: false }
   const FINALIZADA: VentaFinalizada = { ventaId: 31, numero: 1042, articulos: 3, total: 15, pagado: 15, pagos: [PAGO],
     factura: CERTIFICADA, impresion: { impresa: true, mensaje: null } }
 

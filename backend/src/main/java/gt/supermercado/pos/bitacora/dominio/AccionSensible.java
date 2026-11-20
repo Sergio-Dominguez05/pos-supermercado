@@ -44,7 +44,7 @@ public enum AccionSensible {
     FACTURA_ANULADA(Categoria.FACTURACION, "facturacion"),
     /** Pendiente: HU-08.12. */
     FACTURA_REIMPRESA(Categoria.FACTURACION, "facturacion"),
-    /** Pendiente: HU-08.06. */
+    /** El certificador rechazó la factura; también el reenvío no permitido (HU-08.06). */
     FACTURA_RECHAZADA_CERTIFICADOR(Categoria.FACTURACION, "facturacion"),
 
     // Pagos

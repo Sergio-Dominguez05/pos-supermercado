@@ -61,8 +61,10 @@ export interface FacturaDeVenta {
   serie: string | null
   numero: string | null
   certificadaEn: string | null
-  /** Por qué no se certificó, si no se certificó. */
+  /** Por qué no se certificó, si no se certificó, en lenguaje comprensible (HU-08.06 crit. 1). */
   motivo: string | null
+  /** HU-08.06 crit. 2: el rechazo se corrige en caja (el cliente) y se reenvía sin volver a cobrar. */
+  corregible: boolean
 }
 
 /** HU-08.05: si la factura se imprimió; `mensaje` dice por qué no, si hay algo que decir. */

@@ -10,11 +10,15 @@ import gt.supermercado.pos.compartido.dominio.Nit;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
 import gt.supermercado.pos.facturacion.aplicacion.ConsultaContribuyentes;
 import gt.supermercado.pos.facturacion.aplicacion.ConsultaContribuyentes.ConsultaNit;
+import gt.supermercado.pos.facturacion.aplicacion.ReenvioFacturas;
+import gt.supermercado.pos.facturacion.dominio.Receptor;
+import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.ventas.aplicacion.GestionVentas;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -44,13 +48,17 @@ public class GestionClientes {
     private final ConsultaContribuyentes contribuyentes;
     private final GestionVentas ventas;
     private final Bitacora bitacora;
+    private final ReenvioFacturas reenvio;
+    private final TransactionOperations transacciones;
 
     public GestionClientes(RepositorioClientes clientes, ConsultaContribuyentes contribuyentes, GestionVentas ventas,
-                           Bitacora bitacora) {
+                           Bitacora bitacora, ReenvioFacturas reenvio, TransactionOperations transacciones) {
         this.clientes = clientes;
         this.contribuyentes = contribuyentes;
         this.ventas = ventas;
         this.bitacora = bitacora;
+        this.reenvio = reenvio;
+        this.transacciones = transacciones;
     }
 
     /** Cómo terminó la búsqueda por NIT. */
@@ -142,6 +150,24 @@ public class GestionClientes {
                         "CLIENTE_NO_ENCONTRADO", "El cliente no existe.")));
         ventas.asignarCliente(sesion, clienteId);
         return cliente;
+    }
+
+    /**
+     * HU-08.06 crit. 2: el cajero corrige el cliente de su venta ya cobrada cuya factura se rechazó por el receptor, y
+     * la reenvía sin volver a cobrar. {@code clienteId} vacío la reenvía a Consumidor Final.
+     */
+    public FacturaDeVenta reenviarFactura(long ventaId, Long clienteId, SesionActiva sesion) {
+        Receptor receptor = clienteId == null
+                ? Receptor.consumidorFinal()
+                : clientes.porId(clienteId)
+                        .map(cliente -> new Receptor(Receptor.TipoReceptor.NIT, cliente.nit(), cliente.nombre()))
+                        .orElseThrow(() -> new RecursoNoEncontradoException("CLIENTE_NO_ENCONTRADO",
+                                "El cliente no existe."));
+        transacciones.executeWithoutResult(transaccion -> {
+            reenvio.reabrir(ventaId, receptor, true, sesion);
+            ventas.corregirCliente(ventaId, clienteId);
+        });
+        return reenvio.certificar(ventaId, sesion);
     }
 
     private Cliente registrar(String nit, String nombre, String direccion, String correo, SesionActiva sesion,

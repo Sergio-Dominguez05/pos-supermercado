@@ -7,16 +7,19 @@ import gt.supermercado.pos.facturacion.dominio.DatosDte;
 import gt.supermercado.pos.facturacion.dominio.EstadoFactura;
 import gt.supermercado.pos.facturacion.dominio.Factura;
 import gt.supermercado.pos.facturacion.dominio.FacturaImprimible;
+import gt.supermercado.pos.facturacion.dominio.FacturaRechazada;
 import gt.supermercado.pos.facturacion.dominio.Receptor;
 import gt.supermercado.pos.facturacion.dominio.RepositorioFacturas;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,6 +92,62 @@ class RepositorioFacturasJdbc implements RepositorioFacturas {
         }, factura.id()).stream().findFirst());
     }
 
+    /** El último intento fallido de certificar cada factura rechazada, con su venta, caja y cajero. */
+    private static final String SELECT_RECHAZADA = """
+            SELECT f.id AS factura_id, v.id AS venta_id, v.numero, c.nombre AS caja, u.nombre_completo AS cajero,
+                   f.emitida_en, v.total, f.receptor_id, f.receptor_nombre, i.codigo_error,
+                   i.respuesta->>'mensaje' AS mensaje, i.respuesta->>'respuesta' AS respuesta, i.intentado_en
+            FROM factura f
+            JOIN venta v ON v.id = f.venta_id
+            JOIN caja c ON c.id = v.caja_id
+            JOIN usuario u ON u.id = v.usuario_id
+            JOIN LATERAL (SELECT * FROM fel_intento fi
+                          WHERE fi.factura_id = f.id AND fi.operacion = 'CERTIFICAR' AND NOT fi.exitoso
+                          ORDER BY fi.id DESC LIMIT 1) i ON true
+            """;
+
+    private static final RowMapper<FacturaRechazada> RECHAZADA = (rs, fila) -> new FacturaRechazada(
+            rs.getLong("factura_id"),
+            rs.getLong("venta_id"),
+            rs.getLong("numero"),
+            rs.getString("caja"),
+            rs.getString("cajero"),
+            rs.getObject("emitida_en", OffsetDateTime.class),
+            rs.getBigDecimal("total"),
+            rs.getString("receptor_id"),
+            rs.getString("receptor_nombre"),
+            rs.getString("codigo_error"),
+            rs.getString("mensaje"),
+            rs.getString("respuesta"),
+            rs.getObject("intentado_en", OffsetDateTime.class));
+
+    @Override
+    public Optional<FacturaRechazada> rechazoDe(long facturaId) {
+        return jdbc.query(SELECT_RECHAZADA + "WHERE f.id = ? AND f.estado = 'RECHAZADA'", RECHAZADA, facturaId).stream()
+                .findFirst();
+    }
+
+    @Override
+    public List<FacturaRechazada> rechazadas() {
+        return jdbc.query(SELECT_RECHAZADA + "WHERE f.estado = 'RECHAZADA' ORDER BY f.emitida_en, f.id", RECHAZADA);
+    }
+
+    @Override
+    @Transactional
+    public boolean reabrir(long facturaId, DatosDte datos, String xmlEnviado) {
+        if (jdbc.update("""
+                UPDATE factura SET estado = 'PENDIENTE', receptor_tipo = ?, receptor_id = ?, receptor_nombre = ?,
+                                   emisor_snapshot = ?::jsonb, xml_enviado = ?
+                WHERE id = ? AND estado = 'RECHAZADA'""", datos.receptor().tipo().name(),
+                datos.receptor().identificacion(), datos.receptor().nombre(),
+                json.writeValueAsString(copiaDelEmisor(datos.emisor(), datos.establecimiento())), xmlEnviado,
+                facturaId) == 0) {
+            return false;
+        }
+        jdbc.update("INSERT INTO tarea_pendiente (tipo, factura_id) VALUES ('CERTIFICAR', ?)", facturaId);
+        return true;
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> leer(String copia) {
         return json.readValue(copia, Map.class);
@@ -129,6 +188,7 @@ class RepositorioFacturasJdbc implements RepositorioFacturas {
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("codigo", resultado.codigoError());
         respuesta.put("mensaje", resultado.mensajeError());
+        respuesta.put("respuesta", resultado.respuesta());   // HU-08.06 crit. 4: la respuesta completa
         intento(facturaId, false, resultado.codigoError(), respuesta);
         // Reenviarla después de corregir los datos es de HU-08.06: no se reintenta sola.
         completarTarea(facturaId, resultado.mensajeError());
