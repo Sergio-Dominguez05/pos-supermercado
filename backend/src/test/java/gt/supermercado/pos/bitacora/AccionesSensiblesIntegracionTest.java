@@ -378,6 +378,14 @@ class AccionesSensiblesIntegracionTest {
     }
 
     @Test
+    void reenvioDeFacturaRechazado() throws Exception {   // HU-08.06: el éxito lo registra el rechazo del certificador
+        // Un reenvío sin factura rechazada se rechaza y queda en la bitácora; el rechazo del certificador (éxito) lo
+        // prueba RechazosIntegracionTest, porque necesita una venta cobrada y el simulador que rechaza.
+        assertThat(registrosDe(() -> enviar("/api/facturas/rechazadas/999999999/reenviar", "POST", null, cookieAdmin)))
+                .containsExactly(new Registro(FACTURA_RECHAZADA_CERTIFICADOR, false, adminId));
+    }
+
+    @Test
     void registroDeClienteExitosoYRechazado() throws Exception {   // HU-05.05 crit. 4
         String nit = NitsDePrueba.nuevo();
 

@@ -1,5 +1,6 @@
 package gt.supermercado.pos.pagos.dominio;
 
+import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.ventas.dominio.Venta;
 
 /**
@@ -17,6 +18,6 @@ public interface EmisionDeFactura {
     /** Registra la factura pendiente de la venta recién finalizada. Lanza {@code NegocioException} si no se puede. */
     void emitir(Venta venta);
 
-    /** Certifica la factura de la venta y devuelve cómo quedó. */
-    FacturaDeVenta certificar(Venta venta);
+    /** Certifica la factura de la venta y devuelve cómo quedó. Un rechazo queda en la bitácora a nombre de la sesión. */
+    FacturaDeVenta certificar(Venta venta, SesionActiva sesion);
 }

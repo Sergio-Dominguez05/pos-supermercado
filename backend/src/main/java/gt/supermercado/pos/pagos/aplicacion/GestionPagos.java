@@ -171,7 +171,7 @@ public class GestionPagos {
      */
     public VentaFinalizada finalizar(SesionActiva sesion) {
         VentaFinalizada registrada = transacciones.execute(transaccion -> registrarFinalizacion(sesion));
-        FacturaDeVenta factura = facturas.certificar(registrada.venta());
+        FacturaDeVenta factura = facturas.certificar(registrada.venta(), sesion);
         return new VentaFinalizada(registrada.venta(), registrada.pagos(), registrada.pagado(), factura,
                 imprimir(registrada, factura));
     }

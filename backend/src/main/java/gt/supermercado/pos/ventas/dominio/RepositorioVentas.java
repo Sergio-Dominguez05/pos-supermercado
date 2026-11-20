@@ -65,6 +65,9 @@ public interface RepositorioVentas {
     /** EP-05: el cliente de la venta en curso; {@code null} es Consumidor Final. Falso si ya no está en curso. */
     boolean asignarCliente(long ventaId, Long clienteId);
 
+    /** HU-08.06: el cliente de una venta finalizada, al corregir su factura rechazada. Falso si no está finalizada. */
+    boolean corregirCliente(long ventaId, Long clienteId);
+
     /**
      * La línea de ese producto con ese precio unitario, si ya se agregó (HU-06.02 crit. 2). Con otro precio es otra
      * línea (HU-06.09 crit. 3).

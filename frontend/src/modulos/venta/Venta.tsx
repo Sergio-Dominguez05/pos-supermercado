@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ErrorDeApi } from '../../api/cliente'
-import { CLAVE_COBRO } from '../../api/pagos'
+import { CLAVE_COBRO, type FacturaDeVenta } from '../../api/pagos'
 import {
   cancelarVenta,
   CLAVE_VENTA_EN_CURSO,
@@ -26,7 +26,8 @@ import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
-import { avisoVentaFinalizada } from './cobro'
+import { CorregirFactura } from '../facturas/CorregirFactura'
+import { avisoFactura, avisoVentaFinalizada } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { type AccionDeLaVenta, lineaSeleccionada, moverSeleccion, supresionEsParaLaLinea } from './teclado'
 import {
@@ -76,6 +77,8 @@ export function Venta() {
   const seleccionada = seleccion.id
   const [ayudaVisible, setAyudaVisible] = useState(false)
   const [aviso, setAviso] = useState<string>()
+  // HU-08.06: la factura de la última venta que rechazó el certificador, para corregirla sin volver a cobrar.
+  const [rechazada, setRechazada] = useState<{ ventaId: number; numero: number; factura: FacturaDeVenta }>()
 
   // HU-06.15: "Cobrar" (F12) pide al servidor validar la venta (crit. 2 y 3) y, si puede cobrarse, la pantalla pasa al
   // cobro. La venta sigue en curso: al regresar se pueden agregar o quitar productos (crit. 4).
@@ -199,6 +202,23 @@ export function Venta() {
             {cobro.error.message}
           </p>
         )}
+        {/* HU-08.06: si el certificador rechazó la factura de la venta recién cobrada, se corrige aquí. */}
+        {rechazada && (
+          <CorregirFactura
+            key={rechazada.ventaId}
+            ventaId={rechazada.ventaId}
+            numero={rechazada.numero}
+            factura={rechazada.factura}
+            onTerminado={(resultado) => {
+              if (resultado.estado === 'RECHAZADA') {
+                setRechazada({ ...rechazada, factura: resultado })
+                return
+              }
+              setRechazada(undefined)
+              setAviso(`Venta N.º ${rechazada.numero}: ${avisoFactura(resultado)}`)
+            }}
+          />
+        )}
         {/* EP-05: el cliente de la venta, también en el cobro (se puede cambiar hasta finalizar). */}
         {habilitada && venta && <ClienteDeLaVenta key={venta.id} ventaId={venta.id} />}
         {habilitada && venta && enCobro ? (
@@ -209,6 +229,11 @@ export function Venta() {
               onFinalizada={(finalizada) => {
                 // HU-07.08 crit. 5: el aviso dice qué venta se finalizó y la pantalla queda en la siguiente.
                 setAviso(avisoVentaFinalizada(finalizada))
+                setRechazada(
+                  finalizada.factura.estado === 'RECHAZADA'
+                    ? { ventaId: finalizada.ventaId, numero: finalizada.numero, factura: finalizada.factura }
+                    : undefined,
+                )
                 regresarALaVenta()
               }}
             />
