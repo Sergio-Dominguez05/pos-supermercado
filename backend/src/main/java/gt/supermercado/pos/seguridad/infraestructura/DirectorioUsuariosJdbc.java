@@ -39,7 +39,8 @@ class DirectorioUsuariosJdbc implements DirectorioUsuarios {
 
     @Override
     public List<ResumenUsuario> buscar(String texto, Rol rol, Boolean activo) {
-        StringBuilder sql = new StringBuilder(SELECT_RESUMEN).append("WHERE true");
+        // El usuario técnico "sistema" (HU-08.08) no aparece en la administración de usuarios.
+        StringBuilder sql = new StringBuilder(SELECT_RESUMEN).append("WHERE r.codigo <> 'SISTEMA'");
         List<Object> argumentos = new ArrayList<>();
         if (texto != null) {
             // Igual que la búsqueda de productos (HU-03.07): sin distinguir tildes ni mayúsculas.
@@ -64,7 +65,8 @@ class DirectorioUsuariosJdbc implements DirectorioUsuarios {
 
     @Override
     public Optional<ResumenUsuario> buscarPorId(long id) {
-        return jdbc.query(SELECT_RESUMEN + "WHERE u.id = ?", RESUMEN, id).stream().findFirst();
+        return jdbc.query(SELECT_RESUMEN + "WHERE u.id = ? AND r.codigo <> 'SISTEMA'", RESUMEN, id).stream()
+                .findFirst();
     }
 
     /** Lo que escribe el usuario se busca literal: '%' y '_' no son comodines (p. ej. en "caja_1"). */

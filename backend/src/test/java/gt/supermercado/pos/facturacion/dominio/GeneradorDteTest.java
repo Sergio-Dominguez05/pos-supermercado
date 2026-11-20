@@ -52,6 +52,17 @@ class GeneradorDteTest {
     }
 
     @Test
+    void enContingenciaLlevaSuNumeroDeAcceso() {   // HU-08.07 crit. 1
+        DatosDte normal = datos(Receptor.consumidorFinal(), linea("Arroz 1 lb", "5.00", 1));
+
+        Element sinNumero = unico(leer(GeneradorDte.generar(normal)), "DatosGenerales");
+        Element conNumero = unico(leer(GeneradorDte.generar(normal.enContingencia(100000042L))), "DatosGenerales");
+
+        assertThat(sinNumero.hasAttribute("NumeroAcceso")).isFalse();
+        assertThat(conNumero.getAttribute("NumeroAcceso")).isEqualTo("100000042");
+    }
+
+    @Test
     void incluyeElEmisorConSuEstablecimientoYLaFraseDelRegimenGeneral() {   // crit. 1
         Document dte = leer(GeneradorDte.generar(datos(Receptor.consumidorFinal(), linea("Arroz 1 lb", "5.00", 1))));
 

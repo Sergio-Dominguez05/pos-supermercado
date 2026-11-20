@@ -16,9 +16,16 @@ import java.util.UUID;
  * @param certificador    el nombre del certificador FEL
  * @param nitCertificador su NIT, o {@code null} si todavía no se configuró
  * @param reimpresion     HU-08.12 crit. 3: es una copia, y el ticket lo dice
+ * @param numeroAcceso    HU-08.07: el número de acceso de un comprobante en contingencia, todavía sin certificar
  */
 public record DatosTicketFactura(Emisor emisor, Establecimiento establecimiento, String receptorId,
                                  String receptorNombre, UUID autorizacion, String serie, String numero,
                                  OffsetDateTime certificadaEn, OffsetDateTime emitidaEn, Venta venta, List<Pago> pagos,
-                                 String certificador, String nitCertificador, boolean reimpresion) {
+                                 String certificador, String nitCertificador, boolean reimpresion,
+                                 Long numeroAcceso) {
+
+    /** HU-08.07: todavía no se certifica; se imprime como comprobante en contingencia. */
+    public boolean enContingencia() {
+        return autorizacion == null && numeroAcceso != null;
+    }
 }

@@ -11,6 +11,7 @@ import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimie
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
+import { PaginaContingencia } from './modulos/facturas/Contingencia'
 import { PaginaFacturas } from './modulos/facturas/Facturas'
 import { PaginaFacturasRechazadas } from './modulos/facturas/FacturasRechazadas'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
@@ -114,6 +115,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/contingencia"
+            element={
+              <RutaProtegida>
+                <PaginaContingencia />
               </RutaProtegida>
             }
           />

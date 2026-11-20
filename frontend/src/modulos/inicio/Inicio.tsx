@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { CLAVE_FACTURAS_RECHAZADAS, listarFacturasRechazadas } from '../../api/facturas'
 import { EstadoTurno } from '../caja/EstadoTurno'
 import { useSesion } from '../login/sesion'
+import { AvisoContingenciaSupervisor } from '../facturas/Contingencia'
 import { rotuloRechazadas } from '../facturas/textos'
 import { opcionesPara } from './opciones'
 
@@ -23,6 +24,8 @@ export function Inicio() {
 
       {/* HU-08.06 crit. 3: se avisa al supervisor de las ventas pendientes de facturar. */}
       {usuario.permisos.includes('FACTURA_ANULAR') && <AvisoRechazadas />}
+      {/* HU-08.09 crit. 1 y 2: los comprobantes en contingencia y su plazo. */}
+      {usuario.permisos.includes('FACTURA_ANULAR') && <AvisoContingenciaSupervisor />}
 
       <section className="tarjeta">
         <h2>Opciones de su rol</h2>

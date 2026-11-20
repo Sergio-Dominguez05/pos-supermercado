@@ -40,6 +40,22 @@ public interface RepositorioFacturas {
      */
     boolean reabrir(long facturaId, DatosDte datos, String xmlEnviado);
 
-    /** HU-08.03 crit. 3: sin respuesta a tiempo. La tarea queda pendiente para reintentarla (HU-08.07 y HU-08.08). */
-    boolean enContingencia(long facturaId, String motivo);
+    /**
+     * HU-08.03 crit. 3 y HU-08.07: sin respuesta a tiempo, la factura queda en contingencia. La primera vez recibe su
+     * número de acceso y el DTE que lo lleva ({@code numeroAcceso} y {@code xmlEnviado} no nulos; después se
+     * conservan). La tarea queda pendiente y el siguiente intento espera cada vez más: 1, 2, 4... hasta 30 minutos.
+     */
+    boolean enContingencia(long facturaId, String motivo, Long numeroAcceso, String xmlEnviado);
+
+    /** HU-08.07 crit. 1: el siguiente número de acceso de contingencia (correlativo de 9 dígitos). */
+    long siguienteNumeroAcceso();
+
+    /**
+     * HU-08.08 crit. 1: las facturas por certificar, en orden de emisión. Sin {@code todas}, solo las que ya cumplieron
+     * su espera; con {@code todas} (la certificación manual, crit. 4), también las que esperan.
+     */
+    List<FacturaPendiente> porCertificar(boolean todas, int limite);
+
+    /** HU-08.09: todas las facturas pendientes de certificar, de la más antigua. */
+    List<FacturaPendiente> pendientes();
 }

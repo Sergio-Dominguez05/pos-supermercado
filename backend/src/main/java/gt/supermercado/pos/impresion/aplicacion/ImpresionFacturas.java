@@ -31,7 +31,7 @@ import java.util.Optional;
  *   <li>Crit. 6: si la impresora falla o la caja no tiene impresora, la venta y su factura siguen siendo válidas; se
  *       avisa al cajero que puede reimprimirla (HU-08.12).</li>
  * </ul>
- * Una factura en contingencia o rechazada no se imprime aquí: el comprobante de contingencia es de HU-08.07.
+ * Una factura en contingencia se imprime como comprobante en contingencia (HU-08.07); una rechazada no se imprime.
  */
 @Service
 public class ImpresionFacturas implements ImpresionDeFactura {
@@ -52,7 +52,8 @@ public class ImpresionFacturas implements ImpresionDeFactura {
 
     @Override
     public ResultadoImpresion imprimir(Venta venta, List<Pago> pagos, FacturaDeVenta factura) {
-        if (!"CERTIFICADA".equals(factura.estado())) {
+        // HU-08.07 crit. 2: también el comprobante en contingencia, con su número de acceso.
+        if (!"CERTIFICADA".equals(factura.estado()) && !"CONTINGENCIA".equals(factura.estado())) {
             return ResultadoImpresion.sinImprimir(null);
         }
         try {
@@ -87,6 +88,6 @@ public class ImpresionFacturas implements ImpresionDeFactura {
                 imprimible.receptor().identificacion(), imprimible.receptor().nombre(),
                 imprimible.factura().autorizacion(), imprimible.factura().serie(), imprimible.factura().numero(),
                 imprimible.factura().fechaCertificacion(), imprimible.factura().emitidaEn(), venta, pagos,
-                certificador.nombre(), certificador.nit(), reimpresion);
+                certificador.nombre(), certificador.nit(), reimpresion, imprimible.factura().numeroAcceso());
     }
 }

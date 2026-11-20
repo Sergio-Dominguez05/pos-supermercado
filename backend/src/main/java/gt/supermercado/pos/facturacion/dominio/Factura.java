@@ -8,7 +8,9 @@ import java.util.UUID;
  *
  * @param identificador el {@code venta.uuid}, que el certificador usa para no emitir dos facturas (HU-08.04)
  * @param xmlEnviado    el DTE tal como se envió al certificador (HU-08.02)
+ * @param numeroAcceso  el número de acceso si se emitió en contingencia (HU-08.07), o {@code null}
  */
 public record Factura(long id, long ventaId, UUID identificador, EstadoFactura estado, UUID autorizacion, String serie,
-                      String numero, OffsetDateTime fechaCertificacion, OffsetDateTime emitidaEn, String xmlEnviado) {
+                      String numero, OffsetDateTime fechaCertificacion, OffsetDateTime emitidaEn, String xmlEnviado,
+                      Long numeroAcceso) {
 }
