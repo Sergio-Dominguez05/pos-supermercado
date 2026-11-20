@@ -8,6 +8,8 @@ import gt.supermercado.pos.reportes.dominio.Agrupacion;
 import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
 import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteAnuladas;
+import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
@@ -73,7 +75,39 @@ public class GeneracionReportes {
         }).toList();
         return new OpcionesDeFiltro(hoy, rangos, repositorio.cajas(), repositorio.cajeros(),
                 Arrays.stream(TipoTarjetaReporte.values()).map(t -> new Opcion(t.name(), t.etiqueta())).toList(),
-                Arrays.stream(Agrupacion.values()).map(a -> new Opcion(a.name(), a.etiqueta())).toList());
+                Arrays.stream(Agrupacion.values()).map(a -> new Opcion(a.name(), a.etiqueta())).toList(),
+                repositorio.anuladores());
+    }
+
+    /** HU-10.08: los cierres de caja del período, con el total de faltantes y sobrantes. */
+    public ReporteCierres cierresDeCaja(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                        boolean soloConDiferencias, SesionActiva sesion) {
+        return generar(ReporteCierres.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, null);
+            List<FiltroAplicado> aplicados = new ArrayList<>(aplicados(filtros));
+            if (soloConDiferencias) {
+                aplicados.add(new FiltroAplicado("Cierres", "Solo con diferencias"));
+            }
+            EncabezadoReporte encabezado = encabezado(ReporteCierres.TITULO, aplicados, sesion);
+            return new Generado<>(ReporteCierres.de(encabezado, repositorio.cierres(filtros, soloConDiferencias)),
+                    encabezado);
+        });
+    }
+
+    /** HU-10.09: las facturas anuladas en el período, filtradas también por quien las anuló. */
+    public ReporteAnuladas facturasAnuladas(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                            Long anuladaPorId, SesionActiva sesion) {
+        return generar(ReporteAnuladas.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, null);
+            List<FiltroAplicado> aplicados = new ArrayList<>(aplicados(filtros));
+            aplicados.set(0, new FiltroAplicado("Anuladas", aplicados.get(0).valor()));
+            aplicados.add(new FiltroAplicado("Anulada por", anuladaPorId == null ? "Cualquiera"
+                    : repositorio.nombreCajero(anuladaPorId).orElseThrow(() -> new NegocioException(
+                            "FILTRO_ANULADOR_INEXISTENTE", "El usuario que anuló no existe."))));
+            EncabezadoReporte encabezado = encabezado(ReporteAnuladas.TITULO, aplicados, sesion);
+            return new Generado<>(ReporteAnuladas.de(encabezado, repositorio.anuladas(filtros, anuladaPorId)),
+                    encabezado);
+        });
     }
 
     /** HU-10.02: ventas por período, filtradas por fechas, caja y cajero, agrupadas por día (por omisión), semana o mes. */

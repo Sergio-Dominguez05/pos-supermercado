@@ -138,6 +138,34 @@ class ReportesDominioTest {
     }
 
     @Test
+    void losCierresSumanFaltantesYSobrantesPorSeparado() {   // HU-10.08 crit. 2
+        ReporteCierres reporte = ReporteCierres.de(ENCABEZADO, List.of(cierre("0"), cierre("-9.5"), cierre("-0.50"),
+                cierre("5")));
+
+        assertThat(reporte.cierresConDiferencia()).isEqualTo(3);
+        assertThat(reporte.totalFaltantes().toPlainString()).isEqualTo("10.00");
+        assertThat(reporte.totalSobrantes().toPlainString()).isEqualTo("5.00");
+        assertThat(ReporteCierres.de(ENCABEZADO, List.of()).totalFaltantes().toPlainString()).isEqualTo("0.00");
+    }
+
+    @Test
+    void lasAnuladasSumanSuMonto() {   // HU-10.09
+        ReporteAnuladas reporte = ReporteAnuladas.de(ENCABEZADO, List.of(
+                new ReporteAnuladas.Anulada(1, null, null, "A", "1", 1, "Caja 1", new BigDecimal("45"), "Error", "Ana",
+                        "Luis"),
+                new ReporteAnuladas.Anulada(2, null, null, "A", "2", 2, "Caja 1", new BigDecimal("30.5"), "Error",
+                        "Ana", "Luis")));
+
+        assertThat(reporte.cantidad()).isEqualTo(2);
+        assertThat(reporte.monto().toPlainString()).isEqualTo("75.50");
+    }
+
+    private static ReporteCierres.Cierre cierre(String diferencia) {
+        return new ReporteCierres.Cierre(1, null, null, "Caja 1", "Ana", "Ana", BigDecimal.TEN, BigDecimal.TEN,
+                new BigDecimal(diferencia), null);
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP

@@ -132,6 +132,8 @@ describe('reporte de ventas por cajero (HU-10.03)', () => {
       cajeroId: '8',
       agrupacion: 'DIA' as const,
       tipoTarjeta: 'DEBITO',
+      soloConDiferencias: true,
+      anuladaPorId: '3',
     }
 
     await generarReporteCajeros(filtros)

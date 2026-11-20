@@ -21,6 +21,8 @@ export interface OpcionesDeFiltro {
   cajeros: OpcionFiltro[]
   tiposTarjeta: OpcionFiltro[]
   agrupaciones: OpcionFiltro[]
+  /** HU-10.09 crit. 2: quienes pueden anular facturas o ya anularon alguna. */
+  anuladores: OpcionFiltro[]
 }
 
 /** HU-10.01 crit. 4: el encabezado común, con los filtros aplicados. */
@@ -61,6 +63,10 @@ export interface FiltrosVentas {
   agrupacion: Agrupacion
   /** HU-10.01 crit. 2: `DEBITO`, `CREDITO` o vacío (todas); solo en los reportes de tarjetas. */
   tipoTarjeta: string
+  /** HU-10.08 crit. 3: solo los cierres con diferencia. */
+  soloConDiferencias: boolean
+  /** HU-10.09 crit. 2: el usuario que anuló, o vacío (cualquiera). */
+  anuladaPorId: string
 }
 
 export const CLAVE_FILTROS_REPORTE = ['reportes', 'filtros'] as const
@@ -210,6 +216,64 @@ export const generarReporteIva = (filtros: FiltrosVentas) =>
 
 export const generarDetalleIva = (filtros: FiltrosVentas) =>
   pedir<DetalleFacturasIva>(`/api/reportes/iva/facturas?${consultaDe(sinAgrupacion(filtros))}`)
+
+/** HU-10.08 crit. 1: un cierre de caja; la diferencia es lote − registrado (negativa = faltante). */
+export interface CierreDeCaja {
+  turnoId: number
+  abiertoEn: string
+  cerradoEn: string
+  caja: string
+  cajero: string
+  cerradoPor: string | null
+  totalRegistrado: number
+  totalLote: number
+  diferencia: number
+  justificacion: string | null
+}
+
+export interface ReporteCierres {
+  encabezado: EncabezadoReporte
+  cierres: CierreDeCaja[]
+  cierresConDiferencia: number
+  /** Crit. 2: los faltantes, como monto positivo, y los sobrantes. */
+  totalFaltantes: number
+  totalSobrantes: number
+}
+
+/** HU-10.09 crit. 1: una factura anulada. */
+export interface FacturaAnulada {
+  facturaId: number
+  emitidaEn: string
+  anuladaEn: string
+  serie: string
+  numero: string
+  ventaNumero: number
+  caja: string
+  monto: number
+  motivo: string
+  cajero: string
+  anuladaPor: string
+}
+
+export interface ReporteAnuladas {
+  encabezado: EncabezadoReporte
+  facturas: FacturaAnulada[]
+  cantidad: number
+  monto: number
+}
+
+export const generarReporteCierres = (filtros: FiltrosVentas) =>
+  pedir<ReporteCierres>(
+    `/api/reportes/cierres?${consultaDe({
+      ...sinAgrupacion(filtros),
+      soloConDiferencias: filtros.soloConDiferencias ? 'true' : '',
+    })}`,
+  )
+
+export const generarReporteAnuladas = (filtros: FiltrosVentas) =>
+  pedir<ReporteAnuladas>(
+    `/api/reportes/anuladas?${consultaDe({ ...sinAgrupacion(filtros), anuladaPorId: filtros.anuladaPorId })}`,
+  )
 
 /** Cada generación queda en la bitácora (HU-10.15 crit. 3). */
 export const generarReporteVentas = (filtros: FiltrosVentas) =>

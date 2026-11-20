@@ -3,6 +3,8 @@ package gt.supermercado.pos.reportes.infraestructura;
 import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
 import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteAnuladas;
+import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
@@ -228,6 +230,67 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                         fila.getString("receptor_nombre"), fila.getString("caja"), fila.getBigDecimal("subtotal"),
                         fila.getBigDecimal("iva"), fila.getBigDecimal("total")),
                 parametros(filtros).toArray());
+    }
+
+    private static final String NOMBRE = "%1$s.nombre_completo || ' (' || %1$s.username || ')'";
+
+    @Override
+    public List<ReporteCierres.Cierre> cierres(FiltrosReporte filtros, boolean soloConDiferencias) {
+        List<Object> valores = parametros(filtros);
+        valores.add(soloConDiferencias);
+        return jdbc.query("""
+                SELECT t.id, t.abierto_en, t.cerrado_en, c.nombre AS caja, %s AS cajero, %s AS cerrado_por,
+                       t.total_registrado, t.total_lote, t.diferencia, t.justificacion
+                FROM turno t
+                JOIN caja c ON c.id = t.caja_id
+                JOIN usuario u ON u.id = t.usuario_id
+                LEFT JOIN usuario cp ON cp.id = t.cerrado_por
+                WHERE t.estado = 'CERRADO' AND %s AND %s AND (NOT ? OR t.diferencia <> 0)
+                ORDER BY t.cerrado_en, t.id""".formatted(NOMBRE.formatted("u"), NOMBRE.formatted("cp"),
+                        enPeriodo("t.cerrado_en"), deCajaYCajero("t")),
+                (fila, i) -> new ReporteCierres.Cierre(fila.getLong("id"),
+                        fila.getObject("abierto_en", OffsetDateTime.class),
+                        fila.getObject("cerrado_en", OffsetDateTime.class), fila.getString("caja"),
+                        fila.getString("cajero"), fila.getString("cerrado_por"), fila.getBigDecimal("total_registrado"),
+                        fila.getBigDecimal("total_lote"), fila.getBigDecimal("diferencia"),
+                        fila.getString("justificacion")),
+                valores.toArray());
+    }
+
+    @Override
+    public List<ReporteAnuladas.Anulada> anuladas(FiltrosReporte filtros, Long anuladaPorId) {
+        List<Object> valores = parametros(filtros);
+        valores.addAll(Arrays.asList(anuladaPorId, anuladaPorId));
+        return jdbc.query("""
+                SELECT f.id, f.emitida_en, a.anulada_en, f.serie, f.numero, v.numero AS venta_numero,
+                       c.nombre AS caja, v.total, a.motivo, %s AS cajero, %s AS anulada_por
+                FROM anulacion a
+                JOIN factura f ON f.id = a.factura_id
+                JOIN venta v ON v.id = f.venta_id
+                JOIN caja c ON c.id = v.caja_id
+                JOIN usuario u ON u.id = v.usuario_id
+                JOIN usuario ua ON ua.id = a.usuario_id
+                WHERE %s AND %s AND (?::bigint IS NULL OR a.usuario_id = ?::bigint)
+                ORDER BY a.anulada_en, f.id""".formatted(NOMBRE.formatted("u"), NOMBRE.formatted("ua"),
+                        enPeriodo("a.anulada_en"), deCajaYCajero("v")),
+                (fila, i) -> new ReporteAnuladas.Anulada(fila.getLong("id"),
+                        fila.getObject("emitida_en", OffsetDateTime.class),
+                        fila.getObject("anulada_en", OffsetDateTime.class), fila.getString("serie"),
+                        fila.getString("numero"), fila.getLong("venta_numero"), fila.getString("caja"),
+                        fila.getBigDecimal("total"), fila.getString("motivo"), fila.getString("cajero"),
+                        fila.getString("anulada_por")),
+                valores.toArray());
+    }
+
+    @Override
+    public List<Opcion> anuladores() {
+        return jdbc.query("""
+                SELECT u.id, u.nombre_completo, u.username FROM usuario u
+                WHERE EXISTS (SELECT 1 FROM rol_permiso rp WHERE rp.rol_id = u.rol_id AND rp.permiso = 'FACTURA_ANULAR')
+                   OR EXISTS (SELECT 1 FROM anulacion a WHERE a.usuario_id = u.id)
+                ORDER BY lower(u.nombre_completo), u.username""",
+                (fila, i) -> new Opcion(String.valueOf(fila.getLong("id")),
+                        fila.getString("nombre_completo") + " (" + fila.getString("username") + ")"));
     }
 
     @Override

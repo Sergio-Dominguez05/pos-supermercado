@@ -607,5 +607,24 @@ kbd {
 
 /* EP-10: una pestaña por reporte; se acomodan a medida que se agregan reportes. */
 .pestanas-reportes {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.pestanas-reportes button {
+  flex: 1 1 150px;
+}
+
+/* HU-10.08 crit. 3: la casilla "Solo con diferencias" en la barra de filtros. */
+.barra-filtros .casilla {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 9px;
+}
+
+/* Motivos y justificaciones: se ajustan en varias líneas en lugar de ensanchar la tabla. */
+.tabla td.texto-largo {
+  min-width: 220px;
+  white-space: normal;
 }

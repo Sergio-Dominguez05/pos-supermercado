@@ -5,6 +5,8 @@ import gt.supermercado.pos.reportes.dominio.Agrupacion;
 import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
 import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteAnuladas;
+import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
@@ -127,5 +129,31 @@ public class ReportesController {
             @RequestParam(required = false) Long cajeroId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.facturasDelIva(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.08: los cierres de caja del período; {@code soloConDiferencias=true} deja solo los que tienen diferencia. */
+    @GetMapping("/api/reportes/cierres")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteCierres cierresDeCaja(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @RequestParam(defaultValue = "false") boolean soloConDiferencias,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.cierresDeCaja(desde, hasta, cajaId, cajeroId, soloConDiferencias, sesion);
+    }
+
+    /** HU-10.09: las facturas anuladas en el período (por fecha de anulación). */
+    @GetMapping("/api/reportes/anuladas")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteAnuladas facturasAnuladas(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @RequestParam(required = false) Long anuladaPorId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.facturasAnuladas(desde, hasta, cajaId, cajeroId, anuladaPorId, sesion);
     }
 }

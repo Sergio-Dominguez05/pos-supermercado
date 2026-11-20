@@ -36,6 +36,21 @@ public interface RepositorioReportes {
     /** HU-10.07 crit. 3: las facturas certificadas del período, en orden de emisión. */
     List<DetalleFacturasIva.Factura> facturasIva(FiltrosReporte filtros);
 
+    /**
+     * HU-10.08: los turnos cerrados en el período (hora de Guatemala), por caja y cajero del turno, en orden de
+     * cierre; con {@code soloConDiferencias}, solo los que tienen diferencia.
+     */
+    List<ReporteCierres.Cierre> cierres(FiltrosReporte filtros, boolean soloConDiferencias);
+
+    /**
+     * HU-10.09: las facturas anuladas en el período (fecha de anulación), por caja y cajero de la venta y por quien
+     * anuló ({@code null} = cualquiera), en orden de anulación.
+     */
+    List<ReporteAnuladas.Anulada> anuladas(FiltrosReporte filtros, Long anuladaPorId);
+
+    /** Los usuarios que pueden anular facturas o que ya anularon alguna (HU-10.09 crit. 2). */
+    List<OpcionesDeFiltro.Opcion> anuladores();
+
     /** Todas las cajas, también las inactivas: puede haber ventas de una caja que ya no se usa. */
     List<OpcionesDeFiltro.Opcion> cajas();
 

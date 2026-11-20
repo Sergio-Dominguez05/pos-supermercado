@@ -11,12 +11,18 @@ export function FormularioFiltros({
   generando = false,
   conAgrupacion = false,
   conTarjeta = false,
+  conDiferencias = false,
+  conAnulador = false,
   onGenerar,
 }: {
   opciones: OpcionesDeFiltro
   generando?: boolean
   conAgrupacion?: boolean
   conTarjeta?: boolean
+  /** HU-10.08 crit. 3: la casilla "Solo con diferencias". */
+  conDiferencias?: boolean
+  /** HU-10.09 crit. 2: el filtro por quien anuló. */
+  conAnulador?: boolean
   onGenerar: (filtros: FiltrosVentas) => void
 }) {
   const [filtros, setFiltros] = useState(() => filtrosIniciales(opciones))
@@ -106,6 +112,34 @@ export function FormularioFiltros({
                 </option>
               ))}
             </select>
+          </label>
+        )}
+        {conAnulador && (
+          <label>
+            Anulada por
+            <select
+              name="anuladaPorId"
+              value={filtros.anuladaPorId}
+              onChange={(evento) => cambiar({ anuladaPorId: evento.target.value })}
+            >
+              <option value="">Cualquiera</option>
+              {opciones.anuladores.map((usuario) => (
+                <option key={usuario.valor} value={usuario.valor}>
+                  {usuario.etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {conDiferencias && (
+          <label className="casilla">
+            <input
+              type="checkbox"
+              name="soloConDiferencias"
+              checked={filtros.soloConDiferencias}
+              onChange={(evento) => cambiar({ soloConDiferencias: evento.target.checked })}
+            />
+            Solo con diferencias
           </label>
         )}
         {conAgrupacion && (
