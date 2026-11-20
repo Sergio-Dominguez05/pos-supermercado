@@ -125,7 +125,14 @@ describe('reporte de ventas por cajero (HU-10.03)', () => {
   it('pide el resumen sin agrupación y el detalle con el cajero en la ruta', async () => {
     const respuesta = vi.fn(async () => new Response(JSON.stringify(REPORTE), { status: 200 }))
     vi.stubGlobal('fetch', respuesta)
-    const filtros = { desde: '2026-11-01', hasta: '2026-11-20', cajaId: '1', cajeroId: '8', agrupacion: 'DIA' as const }
+    const filtros = {
+      desde: '2026-11-01',
+      hasta: '2026-11-20',
+      cajaId: '1',
+      cajeroId: '8',
+      agrupacion: 'DIA' as const,
+      tipoTarjeta: 'DEBITO',
+    }
 
     await generarReporteCajeros(filtros)
     await generarDetalleCajero(7, filtros)

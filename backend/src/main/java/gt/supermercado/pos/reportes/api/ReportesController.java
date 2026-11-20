@@ -2,7 +2,12 @@ package gt.supermercado.pos.reportes.api;
 
 import gt.supermercado.pos.reportes.aplicacion.GeneracionReportes;
 import gt.supermercado.pos.reportes.dominio.Agrupacion;
+import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
+import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteIva;
+import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
+import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
@@ -72,5 +77,55 @@ public class ReportesController {
             @RequestParam(required = false) Long cajaId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.detalleDeCajero(cajeroId, desde, hasta, cajaId, sesion);
+    }
+
+    /** HU-10.06 crit. 1 y 2: débito y crédito, con los pagos de facturas anuladas aparte. */
+    @GetMapping("/api/reportes/tarjetas")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteTarjetas ingresosPorTarjeta(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @RequestParam(required = false) TipoTarjetaReporte tipoTarjeta,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.ingresosPorTarjeta(desde, hasta, cajaId, cajeroId, tipoTarjeta, sesion);
+    }
+
+    /** HU-10.06 crit. 3: las transacciones de un tipo de tarjeta ({@code DEBITO} o {@code CREDITO}). */
+    @GetMapping("/api/reportes/tarjetas/{tipo}/pagos")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public DetallePagosTarjeta detalleDeTarjeta(
+            @PathVariable TipoTarjetaReporte tipo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.detalleDeTarjeta(tipo, desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.07: el IVA de las facturas certificadas, por día. */
+    @GetMapping("/api/reportes/iva")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteIva ivaCobrado(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.ivaCobrado(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.07 crit. 3: el detalle por factura. */
+    @GetMapping("/api/reportes/iva/facturas")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public DetalleFacturasIva facturasDelIva(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.facturasDelIva(desde, hasta, cajaId, cajeroId, sesion);
     }
 }

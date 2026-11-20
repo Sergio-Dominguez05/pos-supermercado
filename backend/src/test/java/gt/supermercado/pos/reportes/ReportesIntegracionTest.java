@@ -205,6 +205,112 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void sumaLosIngresosPorTipoDeTarjetaConLosAnuladosAparte() throws Exception {   // HU-10.06 crit. 1 y 2
+        Caja caja = caja();
+        long debito = caja.venta("FINALIZADA", "2025-08-04T15:00:00Z", "100.00", "CERTIFICADA");
+        caja.pago(debito, "DEBITO", "100.00", "D-1", false);
+        caja.pago(debito, "CREDITO", "55.00", "X-0", true);                      // eliminado: no cuenta
+        long credito = caja.venta("FINALIZADA", "2025-08-05T15:00:00Z", "40.00", null);
+        caja.pago(credito, "CREDITO", "40.00", "C-1", false);
+        long anulada = caja.venta("FINALIZADA", "2025-08-05T16:00:00Z", "25.00", "ANULADA");
+        caja.pago(anulada, "DEBITO", "25.00", "D-2", false);
+        long cancelada = caja.venta("CANCELADA", "2025-08-05T17:00:00Z", "9.00", null);
+        caja.pago(cancelada, "DEBITO", "9.00", "D-3", true);
+
+        JsonNode reporte = ok(get("/api/reportes/tarjetas?desde=2025-08-01&hasta=2025-08-31&cajaId=" + caja.id));
+
+        List<JsonNode> filas = filas(reporte);
+        assertThat(filas).extracting(f -> f.get("tipo").asString()).containsExactly("DEBITO", "CREDITO");
+        assertThat(filas.get(0).get("etiqueta").asString()).isEqualTo("Débito");
+        assertThat(filas.get(0).get("transacciones").asLong()).isEqualTo(1);
+        assertThat(filas.get(0).get("monto").decimalValue()).isEqualByComparingTo("100.00");
+        assertThat(filas.get(1).get("monto").decimalValue()).isEqualByComparingTo("40.00");
+        assertThat(reporte.get("total").get("transacciones").asLong()).isEqualTo(2);
+        assertThat(reporte.get("total").get("monto").decimalValue()).isEqualByComparingTo("140.00");
+        assertThat(reporte.get("anulados").get(0).get("monto").decimalValue()).isEqualByComparingTo("25.00");
+        assertThat(reporte.get("totalAnulado").get("transacciones").asLong()).isEqualTo(1);
+
+        JsonNode soloCredito = ok(get("/api/reportes/tarjetas?desde=2025-08-01&hasta=2025-08-31&tipoTarjeta=CREDITO"
+                + "&cajaId=" + caja.id));
+        assertThat(filas(soloCredito)).extracting(f -> f.get("tipo").asString()).containsExactly("CREDITO");
+        List<String> filtros = new ArrayList<>();
+        soloCredito.get("encabezado").get("filtros").forEach(f -> filtros.add(f.get("etiqueta").asString() + ": "
+                + f.get("valor").asString()));
+        assertThat(filtros).contains("Tipo de tarjeta: Crédito");
+    }
+
+    @Test
+    void elDetalleDeUnaTarjetaListaSusTransaccionesConLaAutorizacion() throws Exception {   // HU-10.06 crit. 3
+        Caja caja = caja();
+        long primera = caja.venta("FINALIZADA", "2025-08-04T15:00:00Z", "100.00", "CERTIFICADA");
+        caja.pago(primera, "DEBITO", "100.00", "AUT-001", false);
+        long anulada = caja.venta("FINALIZADA", "2025-08-05T16:00:00Z", "25.00", "ANULADA");
+        caja.pago(anulada, "DEBITO", "25.00", "AUT-002", false);
+        long credito = caja.venta("FINALIZADA", "2025-08-05T17:00:00Z", "40.00", null);
+        caja.pago(credito, "CREDITO", "40.00", "AUT-003", false);
+
+        JsonNode detalle = ok(get("/api/reportes/tarjetas/DEBITO/pagos?desde=2025-08-01&hasta=2025-08-31&cajaId="
+                + caja.id));
+
+        List<JsonNode> pagos = new ArrayList<>();
+        detalle.get("pagos").forEach(pagos::add);
+        assertThat(pagos).extracting(p -> p.get("autorizacion").asString()).containsExactly("AUT-001", "AUT-002");
+        assertThat(pagos).extracting(p -> p.get("anulada").asBoolean()).containsExactly(false, true);
+        assertThat(pagos.get(0).get("ultimos4").asString()).isEqualTo("4242");
+        assertThat(pagos.get(0).get("caja").asString()).isEqualTo(caja.nombre);
+        assertThat(get("/api/reportes/tarjetas/EFECTIVO/pagos?desde=2025-08-01&hasta=2025-08-31").statusCode())
+                .isEqualTo(400);
+    }
+
+    @Test
+    void elIvaSoloSumaLasFacturasCertificadasYAvisaLasQueFaltan() throws Exception {   // HU-10.07 crit. 1, 2 y 4
+        Caja caja = caja();
+        caja.venta("FINALIZADA", "2025-09-01T15:00:00Z", "112.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-09-01T16:00:00Z", "56.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-09-02T15:00:00Z", "22.40", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-09-02T16:00:00Z", "999.00", "ANULADA");        // crit. 2
+        caja.venta("FINALIZADA", "2025-09-02T17:00:00Z", "30.00", "CONTINGENCIA");    // aún no cuenta
+        caja.venta("FINALIZADA", "2025-09-02T18:00:00Z", "11.20", "RECHAZADA");       // aún no cuenta
+
+        JsonNode reporte = ok(get("/api/reportes/iva?desde=2025-09-01&hasta=2025-09-30&cajaId=" + caja.id));
+
+        List<JsonNode> dias = new ArrayList<>();
+        reporte.get("dias").forEach(dias::add);
+        assertThat(dias).extracting(d -> d.get("fecha").asString()).containsExactly("2025-09-01", "2025-09-02");
+        assertThat(dias.get(0).get("facturas").asLong()).isEqualTo(2);
+        assertThat(dias.get(0).get("baseImponible").decimalValue()).isEqualByComparingTo("150.00");
+        assertThat(dias.get(0).get("iva").decimalValue()).isEqualByComparingTo("18.00");
+        JsonNode total = reporte.get("total");
+        assertThat(total.get("facturas").asLong()).isEqualTo(3);
+        assertThat(total.get("baseImponible").decimalValue()).isEqualByComparingTo("170.00");
+        assertThat(total.get("iva").decimalValue()).isEqualByComparingTo("20.40");
+        assertThat(total.get("total").decimalValue()).isEqualByComparingTo("190.40");
+        assertThat(reporte.get("sinCertificar").get("facturas").asLong()).isEqualTo(2);
+        assertThat(reporte.get("sinCertificar").get("total").decimalValue()).isEqualByComparingTo("41.20");
+    }
+
+    @Test
+    void elDetalleDelIvaListaCadaFacturaCertificada() throws Exception {   // HU-10.07 crit. 3
+        Caja caja = caja();
+        long primera = caja.venta("FINALIZADA", "2025-09-01T15:00:00Z", "112.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-09-02T16:00:00Z", "999.00", "ANULADA");
+        long segunda = caja.venta("FINALIZADA", "2025-09-02T15:00:00Z", "22.40", "CERTIFICADA");
+
+        JsonNode detalle = ok(get("/api/reportes/iva/facturas?desde=2025-09-01&hasta=2025-09-30&cajaId=" + caja.id));
+
+        List<JsonNode> facturas = new ArrayList<>();
+        detalle.get("facturas").forEach(facturas::add);
+        assertThat(facturas).extracting(f -> f.get("numero").asString())
+                .containsExactly(String.valueOf(primera), String.valueOf(segunda));
+        assertThat(facturas.get(0).get("serie").asString()).isEqualTo("SERIE");
+        assertThat(facturas.get(0).get("autorizacion").asString()).hasSize(36);
+        assertThat(facturas.get(0).get("receptorNombre").asString()).isEqualTo("Consumidor Final");
+        assertThat(facturas.get(0).get("baseImponible").decimalValue()).isEqualByComparingTo("100.00");
+        assertThat(facturas.get(0).get("iva").decimalValue()).isEqualByComparingTo("12.00");
+        assertThat(detalle.get("encabezado").get("titulo").asString()).isEqualTo("Detalle de IVA por factura");
+    }
+
+    @Test
     void lasOpcionesTraenLosRangosRapidosConLaFechaDelServidor() throws Exception {   // HU-10.01 crit. 2 y 3
         Caja caja = caja();
         JsonNode opciones = ok(get("/api/reportes/filtros"));
@@ -273,9 +379,14 @@ class ReportesIntegracionTest {
                 .isEqualTo(403);
         assertThat(enviar("/api/reportes/cajeros/%d/ventas?desde=2025-04-01&hasta=2025-04-10".formatted(cajeroId),
                 sesion).statusCode()).isEqualTo(403);
+        for (String ruta : List.of("/api/reportes/tarjetas", "/api/reportes/tarjetas/DEBITO/pagos", "/api/reportes/iva",
+                "/api/reportes/iva/facturas")) {
+            assertThat(enviar(ruta + "?desde=2025-04-01&hasta=2025-04-10", sesion).statusCode()).as(ruta)
+                    .isEqualTo(403);
+        }
         assertThat(jdbc.queryForList("""
                 SELECT cambios->>'permisoRequerido' FROM bitacora WHERE accion = 'ACCESO_DENEGADO' AND usuario_id = ?""",
-                String.class, cajeroId)).hasSize(4).containsOnly("REPORTE_CONSULTAR");
+                String.class, cajeroId)).hasSize(8).containsOnly("REPORTE_CONSULTAR");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bitacora WHERE accion = 'REPORTE_GENERADO' AND usuario_id = ?",
                 Integer.class, cajeroId)).isZero();
     }
@@ -324,16 +435,28 @@ class ReportesIntegracionTest {
                     RETURNING id""", Long.class, turnoId, id, cajeroId, estado, subtotal, monto.subtract(subtotal),
                     monto, finalizadaEn, estado, finalizadaEn);
             if (estadoFactura != null) {
-                boolean autorizada = !estadoFactura.equals("RECHAZADA");
+                boolean autorizada = estadoFactura.equals("CERTIFICADA") || estadoFactura.equals("ANULADA");
                 jdbc.update("""
                         INSERT INTO factura (venta_id, estado, receptor_tipo, receptor_id, receptor_nombre,
                                              emisor_snapshot, serie, numero, uuid_autorizacion, fecha_certificacion,
-                                             xml_enviado)
-                        VALUES (?, ?, 'CF', 'CF', 'Consumidor Final', '{}'::jsonb, ?, ?, ?, ?::timestamptz, '<dte/>')""",
+                                             xml_enviado, emitida_en)
+                        VALUES (?, ?, 'CF', 'CF', 'Consumidor Final', '{}'::jsonb, ?, ?, ?, ?::timestamptz, '<dte/>',
+                                ?::timestamptz)""",
                         venta, estadoFactura, autorizada ? "SERIE" : null, autorizada ? String.valueOf(venta) : null,
-                        autorizada ? java.util.UUID.randomUUID() : null, autorizada ? finalizadaEn : null);
+                        autorizada ? java.util.UUID.randomUUID() : null, autorizada ? finalizadaEn : null,
+                        finalizadaEn);
             }
             return venta;
+        }
+
+        /** Un pago con tarjeta de la venta; {@code eliminado} si se quitó antes de finalizar (HU-07.06). */
+        void pago(long venta, String tipo, String monto, String autorizacion, boolean eliminado) {
+            jdbc.update("""
+                    INSERT INTO pago (venta_id, turno_id, usuario_id, tipo_tarjeta, autorizacion, ultimos4, monto,
+                                      eliminado_en, eliminado_por)
+                    VALUES (?, ?, ?, ?, ?, '4242', ?, CASE WHEN ? THEN now() END, CASE WHEN ? THEN ?::bigint END)""",
+                    venta, turnoId, cajeroId, tipo, autorizacion, new BigDecimal(monto), eliminado, eliminado,
+                    cajeroId);
         }
 
         /** Una línea eliminada de la venta en el momento indicado. */

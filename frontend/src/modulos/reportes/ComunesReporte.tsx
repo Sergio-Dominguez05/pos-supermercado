@@ -3,18 +3,20 @@ import type { Agrupacion, EncabezadoReporte, FiltrosVentas, OpcionesDeFiltro } f
 import { fechaHora, filtrosIniciales } from './filtros'
 
 /**
- * HU-10.01: los filtros comunes de los reportes, con los rangos rápidos (crit. 3). La agrupación solo se muestra en
- * los reportes que la usan.
+ * HU-10.01: los filtros comunes de los reportes, con los rangos rápidos (crit. 3). La agrupación y el tipo de tarjeta
+ * solo se muestran en los reportes que los usan (crit. 2: "cuando aplica").
  */
 export function FormularioFiltros({
   opciones,
   generando = false,
   conAgrupacion = false,
+  conTarjeta = false,
   onGenerar,
 }: {
   opciones: OpcionesDeFiltro
   generando?: boolean
   conAgrupacion?: boolean
+  conTarjeta?: boolean
   onGenerar: (filtros: FiltrosVentas) => void
 }) {
   const [filtros, setFiltros] = useState(() => filtrosIniciales(opciones))
@@ -89,6 +91,23 @@ export function FormularioFiltros({
             ))}
           </select>
         </label>
+        {conTarjeta && (
+          <label>
+            Tipo de tarjeta
+            <select
+              name="tipoTarjeta"
+              value={filtros.tipoTarjeta}
+              onChange={(evento) => cambiar({ tipoTarjeta: evento.target.value })}
+            >
+              <option value="">Todas</option>
+              {opciones.tiposTarjeta.map((tipo) => (
+                <option key={tipo.valor} value={tipo.valor}>
+                  {tipo.etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {conAgrupacion && (
           <label>
             Agrupar por
