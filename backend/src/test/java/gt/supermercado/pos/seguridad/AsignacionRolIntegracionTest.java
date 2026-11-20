@@ -57,8 +57,13 @@ class AsignacionRolIntegracionTest {
 
     @Test
     void soloExistenLosRolesAdministradorSupervisorYCajero() {
-        assertThat(jdbc.queryForList("SELECT codigo FROM rol", String.class))
+        // El rol técnico "Sistema" (HU-08.08, decisión de Sergio) no es de personas: solo lo tiene el usuario "sistema",
+        // que no inicia sesión ni se administra, y la API no lo asigna.
+        assertThat(jdbc.queryForList("SELECT codigo FROM rol WHERE codigo <> 'SISTEMA'", String.class))
                 .containsExactlyInAnyOrder("ADMIN", "SUPERVISOR", "CAJERO");
+        assertThat(jdbc.queryForList("""
+                SELECT u.username FROM usuario u JOIN rol r ON r.id = u.rol_id WHERE r.codigo = 'SISTEMA'""",
+                String.class)).containsExactly("sistema");
     }
 
     @Test

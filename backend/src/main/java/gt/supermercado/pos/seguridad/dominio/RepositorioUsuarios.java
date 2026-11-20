@@ -10,6 +10,11 @@ public interface RepositorioUsuarios {
 
     boolean existeAlgunoConRol(Rol rol);
 
+    /** HU-08.08: el id del usuario técnico "sistema", a cuyo nombre registran los procesos automáticos. */
+    default long idDelSistema() {
+        throw new UnsupportedOperationException("Este repositorio no conoce el usuario del sistema.");
+    }
+
     long contarAdministradoresActivos();
 
     /**

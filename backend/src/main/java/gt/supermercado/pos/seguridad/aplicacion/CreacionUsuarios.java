@@ -44,6 +44,9 @@ public class CreacionUsuarios {
         String nombreCompleto = datos.nombreCompleto().strip();
         TipoCredencial tipo = TipoCredencial.de(datos.rol());
 
+        if (datos.rol() == Rol.SISTEMA) {
+            throw rechazar(actor, username, "ROL_INVALIDO", "El rol Sistema es solo de los procesos automáticos.");
+        }
         if (!ReglasCredencial.esUsernameValido(username)) {
             throw rechazar(actor, username, "USERNAME_INVALIDO",
                     "El nombre de usuario debe tener de 3 a 30 caracteres: letras, números, punto, guion o guion bajo.");

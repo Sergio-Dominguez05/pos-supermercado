@@ -69,6 +69,10 @@ public final class GeneradorDte {
         generales.setAttribute("Tipo", TIPO_FACTURA);
         generales.setAttribute("FechaHoraEmision", FECHA.format(datos.emitidaEn().truncatedTo(ChronoUnit.SECONDS)));
         generales.setAttribute("CodigoMoneda", MONEDA);
+        if (datos.numeroAcceso() != null) {
+            // HU-08.07 crit. 1: el comprobante emitido en contingencia lleva su número de acceso.
+            generales.setAttribute("NumeroAcceso", String.valueOf(datos.numeroAcceso()));
+        }
 
         emisor(emision, datos.emisor(), datos.establecimiento());
         receptor(emision, datos.receptor());

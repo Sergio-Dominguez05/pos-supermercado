@@ -3,3 +3,6 @@ pos:
   seguridad:
     # HU-12.15: llave AES-256 solo para pruebas.
     llave-maestra: 7Z+e2IQC85+vIMKzN3T+b45ZhrtilmldiFcUq0bNwwI=
+  contingencia:
+    # HU-08.08: el proceso automático no corre en las pruebas, para que no certifique mientras se prueba la contingencia.
+    automatica: false

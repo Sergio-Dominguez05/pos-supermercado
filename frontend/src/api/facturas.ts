@@ -89,3 +89,59 @@ export const reimprimirUltima = () => pedir<ResultadoImpresion>('/api/facturas/u
 
 export const reimprimirFactura = (facturaId: number) =>
   pedir<ResultadoImpresion>(`/api/facturas/${facturaId}/reimprimir`, { method: 'POST' })
+
+/** HU-08.07 crit. 3: si hay comprobantes en contingencia, para el aviso de la pantalla de venta. */
+export interface EstadoContingencia {
+  enContingencia: boolean
+  pendientes: number
+}
+
+/** HU-08.09 crit. 3: un comprobante pendiente de certificar, con el error de su último intento. */
+export interface PendienteContingencia {
+  ventaId: number
+  ventaNumero: number
+  cajaNombre: string
+  estado: 'PENDIENTE' | 'CONTINGENCIA'
+  numeroAcceso: number | null
+  emitidaEn: string
+  total: number
+  intentos: number
+  ultimoError: string | null
+  proximoIntento: string
+  dias: number
+  /** El último día para certificarlo. */
+  vence: string
+  alerta: boolean
+}
+
+/** HU-08.09 crit. 1 y 2: cuántos hay, el más antiguo y si se acerca el plazo de la SAT. */
+export interface ResumenContingencia {
+  pendientes: number
+  masAntigua: string | null
+  diasMasAntigua: number
+  venceMasAntigua: string | null
+  alerta: boolean
+  diasMaximos: number
+  diaDeAlerta: number
+  lista: PendienteContingencia[]
+}
+
+export interface RondaCertificacion {
+  procesadas: number
+  certificadas: number
+  rechazadas: number
+  quedan: number
+  ocupado: boolean
+  mensaje: string
+}
+
+export const CLAVE_ESTADO_CONTINGENCIA = ['facturas', 'contingencia', 'estado'] as const
+export const CLAVE_CONTINGENCIA = ['facturas', 'contingencia'] as const
+
+export const obtenerEstadoContingencia = () => pedir<EstadoContingencia>('/api/facturas/contingencia/estado')
+
+export const obtenerContingencia = () => pedir<ResumenContingencia>('/api/facturas/contingencia')
+
+/** HU-08.08 crit. 4: certificar ahora los comprobantes pendientes, sin esperar el proceso automático. */
+export const certificarContingencia = () =>
+  pedir<RondaCertificacion>('/api/facturas/contingencia/certificar', { method: 'POST' })

@@ -40,7 +40,14 @@ class RepositorioUsuariosJdbc implements RepositorioUsuarios {
 
     @Override
     public Optional<Usuario> buscarPorId(long id) {
-        return jdbc.query(SELECT_USUARIO + "WHERE u.id = ?", USUARIO, id).stream().findFirst();
+        // El usuario técnico "sistema" (HU-08.08) no se edita, activa ni restablece.
+        return jdbc.query(SELECT_USUARIO + "WHERE u.id = ? AND r.codigo <> 'SISTEMA'", USUARIO, id).stream()
+                .findFirst();
+    }
+
+    @Override
+    public long idDelSistema() {
+        return jdbc.queryForObject("SELECT id FROM usuario WHERE username = 'sistema'", Long.class);
     }
 
     @Override

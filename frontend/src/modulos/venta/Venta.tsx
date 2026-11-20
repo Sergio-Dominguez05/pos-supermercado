@@ -27,6 +27,7 @@ import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
 import { reimprimirUltima } from '../../api/facturas'
+import { AvisoContingenciaVenta } from '../facturas/Contingencia'
 import { CorregirFactura } from '../facturas/CorregirFactura'
 import { avisoFactura, avisoVentaFinalizada } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
@@ -189,6 +190,9 @@ export function Venta() {
 
       {/* HU-09.01 crit. 1: en una caja cerrada se pide abrir el turno. */}
       <EstadoTurno />
+
+      {/* HU-08.07 crit. 3: el cajero sabe que se está operando en contingencia. */}
+      {habilitada && <AvisoContingenciaVenta />}
 
       {/* HU-09.02 crit. 1 y HU-06.01 crit. 2: con la caja cerrada la pantalla de venta está deshabilitada. */}
       <section className="tarjeta formulario" aria-label="Venta">

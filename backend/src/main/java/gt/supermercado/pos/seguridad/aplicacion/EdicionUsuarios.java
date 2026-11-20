@@ -58,6 +58,9 @@ public class EdicionUsuarios {
         TipoCredencial tipoNuevo = TipoCredencial.de(datos.rol());
         boolean cambiaCredencial = TipoCredencial.de(actual.rol()) != tipoNuevo;
 
+        if (datos.rol() == Rol.SISTEMA) {
+            throw rechazar(actor, actual, "ROL_INVALIDO", "El rol Sistema es solo de los procesos automáticos.");
+        }
         if (actual.rol() == Rol.ADMIN && datos.rol() != Rol.ADMIN && actual.activo()
                 && usuarios.contarAdministradoresActivos() <= 1) {
             throw rechazar(actor, actual, "ULTIMO_ADMINISTRADOR",

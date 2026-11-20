@@ -8,6 +8,7 @@ import gt.supermercado.pos.facturacion.dominio.ConfiguracionFel;
 import gt.supermercado.pos.facturacion.dominio.DatosDte;
 import gt.supermercado.pos.facturacion.dominio.EstadoFactura;
 import gt.supermercado.pos.facturacion.dominio.Factura;
+import gt.supermercado.pos.facturacion.dominio.FacturaImprimible;
 import gt.supermercado.pos.facturacion.dominio.GeneradorDte;
 import gt.supermercado.pos.facturacion.dominio.MotivoRechazo;
 import gt.supermercado.pos.facturacion.dominio.ReceptorDeVenta;
@@ -114,11 +115,11 @@ public class EmisionFacturas implements EmisionDeFactura {
                             .orElseGet(() -> certificador.certificar(factura.xmlEnviado(), factura.identificador()))
                     : certificador.certificar(factura.xmlEnviado(), factura.identificador()), limite());
         } catch (CertificadorNoDisponibleException e) {
-            return contingencia(factura, e.getMessage());
+            return contingencia(factura, venta, e.getMessage());
         } catch (RuntimeException e) {
             // La venta ya está cobrada: cualquier falla del envío deja la factura para reintentarla, nunca un error.
             LOG.warn("Falló el envío de la factura {} al certificador", factura.id(), e);
-            return contingencia(factura, "Falló la comunicación con el certificador.");
+            return contingencia(factura, venta, "Falló la comunicación con el certificador.");
         }
         if (resultado.certificada()) {
             if (!facturas.certificada(factura.id(), resultado)) {
@@ -156,12 +157,27 @@ public class EmisionFacturas implements EmisionDeFactura {
                         motivo.mensaje()), "factura", factura.id(), detalle));
     }
 
-    private FacturaDeVenta contingencia(Factura factura, String motivo) {
-        if (!facturas.enContingencia(factura.id(), motivo)) {
+    /**
+     * HU-08.07 crit. 1 y 4: sin respuesta, la factura queda guardada en contingencia. La primera vez recibe su número de
+     * acceso y se arma otra vez el DTE con ese número (con la copia del emisor guardada en la factura), que es el que
+     * se certificará después (HU-08.08).
+     */
+    private FacturaDeVenta contingencia(Factura factura, Venta venta, String motivo) {
+        Long nuevo = null;
+        String xml = null;
+        if (factura.numeroAcceso() == null) {
+            nuevo = facturas.siguienteNumeroAcceso();
+            FacturaImprimible copia = facturas.imprimible(factura.ventaId()).orElseThrow();
+            xml = GeneradorDte.generar(new DatosDte(copia.emisor(), copia.establecimiento(), copia.receptor(),
+                    factura.emitidaEn(), venta, nuevo));
+        }
+        if (!facturas.enContingencia(factura.id(), motivo, nuevo, xml)) {
             return actual(facturaDe(factura.ventaId()));
         }
+        long numeroAcceso = nuevo != null ? nuevo : factura.numeroAcceso();
         return new FacturaDeVenta(EstadoFactura.CONTINGENCIA.name(), null, null, null, null, motivo
-                + " La factura queda en contingencia y se certificará después.", false);
+                + " Se emitió el comprobante en contingencia con el número de acceso %d; se certificará después."
+                .formatted(numeroAcceso), false);
     }
 
     private static FacturaDeVenta rechazada(MotivoRechazo motivo) {
