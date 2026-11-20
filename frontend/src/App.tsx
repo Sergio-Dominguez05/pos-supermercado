@@ -12,6 +12,7 @@ import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimie
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { PaginaParametrosOperacion } from './modulos/configuracion/ParametrosOperacion'
+import { PaginaServidorCorreo } from './modulos/configuracion/ServidorCorreo'
 import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
 import { PaginaTurnosAbiertos } from './modulos/caja/TurnosAbiertos'
 import { PaginaPermisos } from './modulos/usuarios/PermisosPorRol'
@@ -115,6 +116,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaConexionFel />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/correo"
+            element={
+              <RutaProtegida>
+                <PaginaServidorCorreo />
               </RutaProtegida>
             }
           />

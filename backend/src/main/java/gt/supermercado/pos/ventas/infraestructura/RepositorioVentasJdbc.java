@@ -66,6 +66,18 @@ class RepositorioVentasJdbc implements RepositorioVentas {
     }
 
     @Override
+    public boolean asignarCorreoFactura(long ventaId, String correo) {
+        return jdbc.update("UPDATE venta SET correo_factura = ? WHERE id = ? AND estado = 'EN_CURSO'", correo,
+                ventaId) == 1;
+    }
+
+    @Override
+    public Optional<String> correoFactura(long ventaId) {
+        return jdbc.queryForList("SELECT correo_factura FROM venta WHERE id = ? AND correo_factura IS NOT NULL",
+                String.class, ventaId).stream().findFirst();
+    }
+
+    @Override
     public boolean asignarCliente(long ventaId, Long clienteId) {
         return jdbc.update("UPDATE venta SET cliente_id = ? WHERE id = ? AND estado = 'EN_CURSO'", clienteId, ventaId) == 1;
     }

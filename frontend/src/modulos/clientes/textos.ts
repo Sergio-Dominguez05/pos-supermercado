@@ -5,6 +5,15 @@ import type { BusquedaNit, Cliente, ClienteListado } from '../../api/clientes'
 /** HU-05.01 crit. 3: el receptor de la factura cuando la venta no tiene cliente. */
 export const CONSUMIDOR_FINAL = 'CF · Consumidor Final'
 
+/** HU-05.11 crit. 3: la misma forma que valida el servidor (nombre@dominio.tld, sin espacios). */
+export const correoValido = (correo: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo.trim())
+
+export const CORREO_INVALIDO = 'El correo no es válido, por ejemplo cliente@correo.com.'
+
+/** HU-05.11 crit. 4: lo que ve el cajero sobre el envío de la factura. */
+export const avisoCorreoFactura = (correo: string | null) =>
+  correo ? `La factura se enviará a ${correo}.` : 'Sin correo: la factura solo se imprime.'
+
 /** HU-05.03 crit. 2: el aviso de un NIT mal escrito; no se usa. */
 export const NIT_CLIENTE_INVALIDO = 'El NIT no es válido: revise los dígitos y el verificador (puede terminar en K).'
 

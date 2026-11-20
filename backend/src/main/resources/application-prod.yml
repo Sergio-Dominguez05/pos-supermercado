@@ -14,6 +14,9 @@ pos:
   impresion:
     # red: imprime en la impresora de cada caja. simulado solo para pruebas del servidor.
     modo: ${POS_IMPRESION_MODO:red}
+  correo:
+    # HU-08.15: smtp envía las facturas con el servidor de Configuración > Correo. simulado solo para pruebas.
+    modo: ${POS_CORREO_MODO:smtp}
   seguridad:
     cookie-segura: true
     admin-inicial:

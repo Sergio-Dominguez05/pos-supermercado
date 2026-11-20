@@ -17,4 +17,7 @@ public interface RepositorioClientes {
 
     /** Lanza {@code DuplicateKeyException} si el NIT ya está registrado. */
     long registrar(String nit, String nombre, String direccion, String correo, long usuarioId);
+
+    /** HU-05.11 crit. 1: el correo del cliente, agregado o cambiado durante la venta. */
+    void cambiarCorreo(long clienteId, String correo);
 }

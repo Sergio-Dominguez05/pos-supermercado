@@ -25,6 +25,8 @@ export interface BusquedaNit {
 export interface ClienteDeVenta {
   consumidorFinal: boolean
   cliente: Cliente | null
+  /** HU-05.11: a dónde se enviará la factura (HU-08.15); `null` si no se envía. */
+  correoFactura: string | null
 }
 
 export interface DatosCliente {
@@ -81,3 +83,13 @@ export const obtenerClienteDeVenta = () => pedir<ClienteDeVenta>('/api/ventas/ac
 /** Asigna el cliente a la venta en curso; `null` vuelve a Consumidor Final (HU-05.01 crit. 2). */
 export const asignarClienteAVenta = (clienteId: number | null) =>
   pedir<ClienteDeVenta>('/api/ventas/actual/cliente', { method: 'PUT', body: JSON.stringify({ clienteId }) })
+
+/**
+ * HU-05.11: el correo para la factura de la venta en curso; vacío no la envía. Con cliente, también queda en el
+ * cliente. 422 `CORREO_INVALIDO` si no tiene la forma nombre@dominio.com.
+ */
+export const cambiarCorreoDeFactura = (correo: string) =>
+  pedir<ClienteDeVenta>('/api/ventas/actual/cliente/correo', {
+    method: 'PUT',
+    body: JSON.stringify({ correo: correo.trim() }),
+  })

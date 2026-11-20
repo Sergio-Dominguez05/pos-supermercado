@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import {
   claveDetalleFactura,
   obtenerDetalleFactura,
+  enviarFacturaPorCorreo,
   reimprimirFactura,
   type DetalleFactura,
   type FacturaEmitida,
@@ -235,10 +236,16 @@ function Acciones({ factura, permisos }: { factura: DetalleFactura; permisos: re
     mutationFn: () => reimprimirFactura(factura.facturaId),
     onSettled: refrescar,
   })
+  const correo = useMutation({
+    mutationFn: () => enviarFacturaPorCorreo(factura.facturaId),
+    onSettled: refrescar,
+  })
   const certificada = factura.estado === 'CERTIFICADA'
   const puedeReimprimir = certificada && permisos.includes('FACTURA_REIMPRIMIR')
   const puedeAnular = certificada && permisos.includes('FACTURA_ANULAR')
-  if (!puedeReimprimir && !puedeAnular) return null
+  // HU-08.15 crit. 4: con el mismo permiso del detalle, si el receptor tiene correo.
+  const puedeEnviar = certificada && factura.receptor.correo !== null && permisos.includes('FACTURA_ANULAR')
+  if (!puedeReimprimir && !puedeAnular && !puedeEnviar) return null
 
   return (
     <div className="acciones-factura">
@@ -255,6 +262,23 @@ function Acciones({ factura, permisos }: { factura: DetalleFactura; permisos: re
           {reimpresion.error && (
             <p className="error" role="alert">
               {reimpresion.error.message}
+            </p>
+          )}
+        </div>
+      )}
+      {puedeEnviar && (
+        <div>
+          <button type="button" disabled={correo.isPending} onClick={() => correo.mutate()}>
+            {correo.isPending ? 'Enviando…' : `Enviar por correo a ${factura.receptor.correo}`}
+          </button>
+          {correo.data && (
+            <p className={correo.data.enviado ? 'exito' : 'error'} role="status">
+              {correo.data.mensaje}
+            </p>
+          )}
+          {correo.error && (
+            <p className="error" role="alert">
+              {correo.error.message}
             </p>
           )}
         </div>

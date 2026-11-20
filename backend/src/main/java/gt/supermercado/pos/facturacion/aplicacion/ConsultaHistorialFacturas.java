@@ -84,6 +84,11 @@ public class ConsultaHistorialFacturas {
                         : new Evento(e.momento(), TipoEvento.ANULACION_RECHAZADA,
                                 "El certificador no aceptó la anulación"
                                         + (e.mensaje() == null ? "" : ": " + e.mensaje()), null);
+                // HU-08.15: el mensaje es el destinatario y, si falló, el motivo.
+                case "CORREO" -> Boolean.TRUE.equals(e.exitoso())
+                        ? new Evento(e.momento(), TipoEvento.CORREO_ENVIADO, "Enviada por correo a " + e.mensaje(), null)
+                        : new Evento(e.momento(), TipoEvento.CORREO_FALLIDO, "No se pudo enviar por correo a "
+                                + e.mensaje(), null);
                 default -> null;
             };
         };

@@ -76,10 +76,14 @@ public class ImpresionFacturas implements ImpresionDeFactura {
      * la leyenda de copia. Lanza {@link ImpresoraNoDisponibleException} si la impresora no responde.
      */
     public void enviar(Venta venta, List<Pago> pagos, Impresora impresora, int copias, boolean reimpresion) {
-        FacturaImprimible imprimible = facturas.paraImprimir(venta.id()).orElseThrow();
-        Ticket ticket = TicketFactura.armar(datos(imprimible, venta, pagos, facturas.certificador(), reimpresion),
-                impresora.anchoMm());
+        Ticket ticket = ticket(venta, pagos, impresora.anchoMm(), reimpresion);
         canal.enviar(impresora.host(), impresora.puerto(), EscPos.codificar(ticket, copias));
+    }
+
+    /** El ticket de la factura de la venta, sin imprimirlo. HU-08.15: la base de su representación gráfica en PDF. */
+    public Ticket ticket(Venta venta, List<Pago> pagos, int anchoMm, boolean reimpresion) {
+        FacturaImprimible imprimible = facturas.paraImprimir(venta.id()).orElseThrow();
+        return TicketFactura.armar(datos(imprimible, venta, pagos, facturas.certificador(), reimpresion), anchoMm);
     }
 
     private static DatosTicketFactura datos(FacturaImprimible imprimible, Venta venta, List<Pago> pagos,

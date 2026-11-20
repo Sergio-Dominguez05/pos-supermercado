@@ -44,5 +44,6 @@ public record DetalleFactura(long facturaId, long ventaId, long ventaNumero, Est
      */
     public record Evento(OffsetDateTime momento, TipoEvento tipo, String descripcion, String usuario) {}
 
-    public enum TipoEvento { EMITIDA, CERTIFICADA, RECHAZADA, SIN_RESPUESTA, CONSULTA, REIMPRESA, ANULADA, ANULACION_RECHAZADA }
+    public enum TipoEvento { EMITIDA, CERTIFICADA, RECHAZADA, SIN_RESPUESTA, CONSULTA, REIMPRESA, ANULADA, ANULACION_RECHAZADA,
+        CORREO_ENVIADO, CORREO_FALLIDO }
 }

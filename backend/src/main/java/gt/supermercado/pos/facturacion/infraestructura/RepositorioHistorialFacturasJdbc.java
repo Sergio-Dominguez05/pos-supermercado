@@ -176,7 +176,9 @@ class RepositorioHistorialFacturasJdbc implements RepositorioHistorialFacturas {
         return jdbc.query("""
                 SELECT momento, origen, operacion, exitoso, codigo_error, mensaje, usuario, caja FROM (
                     SELECT i.intentado_en AS momento, 'FEL' AS origen, i.operacion, i.exitoso, i.codigo_error,
-                           coalesce(i.respuesta->>'mensaje', i.respuesta->>'error') AS mensaje,
+                           CASE WHEN i.operacion = 'CORREO'
+                                THEN concat_ws(': ', i.respuesta->>'destinatario', i.respuesta->>'mensaje')
+                                ELSE coalesce(i.respuesta->>'mensaje', i.respuesta->>'error') END AS mensaje,
                            NULL AS usuario, NULL AS caja, i.id AS orden
                     FROM fel_intento i WHERE i.factura_id = ?
                     UNION ALL
