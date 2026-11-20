@@ -28,7 +28,7 @@ export function Inicio() {
         <h2>Opciones de su rol</h2>
         <ul className="opciones">
           {opcionesPara(usuario.permisos).map((opcion) => (
-            <li key={opcion.permiso}>
+            <li key={opcion.etiqueta}>
               {opcion.ruta ? (
                 <Link to={opcion.ruta}>{opcion.etiqueta}</Link>
               ) : (

@@ -16,3 +16,10 @@ export const TIPOS_DE_RECHAZO: Record<FacturaRechazada['tipo'], string> = {
 /** El contador del menú principal: cuántas ventas esperan su factura. */
 export const rotuloRechazadas = (cantidad: number) =>
   cantidad === 0 ? 'Facturas rechazadas' : `Facturas rechazadas (${cantidad})`
+
+/** HU-08.10: la anulación se confirma antes de enviarla al certificador. */
+export const confirmacionAnular = (serie: string, numero: string, ventaNumero: number) =>
+  `¿Anular la factura ${serie}-${numero} de la venta N.º ${ventaNumero}? La anulación se envía a la SAT y no se ` +
+  'puede deshacer.'
+
+export const avisoAnulada = (serie: string, numero: string) => `La factura ${serie}-${numero} quedó anulada.`

@@ -375,6 +375,14 @@ class AccionesSensiblesIntegracionTest {
         assertThat(jdbc.queryForObject("""
                 SELECT entidad_id FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
                 Long.class, id)).isEqualTo(venta);
+
+        // HU-08.10 crit. 5: la anulación de su factura, rechazada (sin motivo) y aceptada.
+        long factura = jdbc.queryForObject("SELECT id FROM factura WHERE venta_id = ?", Long.class, venta);
+        assertThat(registrosDe(() -> enviar("/api/facturas/" + factura + "/anular", "POST", "{\"motivo\":\"\"}",
+                cookieAdmin))).containsExactly(new Registro(FACTURA_ANULADA, false, adminId));
+        assertThat(registrosDe(() -> enviar("/api/facturas/" + factura + "/anular", "POST",
+                "{\"motivo\":\"Error de digitación\"}", cookieAdmin)))
+                .containsExactly(new Registro(FACTURA_ANULADA, true, adminId));
     }
 
     @Test

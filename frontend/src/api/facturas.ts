@@ -39,3 +39,38 @@ export const reenviarFacturaDesdeCaja = (ventaId: number, clienteId: number | nu
     method: 'POST',
     body: JSON.stringify({ clienteId }),
   })
+
+/** HU-08.10: una factura emitida, como se busca para anularla. */
+export interface FacturaEmitida {
+  facturaId: number
+  ventaId: number
+  ventaNumero: number
+  turnoId: number
+  /** Decisión D2: solo se anula mientras el turno de la venta siga abierto. */
+  turnoAbierto: boolean
+  cajaNombre: string
+  estado: 'CERTIFICADA' | 'ANULADA'
+  serie: string
+  numero: string
+  autorizacion: string
+  fechaCertificacion: string
+  emitidaEn: string
+  total: number
+  receptorId: string
+  receptorNombre: string
+  motivoAnulacion: string | null
+  anuladaEn: string | null
+}
+
+/** Crit. 1: por número, serie o autorización (`buscar`) y por fecha de emisión (`fecha`, AAAA-MM-DD). */
+export const buscarFacturas = (buscar: string, fecha: string) => {
+  const parametros = new URLSearchParams()
+  if (buscar.trim()) parametros.set('buscar', buscar.trim())
+  if (fecha) parametros.set('fecha', fecha)
+  const consulta = parametros.toString()
+  return pedir<FacturaEmitida[]>(`/api/facturas${consulta ? `?${consulta}` : ''}`)
+}
+
+/** Crit. 2 y 3: anula la factura con su motivo; el certificador debe aceptarla. */
+export const anularFactura = (facturaId: number, motivo: string) =>
+  pedir<FacturaEmitida>(`/api/facturas/${facturaId}/anular`, { method: 'POST', body: JSON.stringify({ motivo }) })

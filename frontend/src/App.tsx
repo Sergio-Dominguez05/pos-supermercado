@@ -10,6 +10,7 @@ import { PaginaEmisor } from './modulos/configuracion/DatosEmisor'
 import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimiento'
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
+import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
 import { PaginaFacturasRechazadas } from './modulos/facturas/FacturasRechazadas'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
@@ -104,6 +105,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaConexionFel />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/anular"
+            element={
+              <RutaProtegida>
+                <PaginaAnularFacturas />
               </RutaProtegida>
             }
           />
