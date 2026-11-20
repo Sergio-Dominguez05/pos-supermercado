@@ -11,9 +11,17 @@ export interface OpcionMenu {
 export const OPCIONES: OpcionMenu[] = [
   // HU-06.01: la pantalla de venta (también es el destino del Cajero al iniciar sesión).
   { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR', ruta: '/venta' },
-  { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA' },
+  // HU-09.08 a 09.10: cerrar la caja propia y reimprimir los cierres.
+  { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA', ruta: '/caja' },
   { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR' },
-  { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR' },
+  // HU-08.12 crit. 2: buscar y reimprimir facturas (el cajero, las de su turno).
+  { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR', ruta: '/facturas' },
+  // HU-08.06 crit. 3: las ventas pendientes de facturar, para quien gestiona facturas (Supervisor y Administrador).
+  { etiqueta: 'Facturas rechazadas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/rechazadas' },
+  // HU-08.10: buscar y anular facturas (Supervisor y Administrador).
+  { etiqueta: 'Anular facturas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/anular' },
+  // HU-08.08 y 08.09: los comprobantes en contingencia.
+  { etiqueta: 'Contingencia', permiso: 'FACTURA_ANULAR', ruta: '/facturas/contingencia' },
   // HU-03.04: la lista del catálogo; desde ahí, quien tiene permiso crea y edita productos.
   { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR', ruta: '/catalogo' },
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },

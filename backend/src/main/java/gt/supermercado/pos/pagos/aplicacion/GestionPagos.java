@@ -88,6 +88,12 @@ public class GestionPagos {
         }
     }
 
+    /** HU-08.12: los pagos vigentes de una venta, para reimprimir su factura. */
+    @Transactional(readOnly = true)
+    public List<Pago> deLaVenta(long ventaId) {
+        return pagos.deLaVenta(ventaId);
+    }
+
     /** Crit. 1 y 2: el total a cobrar y lo pendiente de la venta en curso del turno. */
     @Transactional(readOnly = true)
     public EstadoCobro estado(SesionActiva sesion) {
@@ -171,7 +177,7 @@ public class GestionPagos {
      */
     public VentaFinalizada finalizar(SesionActiva sesion) {
         VentaFinalizada registrada = transacciones.execute(transaccion -> registrarFinalizacion(sesion));
-        FacturaDeVenta factura = facturas.certificar(registrada.venta());
+        FacturaDeVenta factura = facturas.certificar(registrada.venta(), sesion);
         return new VentaFinalizada(registrada.venta(), registrada.pagos(), registrada.pagado(), factura,
                 imprimir(registrada, factura));
     }

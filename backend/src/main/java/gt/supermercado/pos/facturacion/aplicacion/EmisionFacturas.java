@@ -1,16 +1,25 @@
 package gt.supermercado.pos.facturacion.aplicacion;
 
+import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.bitacora.dominio.AccionSensible;
+import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.facturacion.dominio.CertificadorNoDisponibleException;
 import gt.supermercado.pos.facturacion.dominio.ConfiguracionFel;
 import gt.supermercado.pos.facturacion.dominio.DatosDte;
 import gt.supermercado.pos.facturacion.dominio.EstadoFactura;
 import gt.supermercado.pos.facturacion.dominio.Factura;
+import gt.supermercado.pos.facturacion.dominio.FacturaImprimible;
 import gt.supermercado.pos.facturacion.dominio.GeneradorDte;
+import gt.supermercado.pos.facturacion.dominio.MotivoRechazo;
 import gt.supermercado.pos.facturacion.dominio.ReceptorDeVenta;
 import gt.supermercado.pos.facturacion.dominio.RepositorioFacturas;
 import gt.supermercado.pos.facturacion.dominio.ResultadoCertificacion;
+import gt.supermercado.pos.facturacion.dominio.TraductorErrores;
+import gt.supermercado.pos.impuestos.dominio.Totales;
 import gt.supermercado.pos.pagos.dominio.EmisionDeFactura;
 import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
+import gt.supermercado.pos.seguridad.dominio.SesionActiva;
+import gt.supermercado.pos.ventas.aplicacion.GestionVentas;
 import gt.supermercado.pos.ventas.dominio.Venta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * HU-08.03 Certificar la factura al finalizar la venta (Architecture.md §6.2).
@@ -29,6 +40,8 @@ import java.time.OffsetDateTime;
  *       a contingencia (HU-08.07) y la venta ya está guardada.</li>
  *   <li>Crit. 4: la factura queda asociada a su venta, y por ella a la caja, el turno y el usuario.</li>
  * </ul>
+ * HU-08.06: un rechazo se traduce a un motivo comprensible ({@link TraductorErrores}), dice si se corrige en caja y
+ * queda en la bitácora con su detalle; HU-04.09 crit. 2: si es por montos, con los montos que envió el POS.
  * La factura va al cliente asignado a la venta (EP-05) o a Consumidor Final ({@link ReceptorDeVenta}).
  */
 @Service
@@ -44,14 +57,19 @@ public class EmisionFacturas implements EmisionDeFactura {
     private final CertificadorFel certificador;
     private final GestionConexionFel conexion;
     private final ReceptorDeVenta receptores;
+    private final GestionVentas ventas;
+    private final Bitacora bitacora;
 
     public EmisionFacturas(GeneracionDte generacion, RepositorioFacturas facturas, CertificadorFel certificador,
-                           GestionConexionFel conexion, ReceptorDeVenta receptores) {
+                           GestionConexionFel conexion, ReceptorDeVenta receptores, GestionVentas ventas,
+                           Bitacora bitacora) {
         this.generacion = generacion;
         this.facturas = facturas;
         this.certificador = certificador;
         this.conexion = conexion;
         this.receptores = receptores;
+        this.ventas = ventas;
+        this.bitacora = bitacora;
     }
 
     /**
@@ -68,26 +86,27 @@ public class EmisionFacturas implements EmisionDeFactura {
 
     /** Envía la factura pendiente al certificador, después del {@code COMMIT}. Nunca lanza por una falla del envío. */
     @Override
-    public FacturaDeVenta certificar(Venta venta) {
-        return enviar(facturaDe(venta.id()), false);
+    public FacturaDeVenta certificar(Venta venta, SesionActiva sesion) {
+        return enviar(facturaDe(venta.id()), venta, false, sesion);
     }
 
     /**
      * HU-08.04 crit. 2: vuelve a certificar una factura que quedó sin respuesta (pendiente o en contingencia). Como la
      * respuesta anterior pudo perderse, primero pregunta al certificador por el identificador de la venta y solo la
-     * envía si no la tiene. Lo usan la certificación de contingencias (HU-08.08) y el reenvío (HU-08.06).
+     * envía si no la tiene. Lo usan el reenvío de una factura rechazada (HU-08.06) y la certificación de contingencias
+     * (HU-08.08).
      */
-    public FacturaDeVenta reintentar(long ventaId) {
-        return enviar(facturaDe(ventaId), true);
+    public FacturaDeVenta reintentar(long ventaId, SesionActiva sesion) {
+        return enviar(facturaDe(ventaId), ventas.porId(ventaId), true, sesion);
     }
 
     /**
      * Crit. 1: el identificador único es el de la venta, así que un reenvío no genera otra factura. Crit. 3: una
      * factura certificada (o rechazada, o anulada) no se vuelve a enviar.
      */
-    private FacturaDeVenta enviar(Factura factura, boolean consultarAntes) {
+    private FacturaDeVenta enviar(Factura factura, Venta venta, boolean consultarAntes, SesionActiva sesion) {
         if (factura.estado() != EstadoFactura.PENDIENTE && factura.estado() != EstadoFactura.CONTINGENCIA) {
-            return deFactura(factura);
+            return actual(factura);
         }
         ResultadoCertificacion resultado;
         try {
@@ -96,32 +115,84 @@ public class EmisionFacturas implements EmisionDeFactura {
                             .orElseGet(() -> certificador.certificar(factura.xmlEnviado(), factura.identificador()))
                     : certificador.certificar(factura.xmlEnviado(), factura.identificador()), limite());
         } catch (CertificadorNoDisponibleException e) {
-            return contingencia(factura, e.getMessage());
+            return contingencia(factura, venta, e.getMessage());
         } catch (RuntimeException e) {
             // La venta ya está cobrada: cualquier falla del envío deja la factura para reintentarla, nunca un error.
             LOG.warn("Falló el envío de la factura {} al certificador", factura.id(), e);
-            return contingencia(factura, "Falló la comunicación con el certificador.");
+            return contingencia(factura, venta, "Falló la comunicación con el certificador.");
         }
         if (resultado.certificada()) {
             if (!facturas.certificada(factura.id(), resultado)) {
-                return deFactura(facturaDe(factura.ventaId()));
+                return actual(facturaDe(factura.ventaId()));
             }
             return new FacturaDeVenta(EstadoFactura.CERTIFICADA.name(), resultado.autorizacion(), resultado.serie(),
-                    resultado.numero(), resultado.fechaCertificacion(), null);
+                    resultado.numero(), resultado.fechaCertificacion(), null, false);
         }
         if (!facturas.rechazada(factura.id(), resultado)) {
-            return deFactura(facturaDe(factura.ventaId()));
+            return actual(facturaDe(factura.ventaId()));
         }
-        return new FacturaDeVenta(EstadoFactura.RECHAZADA.name(), null, null, null, null,
-                "El certificador rechazó la factura: " + resultado.mensajeError());
+        MotivoRechazo motivo = TraductorErrores.traducir(resultado.codigoError(), resultado.mensajeError());
+        registrarRechazo(venta, factura, motivo, sesion);
+        return rechazada(motivo);
     }
 
-    private FacturaDeVenta contingencia(Factura factura, String motivo) {
-        if (!facturas.enContingencia(factura.id(), motivo)) {
-            return deFactura(facturaDe(factura.ventaId()));
+    /** HU-08.06 y HU-04.09 crit. 2: el rechazo queda en la bitácora con el detalle para corregirlo. */
+    private void registrarRechazo(Venta venta, Factura factura, MotivoRechazo motivo, SesionActiva sesion) {
+        Map<String, Object> detalle = new LinkedHashMap<>();
+        detalle.put("venta", venta.numero());
+        detalle.put("tipo", motivo.tipo().name());
+        detalle.put("corregibleEnCaja", motivo.corregibleEnCaja());
+        detalle.put("codigo", motivo.codigo());
+        detalle.put("mensajeCertificador", motivo.detalle());
+        if (motivo.tipo() == MotivoRechazo.Tipo.MONTOS) {
+            Totales totales = venta.totales();
+            detalle.put("subtotalEnviado", totales.subtotal());
+            detalle.put("ivaEnviado", totales.iva());
+            detalle.put("totalEnviado", totales.total());
+            detalle.put("lineas", venta.lineas().size());
         }
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.FACTURA_RECHAZADA_CERTIFICADOR, true,
+                "Factura de la venta N.º %d rechazada por el certificador: %s".formatted(venta.numero(),
+                        motivo.mensaje()), "factura", factura.id(), detalle));
+    }
+
+    /**
+     * HU-08.07 crit. 1 y 4: sin respuesta, la factura queda guardada en contingencia. La primera vez recibe su número de
+     * acceso y se arma otra vez el DTE con ese número (con la copia del emisor guardada en la factura), que es el que
+     * se certificará después (HU-08.08).
+     */
+    private FacturaDeVenta contingencia(Factura factura, Venta venta, String motivo) {
+        Long nuevo = null;
+        String xml = null;
+        if (factura.numeroAcceso() == null) {
+            nuevo = facturas.siguienteNumeroAcceso();
+            FacturaImprimible copia = facturas.imprimible(factura.ventaId()).orElseThrow();
+            xml = GeneradorDte.generar(new DatosDte(copia.emisor(), copia.establecimiento(), copia.receptor(),
+                    factura.emitidaEn(), venta, nuevo));
+        }
+        if (!facturas.enContingencia(factura.id(), motivo, nuevo, xml)) {
+            return actual(facturaDe(factura.ventaId()));
+        }
+        long numeroAcceso = nuevo != null ? nuevo : factura.numeroAcceso();
         return new FacturaDeVenta(EstadoFactura.CONTINGENCIA.name(), null, null, null, null, motivo
-                + " La factura queda en contingencia y se certificará después.");
+                + " Se emitió el comprobante en contingencia con el número de acceso %d; se certificará después."
+                .formatted(numeroAcceso), false);
+    }
+
+    private static FacturaDeVenta rechazada(MotivoRechazo motivo) {
+        return new FacturaDeVenta(EstadoFactura.RECHAZADA.name(), null, null, null, null, motivo.mensaje(),
+                motivo.corregibleEnCaja());
+    }
+
+    /** La factura tal como está; si está rechazada, con su motivo. */
+    private FacturaDeVenta actual(Factura factura) {
+        if (factura.estado() == EstadoFactura.RECHAZADA) {
+            return facturas.rechazoDe(factura.id()).map(r -> rechazada(r.motivo()))
+                    .orElse(new FacturaDeVenta(factura.estado().name(), null, null, null, null, null, false));
+        }
+        return new FacturaDeVenta(factura.estado().name(), factura.autorizacion(), factura.serie(), factura.numero(),
+                factura.fechaCertificacion(), null, false);
     }
 
     private Factura facturaDe(long ventaId) {
@@ -132,10 +203,5 @@ public class EmisionFacturas implements EmisionDeFactura {
     private Duration limite() {
         return conexion.configuracion().map(ConfiguracionFel::timeoutMs).map(Duration::ofMillis)
                 .orElse(LIMITE_POR_DEFECTO);
-    }
-
-    private static FacturaDeVenta deFactura(Factura factura) {
-        return new FacturaDeVenta(factura.estado().name(), factura.autorizacion(), factura.serie(), factura.numero(),
-                factura.fechaCertificacion(), null);
     }
 }

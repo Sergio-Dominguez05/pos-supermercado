@@ -3,6 +3,7 @@ package gt.supermercado.pos.compartido.api;
 import gt.supermercado.pos.compartido.dominio.ConflictoException;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.NoAutenticadoException;
+import gt.supermercado.pos.compartido.dominio.PermisosExigidos;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
 import gt.supermercado.pos.compartido.dominio.RegistroAccesoDenegado;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +14,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.authorization.ExpressionAuthorizationDecision;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -81,12 +84,24 @@ public class ManejadorErrores {
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorApi> accesoDenegado(AccessDeniedException e, HttpServletRequest peticion) {
         try {
-            accesosDenegados.registrar(peticion.getMethod(), peticion.getRequestURI());
+            accesosDenegados.registrar(peticion.getMethod(), peticion.getRequestURI(), permisosExigidos(e));
         } catch (RuntimeException fallo) {
             log.error("No se pudo registrar el acceso denegado en la bitácora", fallo);
         }
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ErrorApi.de("ACCESO_DENEGADO", "No tiene permiso para realizar esta acción."));
+    }
+
+    /**
+     * HU-11.04: los permisos que exigía el endpoint, sacados de su regla {@code @PreAuthorize}. Vacío si la denegación
+     * no viene de una regla con permisos.
+     */
+    private static List<String> permisosExigidos(AccessDeniedException e) {
+        if (e instanceof AuthorizationDeniedException denegada
+                && denegada.getAuthorizationResult() instanceof ExpressionAuthorizationDecision decision) {
+            return PermisosExigidos.de(decision.getExpression().getExpressionString());
+        }
+        return List.of();
     }
 
     /**

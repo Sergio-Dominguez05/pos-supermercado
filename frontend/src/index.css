@@ -335,6 +335,19 @@ kbd {
   gap: 12px;
 }
 
+/* HU-09.08: el resumen del turno en el cierre de caja, como dato y monto. */
+.resumen {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 24px;
+  justify-content: start;
+}
+
+.resumen dd {
+  margin: 0;
+  text-align: right;
+}
+
 /* EP-05: el NIT del cliente, "Buscar" y "CF" en un solo renglón. */
 .en-linea {
   display: flex;

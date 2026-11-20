@@ -32,7 +32,7 @@ public class CertificadorFelSimulado implements CertificadorFel {
      * RESPUESTA_PERDIDA (HU-08.04 crit. 2): el certificador certifica el documento, pero la respuesta no llega al POS,
      * que la toma como falta de conexión.
      */
-    public enum Escenario { ACEPTAR, RECHAZAR, SIN_CONEXION, RESPUESTA_PERDIDA }
+    public enum Escenario { ACEPTAR, RECHAZAR, RECHAZAR_MONTOS, SIN_CONEXION, RESPUESTA_PERDIDA }
 
     private final Map<UUID, ResultadoCertificacion> certificadas = new ConcurrentHashMap<>();
     private final Map<UUID, AtomicInteger> envios = new ConcurrentHashMap<>();
@@ -46,6 +46,13 @@ public class CertificadorFelSimulado implements CertificadorFel {
     /** Permite cambiar el escenario en pruebas automáticas. */
     public void usarEscenario(Escenario escenario) {
         this.escenario = escenario;
+    }
+
+    /** Un rechazo con su respuesta completa, como la devolvería un certificador (HU-08.06 crit. 4). */
+    private static ResultadoCertificacion rechazo(String codigo, String mensaje) {
+        return ResultadoCertificacion.rechazada(codigo, mensaje,
+                "{\"resultado\":false,\"codigo\":\"%s\",\"descripcion\":\"%s\",\"certificador\":\"simulado\"}"
+                        .formatted(codigo, mensaje));
     }
 
     /** Cuántas veces se envió a certificar el documento con ese identificador, para las pruebas de HU-08.04. */
@@ -64,7 +71,10 @@ public class CertificadorFelSimulado implements CertificadorFel {
             return previa;
         }
         if (escenario == Escenario.RECHAZAR) {
-            return ResultadoCertificacion.rechazada("SIM-001", "NIT del receptor no válido (simulado).");
+            return rechazo("SIM-001", "NIT del receptor no válido (simulado).");
+        }
+        if (escenario == Escenario.RECHAZAR_MONTOS) {
+            return rechazo("SIM-002", "El total del documento no cuadra con la suma de las líneas (simulado).");
         }
         ResultadoCertificacion certificada = certificadas.computeIfAbsent(identificadorUnico,
                 id -> ResultadoCertificacion.aceptada(UUID.randomUUID(), "SIM",
@@ -84,6 +94,9 @@ public class CertificadorFelSimulado implements CertificadorFel {
     @Override
     public ResultadoAnulacion anular(UUID autorizacion, String motivo) {
         verificarConexion();
+        if (escenario == Escenario.RECHAZAR) {   // HU-08.10 crit. 3
+            return new ResultadoAnulacion(false, "SIM-003", "La SAT no permite anular este documento (simulado).");
+        }
         boolean existe = certificadas.values().stream().anyMatch(r -> autorizacion.equals(r.autorizacion()));
         return existe
                 ? new ResultadoAnulacion(true, null, null)

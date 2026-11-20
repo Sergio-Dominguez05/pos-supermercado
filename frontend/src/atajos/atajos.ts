@@ -41,7 +41,6 @@ export const ATAJOS: readonly Atajo[] = [
  */
 export const ACCIONES_PENDIENTES: Partial<Record<AccionCaja, string>> = {
   consultarPrecio: 'HU-03.10 (#28)',
-  reimprimirUltima: 'HU-08.12 (#74)',
 }
 
 /** Nombre de la tecla para mostrarlo en pantalla: el teclado en español rotula "Supr" a la tecla Delete. */

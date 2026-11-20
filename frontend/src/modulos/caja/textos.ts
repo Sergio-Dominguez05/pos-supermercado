@@ -13,3 +13,17 @@ export const turnoAbierto = (turno: Turno) => `Su turno en ${turno.cajaNombre} e
 
 export const turnoDeOtroUsuario = (turno: Turno) =>
   `${turno.cajaNombre} tiene abierto el turno de ${turno.usuarioNombre}. Primero se debe cerrar ese turno.`
+
+// Cierre de caja (HU-09.08 a HU-09.10).
+
+/** HU-09.08 crit. 3: la diferencia es el cierre de lote menos lo registrado, en centavos para no redondear mal. */
+export const diferenciaDeCierre = (totalLote: number, totalRegistrado: number) =>
+  (Math.round(totalLote * 100) - Math.round(totalRegistrado * 100)) / 100
+
+/** Un total de lote en quetzales: cero o más, con hasta dos decimales. */
+export const totalLoteValido = (texto: string) => /^\d+(\.\d{1,2})?$/.test(texto.trim())
+
+export const confirmacionCierre = (cajaNombre: string, diferencia: number) =>
+  `¿Cerrar la caja ${cajaNombre}? ` +
+  (diferencia === 0 ? 'El cierre de lote coincide con lo registrado. ' : '') +
+  'Después de cerrarla no se puede modificar el turno.'

@@ -10,6 +10,11 @@ import { PaginaEmisor } from './modulos/configuracion/DatosEmisor'
 import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimiento'
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
+import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
+import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
+import { PaginaContingencia } from './modulos/facturas/Contingencia'
+import { PaginaFacturas } from './modulos/facturas/Facturas'
+import { PaginaFacturasRechazadas } from './modulos/facturas/FacturasRechazadas'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
 import { CambioCredencial } from './modulos/login/CambioCredencial'
@@ -103,6 +108,46 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaConexionFel />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja"
+            element={
+              <RutaProtegida>
+                <PaginaCierreCaja />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas"
+            element={
+              <RutaProtegida>
+                <PaginaFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/contingencia"
+            element={
+              <RutaProtegida>
+                <PaginaContingencia />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/anular"
+            element={
+              <RutaProtegida>
+                <PaginaAnularFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/rechazadas"
+            element={
+              <RutaProtegida>
+                <PaginaFacturasRechazadas />
               </RutaProtegida>
             }
           />

@@ -30,6 +30,10 @@ public final class TicketFactura {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     /** La frase del régimen General (frase 1, escenario 1), la misma del DTE (HU-08.02). */
     static final String FRASE_ISR = "Sujeto a pagos trimestrales ISR";
+    /** HU-08.12 crit. 3: la leyenda de una reimpresión, al principio y al final del ticket. */
+    public static final String LEYENDA_REIMPRESION = "*** COPIA - REIMPRESIÓN ***";
+    /** HU-08.07 crit. 2: el comprobante en contingencia dice claramente que está pendiente de certificar. */
+    public static final String LEYENDA_CONTINGENCIA = "PENDIENTE DE CERTIFICAR ANTE LA SAT";
 
     private TicketFactura() {
     }
@@ -37,22 +41,33 @@ public final class TicketFactura {
     public static Ticket armar(DatosTicketFactura datos, int anchoMm) {
         Ticket ticket = Ticket.paraPapel(anchoMm);
         Establecimiento establecimiento = datos.establecimiento();
+        if (datos.reimpresion()) {
+            ticket.centradoNegrita(LEYENDA_REIMPRESION);
+        }
         ticket.titulo(establecimiento.nombre())
                 .centrado(datos.emisor().razonSocial())
                 .centrado("NIT " + datos.emisor().nit())
                 .centrado(establecimiento.direccion())
                 .centrado(establecimiento.municipio() + ", " + establecimiento.departamento())
                 .centrado("Establecimiento " + establecimiento.codigoSat())
-                .separador()
-                .centradoNegrita("FACTURA")
-                .centrado("Documento Tributario Electrónico")
-                .dato("Serie", datos.serie())
-                .dato("Número", datos.numero())
-                .texto("Autorización:")
-                .texto(datos.autorizacion().toString().toUpperCase())
-                .dato("Certificación", fecha(datos.certificadaEn()))
-                .dato("Emisión", fecha(datos.emitidaEn()))
-                .separador()
+                .separador();
+        if (datos.enContingencia()) {
+            ticket.titulo("COMPROBANTE EN CONTINGENCIA")
+                    .centradoNegrita(LEYENDA_CONTINGENCIA)
+                    .dato("Número de acceso", String.valueOf(datos.numeroAcceso()))
+                    .dato("Emisión", fecha(datos.emitidaEn()))
+                    .texto("La factura se certificará en cuanto vuelva la conexión con el certificador.");
+        } else {
+            ticket.centradoNegrita("FACTURA")
+                    .centrado("Documento Tributario Electrónico")
+                    .dato("Serie", datos.serie())
+                    .dato("Número", datos.numero())
+                    .texto("Autorización:")
+                    .texto(datos.autorizacion().toString().toUpperCase())
+                    .dato("Certificación", fecha(datos.certificadaEn()))
+                    .dato("Emisión", fecha(datos.emitidaEn()));
+        }
+        ticket.separador()
                 .dato("NIT", datos.receptorId())
                 .texto("Nombre: " + datos.receptorNombre())
                 .separador();
@@ -77,8 +92,12 @@ public final class TicketFactura {
         if (datos.nitCertificador() != null) {
             ticket.centrado("NIT certificador: " + datos.nitCertificador());
         }
-        return ticket.centrado("Venta N.º %d · %s".formatted(datos.venta().numero(), datos.venta().cajaNombre()))
+        ticket.centrado("Venta N.º %d · %s".formatted(datos.venta().numero(), datos.venta().cajaNombre()))
                 .centrado("¡Gracias por su compra!");
+        if (datos.reimpresion()) {
+            ticket.centradoNegrita(LEYENDA_REIMPRESION);
+        }
+        return ticket;
     }
 
     /** "Tarjeta de débito ****4321": el número de la tarjeta nunca se guarda completo (HU-07.03 crit. 4). */

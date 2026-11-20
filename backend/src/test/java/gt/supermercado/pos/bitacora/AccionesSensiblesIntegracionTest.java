@@ -273,6 +273,12 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(TURNO_ABIERTO, true, id));
         assertThat(registrosDe(() -> enviar("/api/turnos", "POST", null, sesion)))
                 .containsExactly(new Registro(TURNO_ABIERTO, false, id));   // ya tiene el turno abierto
+
+        // HU-09.08 crit. 6: el cierre de su caja, rechazado (sin el total del lote) y hecho.
+        assertThat(registrosDe(() -> enviar("/api/turnos/actual/cerrar", "POST", "{\"totalLote\":null}", sesion)))
+                .containsExactly(new Registro(TURNO_CERRADO, false, id));
+        assertThat(registrosDe(() -> enviar("/api/turnos/actual/cerrar", "POST", "{\"totalLote\":0}", sesion)))
+                .containsExactly(new Registro(TURNO_CERRADO, true, id));
     }
 
     // Ventas
@@ -375,6 +381,33 @@ class AccionesSensiblesIntegracionTest {
         assertThat(jdbc.queryForObject("""
                 SELECT entidad_id FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
                 Long.class, id)).isEqualTo(venta);
+
+        long factura = jdbc.queryForObject("SELECT id FROM factura WHERE venta_id = ?", Long.class, venta);
+        // HU-08.12 crit. 4: la reimpresión, rechazada (la caja no tiene impresora) y hecha.
+        assertThat(registrosDe(() -> enviar("/api/facturas/ultima/reimprimir", "POST", null, sesion)))
+                .containsExactly(new Registro(FACTURA_REIMPRESA, false, id));
+        long impresora = idDe(enviar("/api/configuracion/impresoras", "POST",
+                "{\"nombre\":\"Auditada %s\",\"host\":\"auditada-%d.local\",\"anchoMm\":80}".formatted(nombre,
+                        SIGUIENTE.incrementAndGet()), cookieAdmin));
+        enviar("/api/cajas/" + cajaId, "PUT", "{\"nombre\":\"%s\",\"impresoraId\":%d}".formatted(nombre, impresora),
+                cookieAdmin);
+        assertThat(registrosDe(() -> enviar("/api/facturas/ultima/reimprimir", "POST", null, sesion)))
+                .containsExactly(new Registro(FACTURA_REIMPRESA, true, id));
+
+        // HU-08.10 crit. 5: la anulación de su factura, rechazada (sin motivo) y aceptada.
+        assertThat(registrosDe(() -> enviar("/api/facturas/" + factura + "/anular", "POST", "{\"motivo\":\"\"}",
+                cookieAdmin))).containsExactly(new Registro(FACTURA_ANULADA, false, adminId));
+        assertThat(registrosDe(() -> enviar("/api/facturas/" + factura + "/anular", "POST",
+                "{\"motivo\":\"Error de digitación\"}", cookieAdmin)))
+                .containsExactly(new Registro(FACTURA_ANULADA, true, adminId));
+    }
+
+    @Test
+    void reenvioDeFacturaRechazado() throws Exception {   // HU-08.06: el éxito lo registra el rechazo del certificador
+        // Un reenvío sin factura rechazada se rechaza y queda en la bitácora; el rechazo del certificador (éxito) lo
+        // prueba RechazosIntegracionTest, porque necesita una venta cobrada y el simulador que rechaza.
+        assertThat(registrosDe(() -> enviar("/api/facturas/rechazadas/999999999/reenviar", "POST", null, cookieAdmin)))
+                .containsExactly(new Registro(FACTURA_RECHAZADA_CERTIFICADOR, false, adminId));
     }
 
     @Test

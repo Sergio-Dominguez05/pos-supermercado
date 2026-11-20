@@ -50,9 +50,13 @@ pos:
     # el Administrador guarda en Configuración > Conexión FEL (HU-12.03). El certificador aún no se elige.
     modo: simulado
     simulador:
-      # ACEPTAR, RECHAZAR, SIN_CONEXION o RESPUESTA_PERDIDA, para probar certificación, rechazos, contingencia y
-      # reintentos sin duplicar (HU-08.04).
+      # ACEPTAR, RECHAZAR (NIT del receptor), RECHAZAR_MONTOS, SIN_CONEXION o RESPUESTA_PERDIDA, para probar
+      # certificación, rechazos (HU-08.06), contingencia y reintentos sin duplicar (HU-08.04).
       escenario: ACEPTAR
+  contingencia:
+    # HU-08.08: certifica solo los comprobantes en contingencia; intervalo-ms es la pausa entre rondas.
+    automatica: true
+    intervalo-ms: 60000
   impresion:
     # simulado: CanalImpresionSimulado (desarrollo y pruebas, no imprime). red: ESC/POS por TCP a la impresora de
     # cada caja (HU-12.08).

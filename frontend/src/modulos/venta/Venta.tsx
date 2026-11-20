@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ErrorDeApi } from '../../api/cliente'
-import { CLAVE_COBRO } from '../../api/pagos'
+import { CLAVE_COBRO, type FacturaDeVenta } from '../../api/pagos'
 import {
   cancelarVenta,
   CLAVE_VENTA_EN_CURSO,
@@ -26,7 +26,10 @@ import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
-import { avisoVentaFinalizada } from './cobro'
+import { reimprimirUltima } from '../../api/facturas'
+import { AvisoContingenciaVenta } from '../facturas/Contingencia'
+import { CorregirFactura } from '../facturas/CorregirFactura'
+import { avisoFactura, avisoVentaFinalizada } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
 import { type AccionDeLaVenta, lineaSeleccionada, moverSeleccion, supresionEsParaLaLinea } from './teclado'
 import {
@@ -76,6 +79,8 @@ export function Venta() {
   const seleccionada = seleccion.id
   const [ayudaVisible, setAyudaVisible] = useState(false)
   const [aviso, setAviso] = useState<string>()
+  // HU-08.06: la factura de la última venta que rechazó el certificador, para corregirla sin volver a cobrar.
+  const [rechazada, setRechazada] = useState<{ ventaId: number; numero: number; factura: FacturaDeVenta }>()
 
   // HU-06.15: "Cobrar" (F12) pide al servidor validar la venta (crit. 2 y 3) y, si puede cobrarse, la pantalla pasa al
   // cobro. La venta sigue en curso: al regresar se pueden agregar o quitar productos (crit. 4).
@@ -92,6 +97,13 @@ export function Venta() {
     onError: () => avisoSonoro(),
   })
   const cobrar = cobro.mutate
+  // HU-08.12 crit. 1: F9 reimprime la última factura de esta caja, como copia.
+  const reimpresion = useMutation({
+    mutationFn: () => reimprimirUltima(),
+    onSuccess: (resultado) => setAviso(resultado.mensaje ?? 'Se reimprimió la última factura.'),
+    onError: (error) => setAviso(error.message),
+  })
+  const reimprimir = reimpresion.mutate
   // Si la venta deja de tener productos (por ejemplo, se canceló desde otra pestaña), no hay nada que cobrar.
   if (enCobro && !venta?.lineas.length) setEnCobro(false)
   const regresarALaVenta = () => {
@@ -123,6 +135,7 @@ export function Venta() {
       retomarVenta: () => setListaVisible((visible) => !visible),
       cancelarVenta: () => document.querySelector<HTMLElement>('main [data-control="cancelar-venta"]')?.click(),
       cobrar: () => cobrar(),
+      reimprimirUltima: () => reimprimir(),
     }
     const pendientes: Manejadores = Object.fromEntries(
       ATAJOS.filter((atajo) => ACCIONES_PENDIENTES[atajo.accion]).map((atajo) => [
@@ -132,7 +145,7 @@ export function Venta() {
     )
     // En el cobro solo queda la ayuda; Escape regresa a la venta (PasoDeCobro).
     return habilitada && !enCobro ? { ...pendientes, ...disponibles } : { ayuda: disponibles.ayuda }
-  }, [habilitada, seleccionada, enCobro, cobrar])
+  }, [habilitada, seleccionada, enCobro, cobrar, reimprimir])
   useAtajos(manejadores)
 
   // HU-06.17: en el campo del código, las flechas arriba y abajo eligen la línea (el campo es de una sola línea).
@@ -178,6 +191,9 @@ export function Venta() {
       {/* HU-09.01 crit. 1: en una caja cerrada se pide abrir el turno. */}
       <EstadoTurno />
 
+      {/* HU-08.07 crit. 3: el cajero sabe que se está operando en contingencia. */}
+      {habilitada && <AvisoContingenciaVenta />}
+
       {/* HU-09.02 crit. 1 y HU-06.01 crit. 2: con la caja cerrada la pantalla de venta está deshabilitada. */}
       <section className="tarjeta formulario" aria-label="Venta">
         {habilitada && venta && <h2>Venta N.º {venta.numero}</h2>}
@@ -199,6 +215,23 @@ export function Venta() {
             {cobro.error.message}
           </p>
         )}
+        {/* HU-08.06: si el certificador rechazó la factura de la venta recién cobrada, se corrige aquí. */}
+        {rechazada && (
+          <CorregirFactura
+            key={rechazada.ventaId}
+            ventaId={rechazada.ventaId}
+            numero={rechazada.numero}
+            factura={rechazada.factura}
+            onTerminado={(resultado) => {
+              if (resultado.estado === 'RECHAZADA') {
+                setRechazada({ ...rechazada, factura: resultado })
+                return
+              }
+              setRechazada(undefined)
+              setAviso(`Venta N.º ${rechazada.numero}: ${avisoFactura(resultado)}`)
+            }}
+          />
+        )}
         {/* EP-05: el cliente de la venta, también en el cobro (se puede cambiar hasta finalizar). */}
         {habilitada && venta && <ClienteDeLaVenta key={venta.id} ventaId={venta.id} />}
         {habilitada && venta && enCobro ? (
@@ -209,6 +242,11 @@ export function Venta() {
               onFinalizada={(finalizada) => {
                 // HU-07.08 crit. 5: el aviso dice qué venta se finalizó y la pantalla queda en la siguiente.
                 setAviso(avisoVentaFinalizada(finalizada))
+                setRechazada(
+                  finalizada.factura.estado === 'RECHAZADA'
+                    ? { ventaId: finalizada.ventaId, numero: finalizada.numero, factura: finalizada.factura }
+                    : undefined,
+                )
                 regresarALaVenta()
               }}
             />

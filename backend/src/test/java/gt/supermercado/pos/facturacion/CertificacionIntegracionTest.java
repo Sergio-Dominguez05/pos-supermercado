@@ -5,6 +5,8 @@ import gt.supermercado.pos.facturacion.aplicacion.EmisionFacturas;
 import gt.supermercado.pos.facturacion.infraestructura.fel.CertificadorFelSimulado;
 import gt.supermercado.pos.facturacion.infraestructura.fel.CertificadorFelSimulado.Escenario;
 import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
+import gt.supermercado.pos.seguridad.dominio.Rol;
+import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -136,7 +139,7 @@ class CertificacionIntegracionTest {
         HttpResponse<String> respuesta = finalizar(cajero);
 
         assertThat(respuesta.statusCode()).isEqualTo(200);
-        assertThat(respuesta.body()).contains("\"estado\":\"RECHAZADA\"", "El certificador rechazó la factura",
+        assertThat(respuesta.body()).contains("\"estado\":\"RECHAZADA\"", "El NIT o el nombre del cliente no es válido",
                 "\"autorizacion\":null");
         assertThat(estadoDeLaVenta(cajero)).isEqualTo("FINALIZADA");
         Map<String, Object> factura = facturaDe(cajero);
@@ -196,7 +199,7 @@ class CertificacionIntegracionTest {
                 .toString();
         simulador.usarEscenario(Escenario.ACEPTAR);
 
-        FacturaDeVenta reintento = emision.reintentar(ventaId(cajero));
+        FacturaDeVenta reintento = emision.reintentar(ventaId(cajero), sesionDe(cajero));
 
         assertThat(reintento.estado()).isEqualTo("CERTIFICADA");
         assertThat(reintento.autorizacion()).hasToString(certificadaEnElCertificador);
@@ -214,7 +217,7 @@ class CertificacionIntegracionTest {
         finalizar(cajero);
         simulador.usarEscenario(Escenario.ACEPTAR);
 
-        assertThat(emision.reintentar(ventaId(cajero)).estado()).isEqualTo("CERTIFICADA");
+        assertThat(emision.reintentar(ventaId(cajero), sesionDe(cajero)).estado()).isEqualTo("CERTIFICADA");
         assertThat(simulador.enviosDe(uuidDeLaVenta(cajero))).isEqualTo(1);
     }
 
@@ -224,7 +227,7 @@ class CertificacionIntegracionTest {
         finalizar(cajero);
         Map<String, Object> factura = facturaDe(cajero);
 
-        FacturaDeVenta reintento = emision.reintentar(ventaId(cajero));
+        FacturaDeVenta reintento = emision.reintentar(ventaId(cajero), sesionDe(cajero));
 
         assertThat(reintento.estado()).isEqualTo("CERTIFICADA");
         assertThat(reintento.autorizacion()).hasToString((String) factura.get("autorizacion"));
@@ -244,6 +247,11 @@ class CertificacionIntegracionTest {
     // Apoyo
 
     record Cajero(long usuarioId, String sesion, long productoId) {}
+
+    /** La sesión del cajero, como la ve el servidor: la bitácora registra a su nombre un rechazo (HU-08.06). */
+    private static SesionActiva sesionDe(Cajero cajero) {
+        return new SesionActiva(0, cajero.usuarioId(), "cajero", "Cajero", Rol.CAJERO, "Cajero", false, Set.of());
+    }
 
     private long ventaId(Cajero cajero) {
         return jdbc.queryForObject("SELECT id FROM venta WHERE usuario_id = ? ORDER BY id DESC LIMIT 1", Long.class,
