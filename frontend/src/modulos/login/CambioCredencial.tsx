@@ -1,27 +1,51 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { cambiarCredencial } from '../../api/autenticacion'
-import { CLAVE_SESION, destinoInicial, useSesion } from './sesion'
+import { avisoCredencialTemporal, CLAVE_SESION, destinoInicial, useSesion } from './sesion'
 
-/** HU-01.13: cada usuario cambia su contraseña, o su PIN si es Cajero. */
+/**
+ * HU-01.13: cada usuario cambia su contraseña, o su PIN si es Cajero. HU-01.15: con una credencial temporal es
+ * obligatorio; al cambiarla, el usuario sigue a su pantalla de inicio.
+ */
 export function CambioCredencial() {
   const { data: usuario } = useSesion()
+  const navegar = useNavigate()
   if (!usuario) return null
   const esPin = usuario.rol === 'CAJERO'
+  const temporal = usuario.credencialTemporal
 
   return (
     <main className="pagina">
       <h1>Cambiar {esPin ? 'PIN' : 'contraseña'}</h1>
-      <p className="subtitulo">
-        <Link to={destinoInicial(usuario.rol)}>Inicio</Link> · Mi {esPin ? 'PIN' : 'contraseña'}
-      </p>
-      <FormularioCredencial esPin={esPin} />
+      {temporal ? (
+        <p className="tarjeta pendiente" role="status">
+          {avisoCredencialTemporal(esPin)}
+        </p>
+      ) : (
+        <p className="subtitulo">
+          <Link to={destinoInicial(usuario.rol)}>Inicio</Link> · Mi {esPin ? 'PIN' : 'contraseña'}
+        </p>
+      )}
+      <FormularioCredencial
+        esPin={esPin}
+        temporal={temporal}
+        onCambiada={temporal ? () => navegar(destinoInicial(usuario.rol), { replace: true }) : undefined}
+      />
     </main>
   )
 }
 
-export function FormularioCredencial({ esPin }: { esPin: boolean }) {
+export function FormularioCredencial({
+  esPin,
+  temporal = false,
+  onCambiada,
+}: {
+  esPin: boolean
+  /** HU-01.15: el campo "actual" es la credencial temporal que le dieron. */
+  temporal?: boolean
+  onCambiada?: () => void
+}) {
   const [actual, setActual] = useState('')
   const [nueva, setNueva] = useState('')
   const [confirmacion, setConfirmacion] = useState('')
@@ -41,6 +65,7 @@ export function FormularioCredencial({ esPin }: { esPin: boolean }) {
       setHecho(true)
       // La credencial deja de ser temporal: se vuelve a leer la sesión.
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_SESION })
+      onCambiada?.()
     },
   })
 
@@ -69,10 +94,18 @@ export function FormularioCredencial({ esPin }: { esPin: boolean }) {
         if (!noCoincide) cambio.mutate()
       }}
     >
-      {campo(`${esPin ? 'PIN' : 'Contraseña'} actual`, 'actual', actual, setActual, false)}
+      {campo(`${esPin ? 'PIN' : 'Contraseña'} ${temporal ? 'temporal' : 'actual'}`, 'actual', actual, setActual, false)}
       {campo(`${esPin ? 'Nuevo PIN' : 'Nueva contraseña'}`, 'nueva', nueva, setNueva, true)}
-      <small>{esPin ? 'Numérico, de 4 a 6 dígitos.' : 'Al menos 8 caracteres, con letras y números.'} Distinto del actual.</small>
-      {campo(`Confirmar ${esPin ? 'nuevo PIN' : 'nueva contraseña'}`, 'confirmacion', confirmacion, setConfirmacion, true)}
+      <small>
+        {esPin ? 'Numérico, de 4 a 6 dígitos.' : 'Al menos 8 caracteres, con letras y números.'} Distinto del actual.
+      </small>
+      {campo(
+        `Confirmar ${esPin ? 'nuevo PIN' : 'nueva contraseña'}`,
+        'confirmacion',
+        confirmacion,
+        setConfirmacion,
+        true,
+      )}
 
       {noCoincide && (
         <p className="error" role="alert">
