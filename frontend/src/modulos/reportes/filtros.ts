@@ -7,6 +7,8 @@ export const PERMISO_REPORTES = 'REPORTE_CONSULTAR'
 export const REPORTES = [
   { codigo: 'VENTAS_PERIODO', titulo: 'Ventas por período' },
   { codigo: 'VENTAS_CAJERO', titulo: 'Ventas por cajero' },
+  { codigo: 'TARJETAS', titulo: 'Ingresos por tarjeta' },
+  { codigo: 'IVA', titulo: 'IVA cobrado' },
 ] as const
 
 export type CodigoReporte = (typeof REPORTES)[number]['codigo']
@@ -20,6 +22,7 @@ export const filtrosIniciales = (opciones: OpcionesDeFiltro): FiltrosVentas => {
     cajaId: '',
     cajeroId: '',
     agrupacion: 'DIA',
+    tipoTarjeta: '',
   }
 }
 

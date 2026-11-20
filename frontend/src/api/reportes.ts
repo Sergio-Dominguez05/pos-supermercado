@@ -59,6 +59,8 @@ export interface FiltrosVentas {
   cajaId: string
   cajeroId: string
   agrupacion: Agrupacion
+  /** HU-10.01 crit. 2: `DEBITO`, `CREDITO` o vacío (todas); solo en los reportes de tarjetas. */
+  tipoTarjeta: string
 }
 
 export const CLAVE_FILTROS_REPORTE = ['reportes', 'filtros'] as const
@@ -121,6 +123,96 @@ export const generarDetalleCajero = (cajeroId: number, filtros: FiltrosVentas) =
     `/api/reportes/cajeros/${cajeroId}/ventas?${consultaDe({ ...sinAgrupacion(filtros), cajeroId: '' })}`,
   )
 
+export type TipoTarjeta = 'DEBITO' | 'CREDITO'
+
+/** HU-10.06: un tipo de tarjeta, o la fila de totales (`tipo` nulo). */
+export interface FilaTarjeta {
+  tipo: TipoTarjeta | null
+  etiqueta: string
+  transacciones: number
+  monto: number
+}
+
+export interface ReporteTarjetas {
+  encabezado: EncabezadoReporte
+  filas: FilaTarjeta[]
+  total: FilaTarjeta
+  /** Crit. 2: los pagos de facturas anuladas, que no se suman al total. */
+  anulados: FilaTarjeta[]
+  totalAnulado: FilaTarjeta
+}
+
+/** HU-10.06 crit. 3: una transacción, con su autorización y los últimos cuatro dígitos si se registraron. */
+export interface PagoConTarjeta {
+  pagoId: number
+  fecha: string
+  ventaNumero: number
+  caja: string
+  cajero: string
+  autorizacion: string
+  ultimos4: string | null
+  monto: number
+  anulada: boolean
+}
+
+export interface DetallePagosTarjeta {
+  encabezado: EncabezadoReporte
+  pagos: PagoConTarjeta[]
+}
+
+/** HU-10.07: un día con facturas certificadas, o el total (`fecha` nula). */
+export interface DiaIva {
+  fecha: string | null
+  facturas: number
+  baseImponible: number
+  iva: number
+  total: number
+}
+
+export interface ReporteIva {
+  encabezado: EncabezadoReporte
+  dias: DiaIva[]
+  total: DiaIva
+  /** Las facturas del período que aún no están certificadas: todavía no cuentan para la SAT. */
+  sinCertificar: { facturas: number; total: number }
+}
+
+export interface FacturaIva {
+  facturaId: number
+  emitidaEn: string
+  serie: string
+  numero: string
+  autorizacion: string
+  receptorId: string
+  receptorNombre: string
+  caja: string
+  baseImponible: number
+  iva: number
+  total: number
+}
+
+export interface DetalleFacturasIva {
+  encabezado: EncabezadoReporte
+  facturas: FacturaIva[]
+}
+
+export const generarReporteTarjetas = (filtros: FiltrosVentas) =>
+  pedir<ReporteTarjetas>(
+    `/api/reportes/tarjetas?${consultaDe({ ...sinAgrupacion(filtros), tipoTarjeta: filtros.tipoTarjeta })}`,
+  )
+
+/** El detalle usa los filtros del resumen; el tipo es el de la fila elegida. */
+export const generarDetalleTarjeta = (tipo: TipoTarjeta, filtros: FiltrosVentas) =>
+  pedir<DetallePagosTarjeta>(`/api/reportes/tarjetas/${tipo}/pagos?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteIva = (filtros: FiltrosVentas) =>
+  pedir<ReporteIva>(`/api/reportes/iva?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarDetalleIva = (filtros: FiltrosVentas) =>
+  pedir<DetalleFacturasIva>(`/api/reportes/iva/facturas?${consultaDe(sinAgrupacion(filtros))}`)
+
 /** Cada generación queda en la bitácora (HU-10.15 crit. 3). */
 export const generarReporteVentas = (filtros: FiltrosVentas) =>
-  pedir<ReporteVentasPeriodo>(`/api/reportes/ventas?${consultaDe({ ...filtros })}`)
+  pedir<ReporteVentasPeriodo>(
+    `/api/reportes/ventas?${consultaDe({ ...sinAgrupacion(filtros), agrupacion: filtros.agrupacion })}`,
+  )

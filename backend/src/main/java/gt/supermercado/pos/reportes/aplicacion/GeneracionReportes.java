@@ -5,7 +5,11 @@ import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.reportes.dominio.Agrupacion;
+import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
+import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteIva;
+import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.EncabezadoReporte;
 import gt.supermercado.pos.reportes.dominio.FiltroAplicado;
@@ -105,6 +109,47 @@ public class GeneracionReportes {
             EncabezadoReporte encabezado = encabezado(DetalleVentasCajero.TITULO, aplicados(filtros), sesion);
             return new Generado<>(new DetalleVentasCajero(encabezado, repositorio.ventasDeCajero(filtros)),
                     encabezado);
+        });
+    }
+
+    /** HU-10.06 crit. 1 y 2: ingresos por tipo de tarjeta, con los pagos de facturas anuladas aparte. */
+    public ReporteTarjetas ingresosPorTarjeta(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                              TipoTarjetaReporte tipo, SesionActiva sesion) {
+        return generar(ReporteTarjetas.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, tipo);
+            EncabezadoReporte encabezado = encabezado(ReporteTarjetas.TITULO, aplicados(filtros), sesion);
+            return new Generado<>(ReporteTarjetas.de(encabezado, tipo, repositorio.pagosPorTipo(filtros)), encabezado);
+        });
+    }
+
+    /** HU-10.06 crit. 3: las transacciones de un tipo de tarjeta, con su autorización. */
+    public DetallePagosTarjeta detalleDeTarjeta(TipoTarjetaReporte tipo, LocalDate desde, LocalDate hasta,
+                                                Long cajaId, Long cajeroId, SesionActiva sesion) {
+        return generar(DetallePagosTarjeta.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, tipo);
+            EncabezadoReporte encabezado = encabezado(DetallePagosTarjeta.TITULO, aplicados(filtros), sesion);
+            return new Generado<>(new DetallePagosTarjeta(encabezado, repositorio.pagosDeTarjeta(filtros)),
+                    encabezado);
+        });
+    }
+
+    /** HU-10.07: el IVA de las facturas certificadas, por día, y las que faltan por certificar. */
+    public ReporteIva ivaCobrado(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId, SesionActiva sesion) {
+        return generar(ReporteIva.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, null);
+            EncabezadoReporte encabezado = encabezado(ReporteIva.TITULO, aplicados(filtros), sesion);
+            return new Generado<>(ReporteIva.de(encabezado, repositorio.ivaPorDia(filtros),
+                    repositorio.sinCertificar(filtros)), encabezado);
+        });
+    }
+
+    /** HU-10.07 crit. 3: el detalle por factura. */
+    public DetalleFacturasIva facturasDelIva(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                             SesionActiva sesion) {
+        return generar(DetalleFacturasIva.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, null);
+            EncabezadoReporte encabezado = encabezado(DetalleFacturasIva.TITULO, aplicados(filtros), sesion);
+            return new Generado<>(new DetalleFacturasIva(encabezado, repositorio.facturasIva(filtros)), encabezado);
         });
     }
 

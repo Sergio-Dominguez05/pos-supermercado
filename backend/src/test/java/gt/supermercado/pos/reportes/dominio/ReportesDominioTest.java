@@ -108,6 +108,36 @@ class ReportesDominioTest {
     }
 
     @Test
+    void lasTarjetasMuestranLosDosTiposEnCeroYLosAnuladosAparte() {   // HU-10.06 crit. 1 y 2
+        ReporteTarjetas reporte = ReporteTarjetas.de(ENCABEZADO, null, List.of(
+                new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.CREDITO, false, 2, new BigDecimal("80.5")),
+                new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.CREDITO, true, 1, new BigDecimal("10.00"))));
+
+        assertThat(reporte.filas()).extracting(ReporteTarjetas.Fila::etiqueta).containsExactly("Débito", "Crédito");
+        assertThat(reporte.filas().get(0).transacciones()).isZero();
+        assertThat(reporte.filas().get(0).monto().toPlainString()).isEqualTo("0.00");
+        assertThat(reporte.total().monto().toPlainString()).isEqualTo("80.50");
+        assertThat(reporte.totalAnulado().monto().toPlainString()).isEqualTo("10.00");
+        assertThat(ReporteTarjetas.de(ENCABEZADO, TipoTarjetaReporte.DEBITO, List.of()).filas())
+                .extracting(ReporteTarjetas.Fila::tipo).containsExactly(TipoTarjetaReporte.DEBITO);
+    }
+
+    @Test
+    void elIvaSumaLosDiasEnElTotal() {   // HU-10.07 crit. 1
+        ReporteIva reporte = ReporteIva.de(ENCABEZADO, List.of(
+                new ReporteIva.Dia(LocalDate.of(2026, 11, 1), 2, new BigDecimal("150.00"), new BigDecimal("18.00"),
+                        new BigDecimal("168.00")),
+                new ReporteIva.Dia(LocalDate.of(2026, 11, 2), 1, new BigDecimal("20.00"), new BigDecimal("2.40"),
+                        new BigDecimal("22.40"))), new ReporteIva.SinCertificar(0, BigDecimal.ZERO));
+
+        assertThat(reporte.total().fecha()).isNull();
+        assertThat(reporte.total().facturas()).isEqualTo(3);
+        assertThat(reporte.total().baseImponible().toPlainString()).isEqualTo("170.00");
+        assertThat(reporte.total().iva().toPlainString()).isEqualTo("20.40");
+        assertThat(reporte.total().total().toPlainString()).isEqualTo("190.40");
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP

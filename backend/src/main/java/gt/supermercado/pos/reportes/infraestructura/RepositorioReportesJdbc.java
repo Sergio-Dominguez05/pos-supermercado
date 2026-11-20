@@ -1,6 +1,11 @@
 package gt.supermercado.pos.reportes.infraestructura;
 
+import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
+import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteIva;
+import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
+import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
@@ -9,6 +14,7 @@ import gt.supermercado.pos.reportes.dominio.VentasDelDia;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -132,6 +138,96 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                 fila.getObject("fecha", OffsetDateTime.class), fila.getString("caja"), fila.getString("estado"),
                 fila.getBigDecimal("total"), fila.getString("estado_factura"), fila.getString("factura"),
                 fila.getLong("eliminadas")), valores.toArray());
+    }
+
+    /** Los pagos vigentes de las ventas finalizadas en el período, con los filtros comunes y el de tarjeta. */
+    private static final String PAGOS_DEL_PERIODO = """
+            FROM pago p
+            JOIN venta v ON v.id = p.venta_id
+            JOIN caja c ON c.id = v.caja_id
+            JOIN usuario u ON u.id = v.usuario_id
+            LEFT JOIN factura f ON f.venta_id = v.id
+            WHERE p.eliminado_en IS NULL AND v.estado = 'FINALIZADA' AND %s AND %s
+              AND (?::text IS NULL OR p.tipo_tarjeta = ?::text)""".formatted(enPeriodo("v.finalizada_en"),
+            deCajaYCajero("v"));
+
+    private static List<Object> parametrosConTarjeta(FiltrosReporte filtros) {
+        List<Object> valores = parametros(filtros);
+        String tipo = filtros.tipoTarjeta() == null ? null : filtros.tipoTarjeta().name();
+        valores.addAll(Arrays.asList(tipo, tipo));
+        return valores;
+    }
+
+    @Override
+    public List<ReporteTarjetas.PagosDelTipo> pagosPorTipo(FiltrosReporte filtros) {
+        return jdbc.query("""
+                SELECT p.tipo_tarjeta, f.estado IS NOT DISTINCT FROM 'ANULADA' AS anulada, count(*) AS transacciones,
+                       sum(p.monto) AS monto
+                %s
+                GROUP BY 1, 2""".formatted(PAGOS_DEL_PERIODO),
+                (fila, i) -> new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.valueOf(fila.getString("tipo_tarjeta")),
+                        fila.getBoolean("anulada"), fila.getLong("transacciones"), fila.getBigDecimal("monto")),
+                parametrosConTarjeta(filtros).toArray());
+    }
+
+    @Override
+    public List<DetallePagosTarjeta.Pago> pagosDeTarjeta(FiltrosReporte filtros) {
+        return jdbc.query("""
+                SELECT p.id, v.finalizada_en, v.numero, c.nombre AS caja,
+                       u.nombre_completo || ' (' || u.username || ')' AS cajero, p.autorizacion, p.ultimos4, p.monto,
+                       f.estado IS NOT DISTINCT FROM 'ANULADA' AS anulada
+                %s
+                ORDER BY v.finalizada_en, p.id""".formatted(PAGOS_DEL_PERIODO),
+                (fila, i) -> new DetallePagosTarjeta.Pago(fila.getLong("id"),
+                        fila.getObject("finalizada_en", OffsetDateTime.class), fila.getLong("numero"),
+                        fila.getString("caja"), fila.getString("cajero"), fila.getString("autorizacion"),
+                        fila.getString("ultimos4"), fila.getBigDecimal("monto"), fila.getBoolean("anulada")),
+                parametrosConTarjeta(filtros).toArray());
+    }
+
+    /** Las facturas emitidas en el período, con los filtros comunes sobre su venta; cada consulta agrega el estado. */
+    private static final String FACTURAS_DEL_PERIODO = """
+            FROM factura f
+            JOIN venta v ON v.id = f.venta_id
+            JOIN caja c ON c.id = v.caja_id
+            WHERE %s AND %s""".formatted(enPeriodo("f.emitida_en"), deCajaYCajero("v"));
+
+    @Override
+    public List<ReporteIva.Dia> ivaPorDia(FiltrosReporte filtros) {
+        return jdbc.query("""
+                SELECT (f.emitida_en AT TIME ZONE 'America/Guatemala')::date AS fecha, count(*) AS facturas,
+                       sum(v.subtotal) AS base, sum(v.iva) AS iva, sum(v.total) AS total
+                %s AND f.estado = 'CERTIFICADA'
+                GROUP BY 1
+                ORDER BY 1""".formatted(FACTURAS_DEL_PERIODO),
+                (fila, i) -> new ReporteIva.Dia(fila.getObject("fecha", LocalDate.class), fila.getLong("facturas"),
+                        fila.getBigDecimal("base"), fila.getBigDecimal("iva"), fila.getBigDecimal("total")),
+                parametros(filtros).toArray());
+    }
+
+    @Override
+    public ReporteIva.SinCertificar sinCertificar(FiltrosReporte filtros) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS facturas, coalesce(sum(v.total), 0) AS total
+                %s AND f.estado IN ('PENDIENTE', 'CONTINGENCIA', 'RECHAZADA')""".formatted(FACTURAS_DEL_PERIODO),
+                (fila, i) -> new ReporteIva.SinCertificar(fila.getLong("facturas"),
+                        fila.getBigDecimal("total").setScale(2)),
+                parametros(filtros).toArray());
+    }
+
+    @Override
+    public List<DetalleFacturasIva.Factura> facturasIva(FiltrosReporte filtros) {
+        return jdbc.query("""
+                SELECT f.id, f.emitida_en, f.serie, f.numero, f.uuid_autorizacion::text AS autorizacion,
+                       f.receptor_id, f.receptor_nombre, c.nombre AS caja, v.subtotal, v.iva, v.total
+                %s AND f.estado = 'CERTIFICADA'
+                ORDER BY f.emitida_en, f.id""".formatted(FACTURAS_DEL_PERIODO),
+                (fila, i) -> new DetalleFacturasIva.Factura(fila.getLong("id"),
+                        fila.getObject("emitida_en", OffsetDateTime.class), fila.getString("serie"),
+                        fila.getString("numero"), fila.getString("autorizacion"), fila.getString("receptor_id"),
+                        fila.getString("receptor_nombre"), fila.getString("caja"), fila.getBigDecimal("subtotal"),
+                        fila.getBigDecimal("iva"), fila.getBigDecimal("total")),
+                parametros(filtros).toArray());
     }
 
     @Override

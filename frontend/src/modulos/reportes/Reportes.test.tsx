@@ -147,6 +147,7 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
       cajaId: '',
       cajeroId: '',
       agrupacion: 'DIA',
+      tipoTarjeta: '',
     })
   })
 
@@ -196,6 +197,7 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
       cajaId: '1',
       cajeroId: '',
       agrupacion: 'MES',
+      tipoTarjeta: 'CREDITO',
     })
 
     expect(respuesta).toHaveBeenCalledWith(

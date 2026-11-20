@@ -18,6 +18,24 @@ public interface RepositorioReportes {
     /** HU-10.03 crit. 2: las ventas finalizadas y canceladas del cajero de los filtros, en orden cronológico. */
     List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros);
 
+    /**
+     * HU-10.06 crit. 1 y 2: los pagos vigentes de las ventas finalizadas en el período, por tipo de tarjeta y según la
+     * factura esté anulada o no. Respeta el filtro de tipo de tarjeta.
+     */
+    List<ReporteTarjetas.PagosDelTipo> pagosPorTipo(FiltrosReporte filtros);
+
+    /** HU-10.06 crit. 3: las transacciones del tipo de tarjeta de los filtros, en orden cronológico. */
+    List<DetallePagosTarjeta.Pago> pagosDeTarjeta(FiltrosReporte filtros);
+
+    /** HU-10.07: las facturas certificadas por día de emisión (hora de Guatemala), solo los días con facturas. */
+    List<ReporteIva.Dia> ivaPorDia(FiltrosReporte filtros);
+
+    /** HU-10.07: las facturas del período que aún no están certificadas (pendientes, en contingencia o rechazadas). */
+    ReporteIva.SinCertificar sinCertificar(FiltrosReporte filtros);
+
+    /** HU-10.07 crit. 3: las facturas certificadas del período, en orden de emisión. */
+    List<DetalleFacturasIva.Factura> facturasIva(FiltrosReporte filtros);
+
     /** Todas las cajas, también las inactivas: puede haber ventas de una caja que ya no se usa. */
     List<OpcionesDeFiltro.Opcion> cajas();
 
