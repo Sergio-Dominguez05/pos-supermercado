@@ -11,6 +11,7 @@ import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.VentasDelDia;
@@ -119,6 +120,34 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                 fila.getString("nombre_completo") + " (" + fila.getString("username") + ")", fila.getLong("ventas"),
                 fila.getBigDecimal("total").setScale(2), fila.getLong("canceladas"), fila.getLong("eliminadas"),
                 fila.getLong("anuladas"), fila.getBigDecimal("monto_anulado").setScale(2)), valores.toArray());
+    }
+
+    @Override
+    public List<ReporteVentasPorCaja.VentasDeCaja> ventasPorCaja(FiltrosReporte filtros) {
+        String sql = """
+                WITH ventas AS (
+                    SELECT v.caja_id, count(*) AS ventas, sum(v.total) AS total
+                    FROM venta v LEFT JOIN factura f ON f.venta_id = v.id
+                    WHERE v.estado = 'FINALIZADA' AND f.estado IS DISTINCT FROM 'ANULADA' AND %s AND %s
+                    GROUP BY v.caja_id),
+                turnos AS (
+                    SELECT t.caja_id, count(*) AS turnos FROM turno t
+                    WHERE %s AND %s
+                    GROUP BY t.caja_id)
+                SELECT c.id, c.nombre, coalesce(ve.ventas, 0) AS ventas, coalesce(ve.total, 0) AS total,
+                       coalesce(tu.turnos, 0) AS turnos
+                FROM caja c
+                LEFT JOIN ventas ve ON ve.caja_id = c.id
+                LEFT JOIN turnos tu ON tu.caja_id = c.id
+                WHERE (?::bigint IS NULL OR c.id = ?::bigint)
+                  AND (c.activo OR ve.caja_id IS NOT NULL OR tu.caja_id IS NOT NULL)""".formatted(
+                enPeriodo("v.finalizada_en"), deCajaYCajero("v"), enPeriodo("t.abierto_en"), deCajaYCajero("t"));
+        List<Object> valores = new ArrayList<>(parametros(filtros));
+        valores.addAll(parametros(filtros));
+        valores.addAll(Arrays.asList(filtros.cajaId(), filtros.cajaId()));
+        return jdbc.query(sql, (fila, i) -> new ReporteVentasPorCaja.VentasDeCaja(fila.getLong("id"),
+                fila.getString("nombre"), fila.getLong("ventas"), fila.getBigDecimal("total").setScale(2),
+                fila.getLong("turnos")), valores.toArray());
     }
 
     @Override

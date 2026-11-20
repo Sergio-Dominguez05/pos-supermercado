@@ -23,6 +23,7 @@ import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.TablasDeReportes;
@@ -102,6 +103,13 @@ public class GeneracionReportes {
     public ReporteVentasPorCajero ventasPorCajero(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
                                                   SesionActiva sesion) {
         return (ReporteVentasPorCajero) generar(CodigoReporte.VENTAS_CAJERO,
+                ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
+    }
+
+    /** HU-10.04: ventas y turnos por caja, para comparar las cajas en el mismo período. */
+    public ReporteVentasPorCaja ventasPorCaja(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                              SesionActiva sesion) {
+        return (ReporteVentasPorCaja) generar(CodigoReporte.VENTAS_CAJA,
                 ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
     }
 
@@ -251,6 +259,7 @@ public class GeneracionReportes {
                     repositorio.ventasPorDia(filtros));
             case VENTAS_CAJERO -> ReporteVentasPorCajero.de(encabezado, repositorio.ventasPorCajero(filtros));
             case DETALLE_CAJERO -> new DetalleVentasCajero(encabezado, repositorio.ventasDeCajero(filtros));
+            case VENTAS_CAJA -> ReporteVentasPorCaja.de(encabezado, repositorio.ventasPorCaja(filtros));
             case TARJETAS -> ReporteTarjetas.de(encabezado, filtros.tipoTarjeta(), repositorio.pagosPorTipo(filtros));
             case DETALLE_TARJETA -> new DetallePagosTarjeta(encabezado, repositorio.pagosDeTarjeta(filtros));
             case IVA -> ReporteIva.de(encabezado, repositorio.ivaPorDia(filtros), repositorio.sinCertificar(filtros));

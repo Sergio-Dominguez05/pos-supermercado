@@ -25,6 +25,7 @@ final class TextosDeCelda {
         }
         return switch (tipo) {
             case DINERO -> dinero((BigDecimal) valor);
+            case PORCENTAJE -> ((BigDecimal) valor).setScale(1, RoundingMode.HALF_UP).toPlainString() + " %";
             case FECHA -> valor instanceof LocalDate fecha ? FECHA.format(fecha) : valor.toString();
             case FECHA_HORA -> valor instanceof OffsetDateTime momento
                     ? FECHA_HORA.format(momento.atZoneSameInstant(GUATEMALA)) : valor.toString();
@@ -39,6 +40,6 @@ final class TextosDeCelda {
 
     /** Si la columna se alinea a la derecha, como los números en la pantalla. */
     static boolean esNumero(Tipo tipo) {
-        return tipo == Tipo.DINERO || tipo == Tipo.ENTERO;
+        return tipo == Tipo.DINERO || tipo == Tipo.ENTERO || tipo == Tipo.PORCENTAJE;
     }
 }

@@ -38,6 +38,21 @@ class TablasDeReportesTest {
     }
 
     @Test
+    void lasVentasPorCajaExportanLaParticipacionComoNumero() {   // HU-10.04, HU-10.14 crit. 2
+        ReporteVentasPorCaja reporte = ReporteVentasPorCaja.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCaja.VentasDeCaja(1, "Caja 1", 3, new BigDecimal("30.00"), 2)));
+
+        TablaReporte tabla = TablasDeReportes.de(CodigoReporte.VENTAS_CAJA, reporte);
+
+        assertThat(tabla.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("Caja", "Ventas",
+                "Total vendido", "Turnos", "Ticket promedio", "Participación");
+        assertThat(tabla.columnas().getLast().tipo()).isEqualTo(TablaReporte.Tipo.PORCENTAJE);
+        assertThat(tabla.filas().getFirst()).containsExactly("Caja 1", 3L, new BigDecimal("30.00"), 2L,
+                new BigDecimal("10.00"), new BigDecimal("100.0"));
+        assertThat(tabla.pie().getFirst().getFirst()).isEqualTo("Total");
+    }
+
+    @Test
     void lasTarjetasSeparanCantidadYMontoAnuladosEnDosColumnasNumericas() {
         ReporteTarjetas reporte = ReporteTarjetas.de(ENCABEZADO, null, List.of(
                 new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, true, 1, new BigDecimal("25.00"))));

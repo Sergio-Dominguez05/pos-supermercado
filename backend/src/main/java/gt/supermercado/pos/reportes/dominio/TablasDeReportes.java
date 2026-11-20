@@ -13,6 +13,7 @@ import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.DINERO;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.ENTERO;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.FECHA;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.FECHA_HORA;
+import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.PORCENTAJE;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.TEXTO;
 
 /**
@@ -33,6 +34,7 @@ public final class TablasDeReportes {
             case VENTAS_PERIODO -> ventasPeriodo((ReporteVentasPeriodo) reporte);
             case VENTAS_CAJERO -> ventasPorCajero((ReporteVentasPorCajero) reporte);
             case DETALLE_CAJERO -> detalleCajero((DetalleVentasCajero) reporte);
+            case VENTAS_CAJA -> ventasPorCaja((ReporteVentasPorCaja) reporte);
             case TARJETAS -> tarjetas((ReporteTarjetas) reporte);
             case DETALLE_TARJETA -> detalleTarjeta((DetallePagosTarjeta) reporte);
             case IVA -> iva((ReporteIva) reporte);
@@ -69,6 +71,21 @@ public final class TablasDeReportes {
     private static List<Object> filaCajero(ReporteVentasPorCajero.Fila fila) {
         return fila(fila.cajero(), fila.cantidadVentas(), fila.totalVendido(), fila.ventasCanceladas(),
                 fila.lineasEliminadas(), fila.facturasAnuladas(), fila.montoAnulado());
+    }
+
+    private static TablaReporte ventasPorCaja(ReporteVentasPorCaja reporte) {
+        return tabla(CodigoReporte.VENTAS_CAJA, reporte.encabezado(), List.of(),
+                columnas("Caja", TEXTO, "Ventas", ENTERO, "Total vendido", DINERO, "Turnos", ENTERO,
+                        "Ticket promedio", DINERO, "Participación", PORCENTAJE),
+                reporte.filas().stream().map(TablasDeReportes::filaCaja).toList(),
+                List.of(filaCaja(reporte.totales())),
+                List.of("Ventas y total sin las facturas anuladas. Los turnos cuentan por la fecha en que se abrieron; "
+                        + "la participación es la parte del total vendido."));
+    }
+
+    private static List<Object> filaCaja(ReporteVentasPorCaja.Fila fila) {
+        return fila(fila.caja(), fila.cantidadVentas(), fila.totalVendido(), fila.turnos(), fila.ticketPromedio(),
+                fila.participacion());
     }
 
     private static TablaReporte detalleCajero(DetalleVentasCajero detalle) {

@@ -15,6 +15,13 @@ public interface RepositorioReportes {
     /** HU-10.03 crit. 1: el resumen de cada cajero con actividad en el período (ver {@link ReporteVentasPorCajero}). */
     List<ReporteVentasPorCajero.Fila> ventasPorCajero(FiltrosReporte filtros);
 
+    /**
+     * HU-10.04: por caja, las ventas finalizadas en el período sin las de facturas anuladas y los turnos abiertos en
+     * el período (los dos por caja y cajero de los filtros). Trae las cajas activas aunque no tengan actividad y las
+     * inactivas que sí la tuvieron.
+     */
+    List<ReporteVentasPorCaja.VentasDeCaja> ventasPorCaja(FiltrosReporte filtros);
+
     /** HU-10.03 crit. 2: las ventas finalizadas y canceladas del cajero de los filtros, en orden cronológico. */
     List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros);
 

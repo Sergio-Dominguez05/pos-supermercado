@@ -180,6 +180,7 @@ final class ExcelDeReporte {
                 String formato = switch (tipo) {
                     case DINERO -> "\"Q\"#,##0.00;-\"Q\"#,##0.00";
                     case ENTERO -> "0";
+                    case PORCENTAJE -> "0.0\" %\"";
                     case FECHA -> "dd/mm/yyyy";
                     case FECHA_HORA -> "dd/mm/yyyy hh:mm";
                     case TEXTO -> "@";

@@ -623,6 +623,13 @@ kbd {
   padding-bottom: 9px;
 }
 
+/* HU-10.04 crit. 2: la barra de participación de cada caja, delante del porcentaje. */
+.tabla td.participacion meter {
+  width: 80px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
 /* Motivos y justificaciones: se ajustan en varias líneas en lugar de ensanchar la tabla. */
 .tabla td.texto-largo {
   min-width: 220px;

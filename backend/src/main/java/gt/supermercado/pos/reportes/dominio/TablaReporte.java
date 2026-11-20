@@ -15,7 +15,8 @@ public record TablaReporte(CodigoReporte codigo, EncabezadoReporte encabezado, D
                            List<Dato> resumen, List<Columna> columnas, List<List<Object>> filas,
                            List<List<Object>> pie, List<String> notas) {
 
-    public enum Tipo { TEXTO, ENTERO, DINERO, FECHA, FECHA_HORA }
+    /** {@code PORCENTAJE} es un {@link java.math.BigDecimal} en puntos (45.5 = 45.5 %). */
+    public enum Tipo { TEXTO, ENTERO, DINERO, PORCENTAJE, FECHA, FECHA_HORA }
 
     public record Columna(String titulo, Tipo tipo) {}
 

@@ -166,6 +166,37 @@ class ReportesDominioTest {
     }
 
     @Test
+    void lasCajasSeOrdenanPorTotalConSuParticipacionYLaFilaDeTotales() {   // HU-10.04 crit. 1 y 2
+        ReporteVentasPorCaja reporte = ReporteVentasPorCaja.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCaja.VentasDeCaja(1, "Caja 1", 1, new BigDecimal("10.00"), 1),
+                new ReporteVentasPorCaja.VentasDeCaja(2, "Caja 2", 2, new BigDecimal("20.00"), 3),
+                new ReporteVentasPorCaja.VentasDeCaja(3, "caja 0", 0, new BigDecimal("0.00"), 0),
+                new ReporteVentasPorCaja.VentasDeCaja(4, "Caja 4", 0, new BigDecimal("0.00"), 1)));
+
+        assertThat(reporte.filas()).extracting(ReporteVentasPorCaja.Fila::caja)
+                .containsExactly("Caja 2", "Caja 1", "caja 0", "Caja 4");
+        assertThat(reporte.filas()).extracting(f -> f.participacion().toPlainString())
+                .containsExactly("66.7", "33.3", "0.0", "0.0");
+        assertThat(reporte.filas().getFirst().ticketPromedio()).isEqualByComparingTo("10.00");
+        ReporteVentasPorCaja.Fila totales = reporte.totales();
+        assertThat(totales.cajaId()).isNull();
+        assertThat(totales.cantidadVentas()).isEqualTo(3);
+        assertThat(totales.totalVendido().toPlainString()).isEqualTo("30.00");
+        assertThat(totales.turnos()).isEqualTo(5);
+        assertThat(totales.participacion().toPlainString()).isEqualTo("100.0");
+    }
+
+    @Test
+    void sinVentasLaParticipacionEsCero() {   // HU-10.04
+        ReporteVentasPorCaja reporte = ReporteVentasPorCaja.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCaja.VentasDeCaja(1, "Caja 1", 0, BigDecimal.ZERO, 2)));
+
+        assertThat(reporte.filas().getFirst().participacion().toPlainString()).isEqualTo("0.0");
+        assertThat(reporte.totales().participacion().toPlainString()).isEqualTo("0.0");
+        assertThat(reporte.totales().ticketPromedio()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP
