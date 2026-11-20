@@ -8,9 +8,10 @@ public interface RepositorioFacturas {
 
     /**
      * Registra la factura {@code PENDIENTE} de la venta con la copia del receptor, del emisor y del establecimiento,
-     * y la tarea de certificarla. Debe correr en la transacción que finaliza la venta.
+     * y la tarea de certificarla. Debe correr en la transacción que finaliza la venta. Con {@code correo}
+     * (HU-05.11), también la tarea de enviarla por correo cuando se certifique (HU-08.15).
      */
-    long registrar(DatosDte datos, String xmlEnviado);
+    long registrar(DatosDte datos, String xmlEnviado, String correo);
 
     Optional<Factura> deLaVenta(long ventaId);
 

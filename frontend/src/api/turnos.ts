@@ -14,12 +14,20 @@ export interface Turno {
 }
 
 export const CLAVE_TURNO_ACTUAL = ['turnos', 'actual'] as const
+export const CLAVE_TURNOS_ABIERTOS = ['turnos', 'abiertos'] as const
+export const claveResumenTurno = (turnoId: number) => ['turnos', turnoId, 'resumen'] as const
 
 /** Turno abierto en la caja de este equipo, o `null` si está cerrada o el equipo no tiene caja (204). */
 export const turnoActual = async () => (await pedir<Turno | undefined>('/api/turnos/actual')) ?? null
 
 /** Abre el turno del usuario en la caja de este equipo. */
 export const abrirTurno = () => pedir<Turno>('/api/turnos', { method: 'POST' })
+
+/** HU-09.06: todos para un supervisor; únicamente el propio para un cajero. */
+export const listarTurnosAbiertos = () => pedir<Turno[]>('/api/turnos/abiertos')
+
+export const obtenerResumenTurno = (turnoId: number) =>
+  pedir<ResumenDeTurno>(`/api/turnos/${turnoId}/resumen`)
 
 /** HU-09.08 crit. 3: lo cobrado con tarjeta en el turno; las facturas anuladas se descuentan y se muestran aparte. */
 export interface ResumenDeTurno {
@@ -32,6 +40,16 @@ export interface ResumenDeTurno {
   totalRegistrado: number
   /** Comprobantes del turno todavía en contingencia (HU-08.07). */
   contingencias: number
+}
+
+export interface PreparacionCierre {
+  cierreCiego: boolean
+  resumen: ResumenDeTurno | null
+}
+
+export interface ComparacionCierre {
+  resumen: ResumenDeTurno
+  diferencia: number
 }
 
 /** HU-09.08 crit. 5 y HU-09.09: el cierre guardado. */
@@ -63,11 +81,42 @@ export interface CierreHecho {
 export const CLAVE_RESUMEN_CIERRE = ['turnos', 'actual', 'cierre'] as const
 export const CLAVE_CIERRES = ['turnos', 'cierres'] as const
 
-export const obtenerResumenCierre = () => pedir<ResumenDeTurno>('/api/turnos/actual/cierre')
+export const obtenerResumenCierre = () => pedir<PreparacionCierre>('/api/turnos/actual/cierre')
+
+/** HU-09.11: revela el total y la diferencia solo después de confirmar el monto del cierre ciego. */
+export const compararCierre = (totalLote: number) =>
+  pedir<ComparacionCierre>('/api/turnos/actual/cierre/comparar', {
+    method: 'POST',
+    body: JSON.stringify({ totalLote, justificacion: null }),
+  })
 
 /** HU-09.08 y 09.09: cierra la caja con el total del cierre de lote y, si hay diferencia, su justificación. */
 export const cerrarCaja = (totalLote: number, justificacion: string) =>
   pedir<CierreHecho>('/api/turnos/actual/cerrar', {
+    method: 'POST',
+    body: JSON.stringify({ totalLote, justificacion: justificacion.trim() || null }),
+  })
+
+/** HU-09.12: un turno abierto de otro usuario, que el supervisor puede cerrar. */
+export interface TurnoAbierto {
+  id: number
+  cajaId: number
+  cajaNombre: string
+  usuarioId: number
+  usuarioNombre: string
+  abiertoEn: string
+}
+
+export const CLAVE_TURNOS_POR_CERRAR = ['turnos', 'por-cerrar'] as const
+
+/** HU-09.12 crit. 1: los turnos abiertos de los demás usuarios, para cerrarlos. */
+export const listarTurnosPorCerrar = () => pedir<TurnoAbierto[]>('/api/turnos/por-cerrar')
+
+export const obtenerResumenDeTurno = (turnoId: number) => pedir<ResumenDeTurno>(`/api/turnos/${turnoId}/cierre`)
+
+/** HU-09.12 crit. 1 y 2: cierra el turno de otro usuario con las mismas reglas del cierre propio. */
+export const cerrarTurnoDeOtro = (turnoId: number, totalLote: number, justificacion: string) =>
+  pedir<CierreHecho>(`/api/turnos/${turnoId}/cerrar`, {
     method: 'POST',
     body: JSON.stringify({ totalLote, justificacion: justificacion.trim() || null }),
   })
@@ -77,3 +126,51 @@ export const listarCierres = () => pedir<CierreDeTurno[]>('/api/turnos/cierres')
 
 export const reimprimirCierre = (turnoId: number) =>
   pedir<ResultadoImpresionCierre>(`/api/turnos/${turnoId}/cierre/reimprimir`, { method: 'POST' })
+
+/** HU-09.13 crit. 2: los filtros de la consulta de cierres, como los escribe el formulario (vacío: sin filtro). */
+export interface FiltrosCierres {
+  desde: string
+  hasta: string
+  cajaId: string
+  cajeroId: string
+  soloConDiferencias: boolean
+}
+
+/** HU-09.13 crit. 1: una página de cierres, del más reciente al más antiguo. */
+export interface PaginaCierres {
+  cierres: CierreDeTurno[]
+  pagina: number
+  tamanoPagina: number
+  total: number
+}
+
+export interface OpcionesCierres {
+  cajas: { id: number; etiqueta: string }[]
+  cajeros: { id: number; etiqueta: string }[]
+}
+
+/** HU-09.13 crit. 3: el cierre completo con lo cobrado en el turno. */
+export interface DetalleCierre {
+  cierre: CierreDeTurno
+  resumen: ResumenDeTurno
+}
+
+export const CLAVE_OPCIONES_CIERRES = ['cierres', 'opciones'] as const
+export const claveDetalleCierre = (turnoId: number) => ['cierres', turnoId] as const
+
+export const rutaCierres = (filtros: FiltrosCierres, pagina: number) => {
+  const parametros = new URLSearchParams()
+  for (const nombre of ['desde', 'hasta', 'cajaId', 'cajeroId'] as const)
+    if (filtros[nombre].trim()) parametros.set(nombre, filtros[nombre].trim())
+  if (filtros.soloConDiferencias) parametros.set('soloConDiferencias', 'true')
+  if (pagina > 0) parametros.set('pagina', String(pagina))
+  const consulta = parametros.toString()
+  return `/api/cierres${consulta ? `?${consulta}` : ''}`
+}
+
+export const consultarCierres = (filtros: FiltrosCierres, pagina: number) =>
+  pedir<PaginaCierres>(rutaCierres(filtros, pagina))
+
+export const obtenerOpcionesCierres = () => pedir<OpcionesCierres>('/api/cierres/opciones')
+
+export const obtenerDetalleCierre = (turnoId: number) => pedir<DetalleCierre>(`/api/cierres/${turnoId}`)

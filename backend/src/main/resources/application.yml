@@ -61,3 +61,12 @@ pos:
     # simulado: CanalImpresionSimulado (desarrollo y pruebas, no imprime). red: ESC/POS por TCP a la impresora de
     # cada caja (HU-12.08).
     modo: simulado
+  correo:
+    # HU-08.15: simulado: CanalCorreoSimulado (desarrollo y pruebas, no envía). smtp: el servidor que el
+    # Administrador guarda en Configuración > Correo.
+    modo: simulado
+    # Reintenta los envíos fallidos y envía los que esperaban la certificación; intervalo-ms es la pausa entre rondas.
+    automatico: true
+    intervalo-ms: 60000
+    # asincrono: la factura sale por correo en segundo plano, sin hacer esperar a la venta.
+    envio-inmediato: asincrono

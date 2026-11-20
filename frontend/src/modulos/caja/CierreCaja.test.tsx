@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UsuarioSesion } from '../../api/autenticacion'
 import {
   cerrarCaja,
+  compararCierre,
   listarCierres,
   reimprimirCierre,
   type CierreDeTurno,
@@ -13,7 +14,8 @@ import {
 } from '../../api/turnos'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { FormularioCierre, ListaCierres, PaginaCierreCaja, ResumenCobrado } from './CierreCaja'
+import { FormularioCierre, ListaCierres, PaginaCierreCaja } from './CierreCaja'
+import { ResumenCobrado } from './ResumenCobrado'
 import { confirmacionCierre, diferenciaDeCierre, totalLoteValido } from './textos'
 
 const CAJERO: Partial<UsuarioSesion> = { rol: 'CAJERO', permisos: ['CAJA_OPERAR_PROPIA'], cajaNombre: null }
@@ -40,7 +42,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('cierre de caja (HU-09.08 a HU-09.10)', () => {
+describe('cierre de caja (HU-09.08 a HU-09.11)', () => {
   it('muestra lo cobrado por tarjeta, las anuladas y el total registrado (09.08 crit. 3)', () => {
     const html = renderizar(<ResumenCobrado resumen={RESUMEN} />)
 
@@ -56,6 +58,17 @@ describe('cierre de caja (HU-09.08 a HU-09.10)', () => {
 
     expect(html).toMatch(/<input[^>]*name="totalLote"[^>]*>/)
     expect(html).toContain('Cerrar la caja</button>')
+  })
+
+  it('en cierre ciego no muestra el resumen antes de confirmar el monto (09.11 crit. 1)', () => {
+    const html = renderizar(
+      <FormularioCierre resumen={null} cierreCiego cajaNombre="Caja 1" onCerrada={sinAccion} />,
+    )
+
+    expect(html).not.toContain('Total registrado')
+    expect(html).not.toContain('Q15.00')
+    expect(html).toContain('confirme el total del cierre de lote')
+    expect(html).toContain('Confirmar monto</button>')
   })
 
   it('la diferencia es lote menos registrado, sin errores de redondeo (09.08 crit. 3 y 09.09)', () => {
@@ -91,16 +104,19 @@ describe('cierre de caja (HU-09.08 a HU-09.10)', () => {
   it('cierra, lista y reimprime con las rutas del servidor', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{}', { status: 200 })))
 
+    await compararCierre(18)
     await cerrarCaja(18, ' Un pago repetido ')
     await cerrarCaja(15, '  ')
     await listarCierres()
     await reimprimirCierre(9)
 
     const llamadas = vi.mocked(fetch).mock.calls
-    expect(llamadas[0][0]).toBe('/api/turnos/actual/cerrar')
-    expect(JSON.parse(llamadas[0][1]?.body as string)).toEqual({ totalLote: 18, justificacion: 'Un pago repetido' })
-    expect(JSON.parse(llamadas[1][1]?.body as string)).toEqual({ totalLote: 15, justificacion: null })
-    expect(llamadas[2][0]).toBe('/api/turnos/cierres')
-    expect(llamadas[3][0]).toBe('/api/turnos/9/cierre/reimprimir')
+    expect(llamadas[0][0]).toBe('/api/turnos/actual/cierre/comparar')
+    expect(JSON.parse(llamadas[0][1]?.body as string)).toEqual({ totalLote: 18, justificacion: null })
+    expect(llamadas[1][0]).toBe('/api/turnos/actual/cerrar')
+    expect(JSON.parse(llamadas[1][1]?.body as string)).toEqual({ totalLote: 18, justificacion: 'Un pago repetido' })
+    expect(JSON.parse(llamadas[2][1]?.body as string)).toEqual({ totalLote: 15, justificacion: null })
+    expect(llamadas[3][0]).toBe('/api/turnos/cierres')
+    expect(llamadas[4][0]).toBe('/api/turnos/9/cierre/reimprimir')
   })
 })

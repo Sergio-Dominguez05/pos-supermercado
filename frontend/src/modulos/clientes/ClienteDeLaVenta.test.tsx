@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   asignarClienteAVenta,
   buscarClientePorNit,
+  cambiarCorreoDeFactura,
   claveClienteDeVenta,
   registrarCliente,
   type BusquedaNit,
@@ -12,8 +13,15 @@ import {
   type ClienteDeVenta,
 } from '../../api/clientes'
 import { ATAJOS, ACCIONES_PENDIENTES } from '../../atajos/atajos'
-import { ClienteDeLaVenta, RegistroCliente } from './ClienteDeLaVenta'
-import { avisoBusqueda, CONSUMIDOR_FINAL, describirCliente, nitConGuion } from './textos'
+import { ClienteDeLaVenta, CorreoDeFactura, RegistroCliente } from './ClienteDeLaVenta'
+import {
+  avisoBusqueda,
+  avisoCorreoFactura,
+  CONSUMIDOR_FINAL,
+  correoValido,
+  describirCliente,
+  nitConGuion,
+} from './textos'
 
 const FERRETERIA: Cliente = { id: 5, nit: '5769370', nombre: 'Ferretería El Clavo', direccion: 'Ciudad', correo: null }
 
@@ -37,7 +45,11 @@ afterEach(() => {
 
 describe('cliente de la venta (EP-05)', () => {
   it('cada venta empieza a Consumidor Final y vuelve a CF con un clic (HU-05.01 crit. 1 y 2)', () => {
-    const html = renderizar(<ClienteDeLaVenta ventaId={31} />, { consumidorFinal: true, cliente: null })
+    const html = renderizar(<ClienteDeLaVenta ventaId={31} />, {
+      consumidorFinal: true,
+      cliente: null,
+      correoFactura: null,
+    })
 
     expect(html).toContain(`<strong>${CONSUMIDOR_FINAL}</strong>`)
     expect(html).toContain('data-control="consumidor-final"')
@@ -46,7 +58,11 @@ describe('cliente de la venta (EP-05)', () => {
   })
 
   it('muestra el NIT, el nombre y la dirección del cliente asignado (HU-05.02 crit. 1)', () => {
-    const html = renderizar(<ClienteDeLaVenta ventaId={31} />, { consumidorFinal: false, cliente: FERRETERIA })
+    const html = renderizar(<ClienteDeLaVenta ventaId={31} />, {
+      consumidorFinal: false,
+      cliente: FERRETERIA,
+      correoFactura: null,
+    })
 
     expect(html).toContain('NIT 576937-0 · Ferretería El Clavo · Ciudad')
     expect(describirCliente(null)).toBe('CF · Consumidor Final')
@@ -64,10 +80,11 @@ describe('cliente de la venta (EP-05)', () => {
   })
 
   it('el registro pide el nombre; la dirección y el correo son opcionales (HU-05.05 crit. 1)', () => {
-    const html = renderizar(
-      <RegistroCliente nit="5769370" onRegistrado={sinAccion} onConsumidorFinal={sinAccion} />,
-      { consumidorFinal: true, cliente: null },
-    )
+    const html = renderizar(<RegistroCliente nit="5769370" onRegistrado={sinAccion} onConsumidorFinal={sinAccion} />, {
+      consumidorFinal: true,
+      cliente: null,
+      correoFactura: null,
+    })
 
     expect(campo(html, 'nombreCliente')).toContain('required')
     expect(campo(html, 'direccionCliente')).not.toContain('required')
@@ -78,7 +95,10 @@ describe('cliente de la venta (EP-05)', () => {
   })
 
   it('busca, registra y asigna con las rutas del servidor', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{}', { status: 200 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => new Response('{}', { status: 200 })),
+    )
 
     await buscarClientePorNit(' 576937-0 ')
     await registrarCliente({ nit: '5769370', nombre: 'Ana', direccion: '', correo: '' })
@@ -90,6 +110,52 @@ describe('cliente de la venta (EP-05)', () => {
     expect(llamadas[1][1]).toMatchObject({ method: 'POST' })
     expect(llamadas[2][0]).toBe('/api/ventas/actual/cliente')
     expect(JSON.parse(llamadas[2][1]?.body as string)).toEqual({ clienteId: null })
+  })
+
+  it('dice a dónde se enviará la factura y permite cambiar el correo o no enviarla (HU-05.11 crit. 1 y 4)', () => {
+    const html = renderizar(<ClienteDeLaVenta ventaId={31} />, {
+      consumidorFinal: false,
+      cliente: { ...FERRETERIA, correo: 'ventas@clavo.test' },
+      correoFactura: 'ventas@clavo.test',
+    })
+
+    expect(html).toContain('La factura se enviará a ventas@clavo.test.')
+    expect(html).toContain('>Cambiar correo</button>')
+    expect(html).toContain('data-control="no-enviar-correo"')
+  })
+
+  it('sin correo no insiste: solo ofrece agregarlo (HU-05.11 crit. 2)', () => {
+    const html = renderizar(<CorreoDeFactura correo={null} onCambiado={sinAccion} />, {
+      consumidorFinal: true,
+      cliente: null,
+      correoFactura: null,
+    })
+
+    expect(html).toContain('Sin correo: la factura solo se imprime.')
+    expect(html).toContain('>Agregar correo</button>')
+    expect(html).not.toContain('No enviar')
+    expect(html).not.toContain('role="alert"')
+    expect(avisoCorreoFactura(null)).toBe('Sin correo: la factura solo se imprime.')
+  })
+
+  it('valida la forma del correo como el servidor (HU-05.11 crit. 3)', () => {
+    for (const valido of ['ana@cliente.test', ' ana.lopez@correo.com.gt ']) expect(correoValido(valido)).toBe(true)
+    for (const invalido of ['ana', 'ana@cliente', 'ana @cliente.test', '@cliente.test', ''])
+      expect(correoValido(invalido)).toBe(false)
+  })
+
+  it('guarda el correo de la factura con la ruta del servidor (HU-05.11)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => new Response('{}', { status: 200 })),
+    )
+
+    await cambiarCorreoDeFactura('  ana@cliente.test ')
+
+    const [ruta, opciones] = vi.mocked(fetch).mock.calls[0]
+    expect(ruta).toBe('/api/ventas/actual/cliente/correo')
+    expect(opciones).toMatchObject({ method: 'PUT' })
+    expect(JSON.parse(opciones?.body as string)).toEqual({ correo: 'ana@cliente.test' })
   })
 
   it('F6 ya no está pendiente: lleva al NIT del cliente (HU-06.17)', () => {

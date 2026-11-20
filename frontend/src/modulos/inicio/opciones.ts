@@ -13,11 +13,17 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR', ruta: '/venta' },
   // HU-09.08 a 09.10: cerrar la caja propia y reimprimir los cierres.
   { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA', ruta: '/caja' },
-  { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR' },
+  // HU-09.12: cerrar el turno que otro usuario dejó abierto (Supervisor y Administrador).
+  { etiqueta: 'Cerrar caja de otro usuario', permiso: 'CAJA_CERRAR_OTRA', ruta: '/caja/turnos' },
+  // HU-09.13: los cierres anteriores de todas las cajas, con filtros (Supervisor y Administrador).
+  { etiqueta: 'Cierres de caja', permiso: 'CAJA_VER_CIERRES', ruta: '/caja/cierres' },
+  { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR', ruta: '/clientes' },
   // HU-08.12 crit. 2: buscar y reimprimir facturas (el cajero, las de su turno).
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR', ruta: '/facturas' },
   // HU-08.06 crit. 3: las ventas pendientes de facturar, para quien gestiona facturas (Supervisor y Administrador).
   { etiqueta: 'Facturas rechazadas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/rechazadas' },
+  // HU-08.13 y 08.14: el historial de facturas con su detalle (Supervisor y Administrador).
+  { etiqueta: 'Historial de facturas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/historial' },
   // HU-08.10: buscar y anular facturas (Supervisor y Administrador).
   { etiqueta: 'Anular facturas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/anular' },
   // HU-08.08 y 08.09: los comprobantes en contingencia.
@@ -28,6 +34,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR', ruta: '/reportes' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
+  // HU-01.10: los permisos del Supervisor y del Cajero (solo el Administrador).
+  { etiqueta: 'Permisos por rol', permiso: 'PERMISO_CONFIGURAR', ruta: '/permisos' },
   // La configuración abre en las cajas (HU-12.05); desde ahí se llega al emisor (HU-12.01), al establecimiento
   // (HU-12.02) y a la conexión FEL (HU-12.03). El resto de EP-12 se agrega a NavConfiguracion.
   { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR', ruta: '/configuracion/cajas' },

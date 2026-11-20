@@ -3,6 +3,9 @@ package gt.supermercado.pos.caja.aplicacion;
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.EstadoTurno;
+import gt.supermercado.pos.caja.dominio.FiltrosCierres;
+import gt.supermercado.pos.caja.dominio.OpcionFiltro;
+import gt.supermercado.pos.caja.dominio.PaginaCierres;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
@@ -35,10 +38,10 @@ class GestionTurnosTest {
     /** Ventas suspendidas por turno, como las cuenta el módulo de ventas (HU-06.12 crit. 4). */
     private final Map<Long, Integer> suspendidas = new HashMap<>();
     // exigirTurnoAbierto no consulta las cajas ni escribe en la bitácora.
-    private final GestionTurnos gestion = new GestionTurnos(turnos, null,
+    private final GestionTurnos gestion = new GestionTurnos(turnos, null, null,
             turnoId -> suspendidas.getOrDefault(turnoId, 0), new Bitacora(evento -> {
         throw new AssertionError("No debe registrar en la bitácora: " + evento);
-    }));
+    }), null);
 
     @Test
     void conElTurnoPropioAbiertoDevuelveEseTurnoParaAsociarleLaVenta() {   // crit. 2
@@ -119,6 +122,26 @@ class GestionTurnosTest {
         @Override
         public Optional<Turno> abiertoEnCaja(long cajaId) {
             return abiertos.stream().filter(t -> t.cajaId() == cajaId).findFirst();
+        }
+
+        @Override
+        public List<Turno> abiertos() {
+            return List.copyOf(abiertos);
+        }
+
+        @Override
+        public PaginaCierres buscarCierres(FiltrosCierres filtros) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<OpcionFiltro> cajasConCierres() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<OpcionFiltro> cajerosConCierres() {
+            throw new UnsupportedOperationException();
         }
 
         @Override

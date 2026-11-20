@@ -41,16 +41,21 @@ class RepositorioFacturasJdbc implements RepositorioFacturas {
 
     @Override
     @Transactional
-    public long registrar(DatosDte datos, String xmlEnviado) {
+    public long registrar(DatosDte datos, String xmlEnviado, String correo) {
         Long id = jdbc.queryForObject("""
-                INSERT INTO factura (venta_id, receptor_tipo, receptor_id, receptor_nombre, emisor_snapshot, emitida_en,
-                                     xml_enviado)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?)
+                INSERT INTO factura (venta_id, receptor_tipo, receptor_id, receptor_nombre, receptor_correo,
+                                     emisor_snapshot, emitida_en, xml_enviado)
+                VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?)
                 RETURNING id""", Long.class, datos.venta().id(), datos.receptor().tipo().name(),
-                datos.receptor().identificacion(), datos.receptor().nombre(),
+                datos.receptor().identificacion(), datos.receptor().nombre(), correo,
                 json.writeValueAsString(copiaDelEmisor(datos.emisor(), datos.establecimiento())), datos.emitidaEn(),
                 xmlEnviado);
         jdbc.update("INSERT INTO tarea_pendiente (tipo, factura_id) VALUES ('CERTIFICAR', ?)", id);
+        if (correo != null) {
+            // HU-08.15 crit. 1: se envía apenas se certifique (sin la espera de la tarea de certificar).
+            jdbc.update("INSERT INTO tarea_pendiente (tipo, factura_id, proximo_intento) VALUES ('ENVIAR_CORREO', ?, now())",
+                    id);
+        }
         return id;
     }
 

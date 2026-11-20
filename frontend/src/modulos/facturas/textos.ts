@@ -41,3 +41,28 @@ const fechaCorta = (dia: string) => {
   const [anio, mes, d] = dia.split('-')
   return `${d}/${mes}/${anio}`
 }
+
+// Historial y detalle (HU-08.13 y HU-08.14).
+
+/** Crit. 1: el estado en palabras. */
+export const ESTADOS_DE_FACTURA: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
+  CERTIFICADA: 'Certificada',
+  CONTINGENCIA: 'En contingencia',
+  RECHAZADA: 'Rechazada',
+  ANULADA: 'Anulada',
+}
+
+/** Serie y número; en contingencia, el número de acceso (HU-08.07); si aún no hay ninguno, un guion. */
+export const numeroDeFactura = (factura: { serie: string | null; numero: string | null; numeroAcceso: number | null }) =>
+  factura.serie && factura.numero
+    ? `${factura.serie}-${factura.numero}`
+    : factura.numeroAcceso
+      ? `Acceso ${factura.numeroAcceso}`
+      : '—'
+
+/** "Mostrando 1–50 de 52 facturas". */
+export const rotuloPagina = (pagina: number, tamano: number, total: number, enPagina: number) =>
+  total === 0
+    ? 'No hay facturas con estos filtros.'
+    : `Mostrando ${pagina * tamano + 1}–${pagina * tamano + enPagina} de ${total} ${total === 1 ? 'factura' : 'facturas'}`

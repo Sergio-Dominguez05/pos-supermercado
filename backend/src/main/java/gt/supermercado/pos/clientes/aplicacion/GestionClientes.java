@@ -4,7 +4,10 @@ import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.clientes.dominio.Cliente;
+import gt.supermercado.pos.clientes.dominio.FiltroClientes;
+import gt.supermercado.pos.clientes.dominio.PaginaClientes;
 import gt.supermercado.pos.clientes.dominio.RepositorioClientes;
+import gt.supermercado.pos.compartido.dominio.Correo;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.Nit;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
@@ -37,7 +40,7 @@ import java.util.regex.Pattern;
  *   <li>HU-05.05: el registro pide NIT y nombre; la dirección es "Ciudad" si no se indica y el correo es opcional.
  *       Un NIT ya registrado no se duplica. Queda en la bitácora con quien lo registró.</li>
  * </ul>
- * El CUI (HU-05.06), el límite para CF (HU-05.07) y la edición y lista de clientes (HU-05.09 y 05.10) llegan después.
+ * El CUI (HU-05.06), el límite para CF (HU-05.07) y la edición de clientes (HU-05.09) llegan después.
  */
 @Service
 public class GestionClientes {
@@ -77,6 +80,12 @@ public class GestionClientes {
     public record BusquedaNit(Origen origen, String nit, Cliente cliente, String mensaje) {}
 
     public record SolicitudCliente(String nit, String nombre, String direccion, String correo) {}
+
+    /** HU-05.10: clientes registrados, con búsqueda y paginación. */
+    @Transactional(readOnly = true)
+    public PaginaClientes listar(FiltroClientes filtro) {
+        return clientes.listar(filtro);
+    }
 
     @Transactional
     public BusquedaNit buscar(String nit, SesionActiva sesion) {
@@ -135,21 +144,51 @@ public class GestionClientes {
         return registrar(nit, nombre, direccion, correo, sesion, "registrado por el cajero");
     }
 
-    /** El cliente de la venta en curso, o vacío si es a Consumidor Final. */
+    /**
+     * El cliente de la venta en curso (vacío si es a Consumidor Final) y el correo al que se le enviará la factura
+     * (HU-05.11), que puede faltar.
+     */
+    public record ClienteYCorreo(Optional<Cliente> cliente, String correoFactura) {}
+
     @Transactional(readOnly = true)
-    public Optional<Cliente> deLaVentaActual(SesionActiva sesion) {
-        return ventas.actual(sesion).flatMap(venta -> clientes.deLaVenta(venta.id()));
+    public ClienteYCorreo deLaVentaActual(SesionActiva sesion) {
+        return ventas.actual(sesion)
+                .map(venta -> new ClienteYCorreo(clientes.deLaVenta(venta.id()),
+                        ventas.correoFactura(venta.id()).orElse(null)))
+                .orElseGet(() -> new ClienteYCorreo(Optional.empty(), null));
     }
 
-    /** Asigna el cliente a la venta en curso; {@code null} vuelve a Consumidor Final (HU-05.01 crit. 2). */
+    /**
+     * Asigna el cliente a la venta en curso; {@code null} vuelve a Consumidor Final (HU-05.01 crit. 2). HU-05.11 crit.
+     * 4: la factura se enviará al correo del cliente, si lo tiene; a Consumidor Final, a ninguno.
+     */
     @Transactional
-    public Optional<Cliente> asignar(Long clienteId, SesionActiva sesion) {
+    public ClienteYCorreo asignar(Long clienteId, SesionActiva sesion) {
         Optional<Cliente> cliente = clienteId == null
                 ? Optional.empty()
                 : Optional.of(clientes.porId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException(
                         "CLIENTE_NO_ENCONTRADO", "El cliente no existe.")));
         ventas.asignarCliente(sesion, clienteId);
-        return cliente;
+        String correo = cliente.map(Cliente::correo).orElse(null);
+        ventas.asignarCorreoFactura(sesion, correo);
+        return new ClienteYCorreo(cliente, correo);
+    }
+
+    /**
+     * HU-05.11 crit. 1 a 3: el cajero agrega, cambia o quita el correo al que se envía la factura de la venta en curso.
+     * Vacío no envía la factura (crit. 2: es opcional, sin avisos). Con un cliente asignado, el correo nuevo también
+     * queda en el cliente para sus próximas compras; quitarlo de la venta no lo borra del cliente.
+     */
+    @Transactional
+    public ClienteYCorreo cambiarCorreoFactura(String correo, SesionActiva sesion) {
+        String nuevo = Correo.opcional(correo, "CORREO_INVALIDO").orElse(null);
+        long ventaId = ventas.asignarCorreoFactura(sesion, nuevo).id();
+        Optional<Cliente> cliente = clientes.deLaVenta(ventaId);
+        if (nuevo != null && cliente.isPresent() && !nuevo.equalsIgnoreCase(String.valueOf(cliente.get().correo()))) {
+            clientes.cambiarCorreo(cliente.get().id(), nuevo);
+            cliente = clientes.porId(cliente.get().id());
+        }
+        return new ClienteYCorreo(cliente, nuevo);
     }
 
     /**

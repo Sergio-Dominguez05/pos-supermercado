@@ -29,8 +29,6 @@ class CatalogoAccionesSensiblesTest {
      * {@link AccionesSensiblesIntegracionTest}.
      */
     static final Map<AccionSensible, String> PENDIENTES = Map.ofEntries(
-            entry(PERMISOS_MODIFICADOS, "HU-01.10"),
-            entry(TURNO_CERRADO_POR_SUPERVISOR, "HU-09.12"),
             entry(CATALOGO_CARGADO, "HU-03.05"));
 
     private static final Set<String> MODULOS = Set.of(

@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { ErrorDeApi } from '../../api/cliente'
 import {
   cerrarCaja,
+  claveResumenTurno,
   CLAVE_CIERRES,
   CLAVE_RESUMEN_CIERRE,
   CLAVE_TURNO_ACTUAL,
+  CLAVE_TURNOS_ABIERTOS,
+  compararCierre,
   listarCierres,
   obtenerResumenCierre,
   reimprimirCierre,
@@ -15,7 +19,9 @@ import {
 } from '../../api/turnos'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
+import { ResumenCobrado } from './ResumenCobrado'
 import { confirmacionCierre, diferenciaDeCierre, totalLoteValido } from './textos'
+import { ResumenTurnosAbiertos } from './ResumenTurnos'
 import { useTurnoActual } from './turno'
 
 const fecha = (iso: string) => new Date(iso).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })
@@ -33,6 +39,7 @@ export function PaginaCierreCaja() {
       <p className="subtitulo">
         <Link to="/inicio">Inicio</Link> · Caja {usuario.cajaNombre ? `· ${usuario.cajaNombre}` : ''}
       </p>
+      <ResumenTurnosAbiertos />
       {hecho ? (
         <CierreTerminado hecho={hecho} />
       ) : turno?.propio ? (
@@ -49,7 +56,14 @@ function CargaResumen({ cajaNombre, onCerrada }: { cajaNombre: string; onCerrada
   const { data, error, isPending } = useQuery({ queryKey: CLAVE_RESUMEN_CIERRE, queryFn: obtenerResumenCierre })
   if (isPending) return <p className="tarjeta">Calculando lo cobrado en el turno…</p>
   if (error) return <p className="tarjeta error">{error.message}</p>
-  return <FormularioCierre resumen={data} cajaNombre={cajaNombre} onCerrada={onCerrada} />
+  return (
+    <FormularioCierre
+      resumen={data.resumen}
+      cierreCiego={data.cierreCiego}
+      cajaNombre={cajaNombre}
+      onCerrada={onCerrada}
+    />
+  )
 }
 
 /**
@@ -59,37 +73,70 @@ function CargaResumen({ cajaNombre, onCerrada }: { cajaNombre: string; onCerrada
  */
 export function FormularioCierre({
   resumen,
+  cierreCiego = false,
   cajaNombre,
   onCerrada,
+  titulo = 'Cerrar la caja',
+  cerrar = cerrarCaja,
 }: {
-  resumen: ResumenDeTurno
+  resumen: ResumenDeTurno | null
+  cierreCiego?: boolean
   cajaNombre: string
   onCerrada: (hecho: CierreHecho) => void
+  /** HU-09.12: el supervisor usa el mismo formulario para cerrar el turno de otro usuario. */
+  titulo?: string
+  cerrar?: (totalLote: number, justificacion: string) => Promise<CierreHecho>
 }) {
   const clienteConsultas = useQueryClient()
   const [lote, setLote] = useState('')
   const [justificacion, setJustificacion] = useState('')
+  const [comparacion, setComparacion] = useState<{
+    totalLote: number
+    resumen: ResumenDeTurno
+    diferencia: number
+  }>()
   const valido = totalLoteValido(lote)
-  const diferencia = valido ? diferenciaDeCierre(Number(lote), resumen.totalRegistrado) : 0
+  const comparacionActual = comparacion?.totalLote === Number(lote) ? comparacion : undefined
+  const resumenVisible = comparacionActual?.resumen ?? resumen
+  const diferencia = comparacionActual?.diferencia
+    ?? (valido && resumenVisible ? diferenciaDeCierre(Number(lote), resumenVisible.totalRegistrado) : 0)
+  const comparar = useMutation({
+    mutationFn: compararCierre,
+    onSuccess: (resultado, totalLote) => setComparacion({ totalLote, ...resultado }),
+  })
   const cierre = useMutation({
-    mutationFn: () => cerrarCaja(Number(lote), justificacion),
+    mutationFn: ({ totalLote, motivo }: { totalLote: number; motivo: string }) => cerrar(totalLote, motivo),
     onSuccess: async (hecho) => {
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_TURNO_ACTUAL })
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_CIERRES })
+      await clienteConsultas.invalidateQueries({ queryKey: CLAVE_TURNOS_ABIERTOS })
+      clienteConsultas.removeQueries({ queryKey: claveResumenTurno(hecho.comprobante.cierre.turnoId) })
       onCerrada(hecho)
+    },
+    onError: (error, solicitud) => {
+      if (cierreCiego && error instanceof ErrorDeApi && error.codigo === 'JUSTIFICACION_REQUERIDA') {
+        comparar.mutate(solicitud.totalLote)
+      }
     },
   })
 
   return (
-    <section className="tarjeta formulario" aria-label="Cerrar la caja">
-      <h2>Cerrar la caja</h2>
-      <ResumenCobrado resumen={resumen} />
+    <section className="tarjeta formulario" aria-label={titulo}>
+      <h2>{titulo}</h2>
+      {resumenVisible ? <ResumenCobrado resumen={resumenVisible} /> : (
+        <p>Ingrese y confirme el total del cierre de lote para compararlo con lo registrado en el POS.</p>
+      )}
       <form
         className="formulario"
         onSubmit={(evento) => {
           evento.preventDefault()
-          if (!valido || !window.confirm(confirmacionCierre(cajaNombre, diferencia))) return
-          cierre.mutate()
+          if (!valido) return
+          if (cierreCiego && !comparacionActual) {
+            comparar.mutate(Number(lote))
+            return
+          }
+          if (!window.confirm(confirmacionCierre(cajaNombre, diferencia))) return
+          cierre.mutate({ totalLote: Number(lote), motivo: justificacion })
         }}
       >
         <label>
@@ -100,17 +147,22 @@ export function FormularioCierre({
             inputMode="decimal"
             pattern="[0-9]+(\.[0-9]{1,2})?"
             placeholder="0.00"
+            disabled={cierre.isPending || comparar.isPending}
             value={lote}
-            onChange={(evento) => setLote(evento.target.value)}
+            onChange={(evento) => {
+              setLote(evento.target.value)
+              setComparacion(undefined)
+              setJustificacion('')
+            }}
           />
         </label>
-        {valido && (
+        {valido && resumenVisible && (
           <p className={diferencia === 0 ? 'exito' : 'error'} role="status">
             Diferencia: {formatoQuetzales(diferencia)}
             {diferencia === 0 ? ' (coincide con lo registrado)' : ''}
           </p>
         )}
-        {valido && diferencia !== 0 && (
+        {valido && resumenVisible && diferencia !== 0 && (
           <label>
             Justificación de la diferencia
             <textarea
@@ -128,42 +180,18 @@ export function FormularioCierre({
             {cierre.error.message}
           </p>
         )}
-        <button type="submit" disabled={cierre.isPending || !valido}>
-          {cierre.isPending ? 'Cerrando…' : 'Cerrar la caja'}
+        {comparar.error && <p className="error" role="alert">{comparar.error.message}</p>}
+        <button type="submit" disabled={cierre.isPending || comparar.isPending || !valido}>
+          {comparar.isPending ? 'Comparando…'
+            : cierre.isPending ? 'Cerrando…'
+              : cierreCiego && !comparacionActual ? 'Confirmar monto' : 'Cerrar la caja'}
         </button>
       </form>
     </section>
   )
 }
 
-export function ResumenCobrado({ resumen }: { resumen: ResumenDeTurno }) {
-  return (
-    <dl className="resumen">
-      <dt>Ventas</dt>
-      <dd>{resumen.ventas}</dd>
-      <dt>Tarjeta de débito</dt>
-      <dd>{formatoQuetzales(resumen.debito)}</dd>
-      <dt>Tarjeta de crédito</dt>
-      <dd>{formatoQuetzales(resumen.credito)}</dd>
-      <dt>Facturas anuladas ({resumen.anuladas})</dt>
-      <dd>{formatoQuetzales(resumen.totalAnulado)}</dd>
-      <dt>
-        <strong>Total registrado</strong>
-      </dt>
-      <dd>
-        <strong>{formatoQuetzales(resumen.totalRegistrado)}</strong>
-      </dd>
-      {resumen.contingencias > 0 && (
-        <>
-          <dt>En contingencia</dt>
-          <dd>{resumen.contingencias} por certificar</dd>
-        </>
-      )}
-    </dl>
-  )
-}
-
-function CierreTerminado({ hecho }: { hecho: CierreHecho }) {
+export function CierreTerminado({ hecho }: { hecho: CierreHecho }) {
   const { cierre } = hecho.comprobante
   return (
     <section className="tarjeta" aria-label="Cierre terminado">

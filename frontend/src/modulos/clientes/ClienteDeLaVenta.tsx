@@ -3,14 +3,23 @@ import { useState } from 'react'
 import {
   asignarClienteAVenta,
   buscarClientePorNit,
+  cambiarCorreoDeFactura,
   claveClienteDeVenta,
   obtenerClienteDeVenta,
   registrarCliente,
   type BusquedaNit,
   type Cliente,
+  type ClienteDeVenta,
 } from '../../api/clientes'
 import { nitValido, normalizarNit } from './nit'
-import { avisoBusqueda, describirCliente, NIT_CLIENTE_INVALIDO } from './textos'
+import {
+  avisoBusqueda,
+  avisoCorreoFactura,
+  CORREO_INVALIDO,
+  correoValido,
+  describirCliente,
+  NIT_CLIENTE_INVALIDO,
+} from './textos'
 
 /**
  * EP-05: el cliente de la venta en curso.
@@ -19,6 +28,7 @@ import { avisoBusqueda, describirCliente, NIT_CLIENTE_INVALIDO } from './textos'
  * - HU-05.03: un NIT mal escrito se avisa y no se usa.
  * - HU-05.04: un NIT nuevo se consulta al certificador; si no aparece o no responde, se escribe el nombre o se usa CF.
  * - HU-05.05: el cliente nuevo se registra sin salir de la venta (dirección "Ciudad" si se deja vacía).
+ * - HU-05.11: el correo al que se envía la factura (HU-08.15), opcional.
  * F6 lleva al campo del NIT (HU-06.17).
  */
 export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
@@ -67,6 +77,13 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
       <p>
         <strong>{describirCliente(data?.cliente ?? null)}</strong>
       </p>
+      {data && (
+        <CorreoDeFactura
+          key={data.correoFactura ?? ''}
+          correo={data.correoFactura}
+          onCambiado={(actual) => clienteConsultas.setQueryData(clave, actual)}
+        />
+      )}
       <form
         className="en-linea"
         onSubmit={(evento) => {
@@ -119,6 +136,87 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
         />
       )}
     </section>
+  )
+}
+
+/**
+ * HU-05.11: crit. 1, el correo se agrega o se cambia durante la venta; crit. 2, es opcional y no se insiste; crit. 3,
+ * se valida su forma; crit. 4, si hay correo se avisa que la factura se enviará, con la opción de no enviarla.
+ */
+export function CorreoDeFactura({
+  correo,
+  onCambiado,
+}: {
+  correo: string | null
+  onCambiado: (actual: ClienteDeVenta) => void
+}) {
+  const [editando, setEditando] = useState(false)
+  const [escrito, setEscrito] = useState(correo ?? '')
+  const [problema, setProblema] = useState<string>()
+  const cambio = useMutation({
+    mutationFn: cambiarCorreoDeFactura,
+    onSuccess: (actual) => {
+      setEditando(false)
+      onCambiado(actual)
+    },
+  })
+
+  if (!editando)
+    return (
+      <p className="correo-factura">
+        <span role="status">{avisoCorreoFactura(correo)}</span>{' '}
+        <button type="button" data-control="editar-correo" onClick={() => setEditando(true)}>
+          {correo ? 'Cambiar correo' : 'Agregar correo'}
+        </button>
+        {correo && (
+          <button
+            type="button"
+            data-control="no-enviar-correo"
+            disabled={cambio.isPending}
+            onClick={() => cambio.mutate('')}
+          >
+            No enviar
+          </button>
+        )}
+      </p>
+    )
+  return (
+    <form
+      className="en-linea"
+      onSubmit={(evento) => {
+        evento.preventDefault()
+        if (escrito.trim() !== '' && !correoValido(escrito)) {
+          setProblema(CORREO_INVALIDO)
+          return
+        }
+        setProblema(undefined)
+        cambio.mutate(escrito)
+      }}
+    >
+      <label>
+        Correo para la factura
+        <input
+          name="correoFactura"
+          type="email"
+          maxLength={254}
+          autoComplete="off"
+          placeholder="cliente@correo.com"
+          value={escrito}
+          onChange={(evento) => setEscrito(evento.target.value)}
+        />
+      </label>
+      <button type="submit" disabled={cambio.isPending}>
+        {cambio.isPending ? 'Guardando…' : 'Guardar'}
+      </button>
+      <button type="button" onClick={() => setEditando(false)}>
+        Cancelar
+      </button>
+      {(problema ?? cambio.error) && (
+        <p className="error" role="alert">
+          {problema ?? cambio.error?.message}
+        </p>
+      )}
+    </form>
   )
 }
 

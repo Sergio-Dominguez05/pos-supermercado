@@ -5,16 +5,24 @@ import { BuscarProducto } from './modulos/catalogo/BuscarProducto'
 import { EditarProducto } from './modulos/catalogo/EditarProducto'
 import { ListaProductos } from './modulos/catalogo/ListaProductos'
 import { NuevoProducto } from './modulos/catalogo/NuevoProducto'
+import { ListaClientes } from './modulos/clientes/ListaClientes'
 import { PaginaConexionFel } from './modulos/configuracion/ConexionFel'
 import { PaginaEmisor } from './modulos/configuracion/DatosEmisor'
 import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimiento'
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
+import { PaginaParametrosOperacion } from './modulos/configuracion/ParametrosOperacion'
+import { PaginaServidorCorreo } from './modulos/configuracion/ServidorCorreo'
 import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
+import { PaginaConsultaCierres, PaginaDetalleCierre } from './modulos/caja/ConsultaCierres'
+import { PaginaTurnosAbiertos } from './modulos/caja/TurnosAbiertos'
+import { PaginaPermisos } from './modulos/usuarios/PermisosPorRol'
 import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
 import { PaginaContingencia } from './modulos/facturas/Contingencia'
 import { PaginaFacturas } from './modulos/facturas/Facturas'
 import { PaginaFacturasRechazadas } from './modulos/facturas/FacturasRechazadas'
+import { PaginaDetalleFactura } from './modulos/facturas/DetalleFactura'
+import { PaginaHistorialFacturas } from './modulos/facturas/HistorialFacturas'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
 import { CambioCredencial } from './modulos/login/CambioCredencial'
@@ -113,10 +121,58 @@ export default function App() {
             }
           />
           <Route
+            path="/configuracion/correo"
+            element={
+              <RutaProtegida>
+                <PaginaServidorCorreo />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/parametros"
+            element={
+              <RutaProtegida>
+                <PaginaParametrosOperacion />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja/cierres"
+            element={
+              <RutaProtegida>
+                <PaginaConsultaCierres />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja/cierres/:turnoId"
+            element={
+              <RutaProtegida>
+                <PaginaDetalleCierre />
+              </RutaProtegida>
+            }
+          />
+          <Route
             path="/caja"
             element={
               <RutaProtegida>
                 <PaginaCierreCaja />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja/turnos"
+            element={
+              <RutaProtegida>
+                <PaginaTurnosAbiertos />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/permisos"
+            element={
+              <RutaProtegida>
+                <PaginaPermisos />
               </RutaProtegida>
             }
           />
@@ -141,6 +197,22 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaAnularFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/historial"
+            element={
+              <RutaProtegida>
+                <PaginaHistorialFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/:facturaId"
+            element={
+              <RutaProtegida>
+                <PaginaDetalleFactura />
               </RutaProtegida>
             }
           />
@@ -197,6 +269,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <Bitacora />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/clientes"
+            element={
+              <RutaProtegida>
+                <ListaClientes />
               </RutaProtegida>
             }
           />

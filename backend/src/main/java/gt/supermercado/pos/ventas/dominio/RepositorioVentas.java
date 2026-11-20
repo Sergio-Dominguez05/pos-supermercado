@@ -65,6 +65,12 @@ public interface RepositorioVentas {
     /** EP-05: el cliente de la venta en curso; {@code null} es Consumidor Final. Falso si ya no está en curso. */
     boolean asignarCliente(long ventaId, Long clienteId);
 
+    /** HU-05.11: el correo para la factura de la venta en curso; {@code null} no la envía. Falso si ya no está en curso. */
+    boolean asignarCorreoFactura(long ventaId, String correo);
+
+    /** HU-05.11: el correo para la factura de la venta, si tiene. */
+    Optional<String> correoFactura(long ventaId);
+
     /** HU-08.06: el cliente de una venta finalizada, al corregir su factura rechazada. Falso si no está finalizada. */
     boolean corregirCliente(long ventaId, Long clienteId);
 

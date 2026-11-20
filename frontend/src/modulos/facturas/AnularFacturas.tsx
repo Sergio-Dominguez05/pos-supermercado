@@ -96,7 +96,10 @@ function FilaFactura({ factura, onAnulada }: { factura: FacturaEmitida; onAnulad
   return (
     <tr>
       <td>
-        {factura.serie}-{factura.numero}
+        {/* HU-08.14: el detalle de la factura. */}
+        <Link to={`/facturas/${factura.facturaId}`}>
+          {factura.serie}-{factura.numero}
+        </Link>
       </td>
       <td>
         <small>{factura.autorizacion.toUpperCase()}</small>

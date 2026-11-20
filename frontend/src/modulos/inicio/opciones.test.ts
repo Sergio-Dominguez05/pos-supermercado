@@ -44,6 +44,12 @@ describe('opciones del menú por rol', () => {
     ])
   })
 
+  it('la opción Clientes lleva a la lista de clientes (HU-05.10)', () => {
+    expect(opcionesPara(['CLIENTE_GESTIONAR'])).toEqual([
+      expect.objectContaining({ etiqueta: 'Clientes', ruta: '/clientes' }),
+    ])
+  })
+
   it('la opción Reportes lleva a los reportes, solo con su permiso (HU-10.15 crit. 1 y 2)', () => {
     expect(opcionesPara(['REPORTE_CONSULTAR'])).toEqual([
       expect.objectContaining({ etiqueta: 'Reportes', ruta: '/reportes' }),

@@ -25,6 +25,8 @@ export interface BusquedaNit {
 export interface ClienteDeVenta {
   consumidorFinal: boolean
   cliente: Cliente | null
+  /** HU-05.11: a dónde se enviará la factura (HU-08.15); `null` si no se envía. */
+  correoFactura: string | null
 }
 
 export interface DatosCliente {
@@ -32,6 +34,40 @@ export interface DatosCliente {
   nombre: string
   direccion: string
   correo: string
+}
+
+/** HU-05.10: cliente mostrado en el directorio. */
+export interface ClienteListado {
+  id: number
+  tipoIdentificacion: 'NIT' | 'CUI'
+  identificacion: string
+  nombre: string
+  direccion: string
+  correo: string | null
+  ultimaCompra: string | null
+}
+
+export interface FiltroClientes {
+  q: string
+  pagina: number
+}
+
+export const FILTRO_CLIENTES_INICIAL: FiltroClientes = { q: '', pagina: 0 }
+
+export interface PaginaClientes {
+  clientes: ClienteListado[]
+  pagina: number
+  tamano: number
+  total: number
+}
+
+export const claveListaClientes = (filtro: FiltroClientes) => ['clientes', 'lista', filtro] as const
+
+export function listarClientes(filtro: FiltroClientes) {
+  const parametros = new URLSearchParams()
+  if (filtro.q.trim()) parametros.set('q', filtro.q.trim())
+  if (filtro.pagina > 0) parametros.set('pagina', String(filtro.pagina))
+  return pedir<PaginaClientes>(`/api/clientes?${parametros}`)
 }
 
 export const claveClienteDeVenta = (ventaId: number) => ['ventas', ventaId, 'cliente'] as const
@@ -47,3 +83,13 @@ export const obtenerClienteDeVenta = () => pedir<ClienteDeVenta>('/api/ventas/ac
 /** Asigna el cliente a la venta en curso; `null` vuelve a Consumidor Final (HU-05.01 crit. 2). */
 export const asignarClienteAVenta = (clienteId: number | null) =>
   pedir<ClienteDeVenta>('/api/ventas/actual/cliente', { method: 'PUT', body: JSON.stringify({ clienteId }) })
+
+/**
+ * HU-05.11: el correo para la factura de la venta en curso; vacío no la envía. Con cliente, también queda en el
+ * cliente. 422 `CORREO_INVALIDO` si no tiene la forma nombre@dominio.com.
+ */
+export const cambiarCorreoDeFactura = (correo: string) =>
+  pedir<ClienteDeVenta>('/api/ventas/actual/cliente/correo', {
+    method: 'PUT',
+    body: JSON.stringify({ correo: correo.trim() }),
+  })
