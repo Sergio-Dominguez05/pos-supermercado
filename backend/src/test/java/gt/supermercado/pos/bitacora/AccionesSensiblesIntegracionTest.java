@@ -273,6 +273,12 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(TURNO_ABIERTO, true, id));
         assertThat(registrosDe(() -> enviar("/api/turnos", "POST", null, sesion)))
                 .containsExactly(new Registro(TURNO_ABIERTO, false, id));   // ya tiene el turno abierto
+
+        // HU-09.08 crit. 6: el cierre de su caja, rechazado (sin el total del lote) y hecho.
+        assertThat(registrosDe(() -> enviar("/api/turnos/actual/cerrar", "POST", "{\"totalLote\":null}", sesion)))
+                .containsExactly(new Registro(TURNO_CERRADO, false, id));
+        assertThat(registrosDe(() -> enviar("/api/turnos/actual/cerrar", "POST", "{\"totalLote\":0}", sesion)))
+                .containsExactly(new Registro(TURNO_CERRADO, true, id));
     }
 
     // Ventas

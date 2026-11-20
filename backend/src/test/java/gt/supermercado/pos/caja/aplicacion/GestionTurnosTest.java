@@ -1,6 +1,7 @@
 package gt.supermercado.pos.caja.aplicacion;
 
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
+import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.EstadoTurno;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
@@ -9,6 +10,7 @@ import gt.supermercado.pos.seguridad.dominio.Rol;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -126,6 +128,22 @@ class GestionTurnosTest {
 
         @Override
         public long abrir(long cajaId, long usuarioId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean cerrar(long turnoId, long cerradoPor, BigDecimal totalRegistrado,
+                              BigDecimal totalLote, BigDecimal diferencia, String justificacion) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<CierreDeTurno> cierre(long turnoId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<CierreDeTurno> cierres(Long usuarioId, int limite) {
             throw new UnsupportedOperationException();
         }
     }

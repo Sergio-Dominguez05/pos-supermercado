@@ -53,7 +53,7 @@ public enum AccionSensible {
 
     // Caja
     TURNO_ABIERTO(Categoria.CAJA, "caja"),
-    /** Pendiente: HU-09.08. */
+    /** El cajero cierra su caja con el cierre de lote y la diferencia; también el intento rechazado (HU-09.08). */
     TURNO_CERRADO(Categoria.CAJA, "caja"),
     /** Un supervisor cierra la caja de otro usuario. Pendiente: HU-09.12. */
     TURNO_CERRADO_POR_SUPERVISOR(Categoria.CAJA, "caja"),
