@@ -136,6 +136,75 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void resumePorCajeroLasVentasLasCanceladasLasLineasEliminadasYLasAnuladas() throws Exception {   // HU-10.03 crit. 1
+        Caja caja = caja();
+        long venta = caja.venta("FINALIZADA", "2025-06-02T15:00:00Z", "100.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-06-02T16:00:00Z", "50.00", null);
+        caja.venta("FINALIZADA", "2025-06-03T16:00:00Z", "30.00", "ANULADA");
+        caja.venta("CANCELADA", "2025-06-03T17:00:00Z", "20.00", null);       // por la fecha en que se inició
+        caja.venta("CANCELADA", "2025-07-03T17:00:00Z", "20.00", null);       // fuera del período
+        caja.lineaEliminada(venta, "2025-06-02T14:59:00Z");
+        caja.lineaEliminada(venta, "2025-06-02T14:59:30Z");
+        Caja otro = caja.conOtroCajero();
+        otro.venta("CANCELADA", "2025-06-04T17:00:00Z", "20.00", null);   // solo tiene una cancelada: también aparece
+
+        JsonNode reporte = ok(get("/api/reportes/cajeros?desde=2025-06-01&hasta=2025-06-30&cajaId=" + caja.id));
+
+        List<JsonNode> filas = filas(reporte);
+        assertThat(filas).hasSize(2);
+        JsonNode primero = filas.stream().filter(f -> f.get("cajeroId").asLong() == caja.cajeroId).findFirst()
+                .orElseThrow();
+        assertThat(primero.get("cajero").asString()).isEqualTo("Usuario " + caja.cajero + " (" + caja.cajero + ")");
+        assertThat(primero.get("cantidadVentas").asLong()).isEqualTo(2);
+        assertThat(primero.get("totalVendido").decimalValue()).isEqualByComparingTo("150.00");
+        assertThat(primero.get("ventasCanceladas").asLong()).isEqualTo(1);
+        assertThat(primero.get("lineasEliminadas").asLong()).isEqualTo(2);
+        assertThat(primero.get("facturasAnuladas").asLong()).isEqualTo(1);
+        assertThat(primero.get("montoAnulado").decimalValue()).isEqualByComparingTo("30.00");
+        JsonNode totales = reporte.get("totales");
+        assertThat(totales.get("cajero").asString()).isEqualTo("Total");
+        assertThat(totales.get("cantidadVentas").asLong()).isEqualTo(2);
+        assertThat(totales.get("ventasCanceladas").asLong()).isEqualTo(2);
+        assertThat(reporte.get("encabezado").get("titulo").asString()).isEqualTo("Ventas por cajero");
+
+        JsonNode soloOtro = ok(get("/api/reportes/cajeros?desde=2025-06-01&hasta=2025-06-30&cajaId=%d&cajeroId=%d"
+                .formatted(caja.id, otro.cajeroId)));
+        assertThat(filas(soloOtro)).extracting(f -> f.get("cajeroId").asLong()).containsExactly(otro.cajeroId);
+    }
+
+    @Test
+    void elDetalleMuestraLasVentasDelCajeroEnOrden() throws Exception {   // HU-10.03 crit. 2
+        Caja caja = caja();
+        long certificada = caja.venta("FINALIZADA", "2025-06-02T15:00:00Z", "100.00", "CERTIFICADA");
+        caja.venta("CANCELADA", "2025-06-02T12:00:00Z", "20.00", null);
+        caja.venta("FINALIZADA", "2025-06-03T16:00:00Z", "30.00", "ANULADA");
+        caja.lineaEliminada(certificada, "2025-06-02T14:59:00Z");
+        caja.conOtroCajero().venta("FINALIZADA", "2025-06-02T15:30:00Z", "70.00", null);   // de otro cajero
+
+        JsonNode detalle = ok(get("/api/reportes/cajeros/%d/ventas?desde=2025-06-01&hasta=2025-06-30&cajaId=%d"
+                .formatted(caja.cajeroId, caja.id)));
+
+        List<JsonNode> ventas = new ArrayList<>();
+        detalle.get("ventas").forEach(ventas::add);
+        assertThat(ventas).extracting(v -> v.get("estado").asString())
+                .containsExactly("CANCELADA", "FINALIZADA", "FINALIZADA");
+        assertThat(ventas.get(1).get("factura").asString()).isEqualTo("SERIE-" + certificada);
+        assertThat(ventas.get(1).get("lineasEliminadas").asLong()).isEqualTo(1);
+        assertThat(ventas.get(1).get("caja").asString()).isEqualTo(caja.nombre);
+        assertThat(ventas.get(2).get("estadoFactura").asString()).isEqualTo("ANULADA");
+        List<String> filtros = new ArrayList<>();
+        detalle.get("encabezado").get("filtros").forEach(f -> filtros.add(f.get("valor").asString()));
+        assertThat(filtros).contains("Usuario " + caja.cajero + " (" + caja.cajero + ")");
+
+        assertError(get("/api/reportes/cajeros/999999999/ventas?desde=2025-06-01&hasta=2025-06-30"),
+                "FILTRO_CAJERO_INEXISTENTE");
+        assertThat(jdbc.queryForList("""
+                SELECT descripcion FROM bitacora WHERE accion = 'REPORTE_GENERADO' AND usuario_id = ?
+                ORDER BY secuencia""", String.class, supervisorId)).hasSize(2)
+                .first().asString().startsWith("Reporte \"Detalle de ventas del cajero\" generado");
+    }
+
+    @Test
     void lasOpcionesTraenLosRangosRapidosConLaFechaDelServidor() throws Exception {   // HU-10.01 crit. 2 y 3
         Caja caja = caja();
         JsonNode opciones = ok(get("/api/reportes/filtros"));
@@ -200,9 +269,13 @@ class ReportesIntegracionTest {
 
         assertThat(enviar("/api/reportes/ventas?desde=2025-04-01&hasta=2025-04-10", sesion).statusCode()).isEqualTo(403);
         assertThat(enviar("/api/reportes/filtros", sesion).statusCode()).isEqualTo(403);
+        assertThat(enviar("/api/reportes/cajeros?desde=2025-04-01&hasta=2025-04-10", sesion).statusCode())
+                .isEqualTo(403);
+        assertThat(enviar("/api/reportes/cajeros/%d/ventas?desde=2025-04-01&hasta=2025-04-10".formatted(cajeroId),
+                sesion).statusCode()).isEqualTo(403);
         assertThat(jdbc.queryForList("""
                 SELECT cambios->>'permisoRequerido' FROM bitacora WHERE accion = 'ACCESO_DENEGADO' AND usuario_id = ?""",
-                String.class, cajeroId)).containsExactly("REPORTE_CONSULTAR", "REPORTE_CONSULTAR");
+                String.class, cajeroId)).hasSize(4).containsOnly("REPORTE_CONSULTAR");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bitacora WHERE accion = 'REPORTE_GENERADO' AND usuario_id = ?",
                 Integer.class, cajeroId)).isZero();
     }
@@ -241,7 +314,7 @@ class ReportesIntegracionTest {
         }
 
         /** Una venta con su total (IVA del 12 % incluido) y, si se indica, su factura en ese estado. */
-        void venta(String estado, String finalizadaEn, String total, String estadoFactura) {
+        long venta(String estado, String finalizadaEn, String total, String estadoFactura) {
             BigDecimal monto = new BigDecimal(total);
             BigDecimal subtotal = monto.divide(new BigDecimal("1.12"), 2, java.math.RoundingMode.HALF_UP);
             long venta = jdbc.queryForObject("""
@@ -260,6 +333,19 @@ class ReportesIntegracionTest {
                         venta, estadoFactura, autorizada ? "SERIE" : null, autorizada ? String.valueOf(venta) : null,
                         autorizada ? java.util.UUID.randomUUID() : null, autorizada ? finalizadaEn : null);
             }
+            return venta;
+        }
+
+        /** Una línea eliminada de la venta en el momento indicado. */
+        void lineaEliminada(long venta, String eliminadaEn) {
+            long producto = jdbc.queryForObject("""
+                    INSERT INTO producto (codigo_barras, descripcion, precio) VALUES (?, 'Producto del reporte', 11.20)
+                    RETURNING id""", Long.class, "REP-" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000);
+            jdbc.update("""
+                    INSERT INTO venta_linea (venta_id, producto_id, descripcion, cantidad, precio_unitario,
+                                             subtotal_con_iva, base_imponible, iva, eliminada_en, eliminada_por)
+                    VALUES (?, ?, 'Producto del reporte', 1, 11.20, 11.20, 10.00, 1.20, ?::timestamptz, ?)""",
+                    venta, producto, eliminadaEn, cajeroId);
         }
     }
 

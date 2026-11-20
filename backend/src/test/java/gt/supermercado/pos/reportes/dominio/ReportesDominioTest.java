@@ -88,6 +88,26 @@ class ReportesDominioTest {
     }
 
     @Test
+    void elReportePorCajeroSumaCadaColumnaEnLaFilaDeTotales() {   // HU-10.03 crit. 1
+        ReporteVentasPorCajero reporte = ReporteVentasPorCajero.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCajero.Fila(1L, "Ana (ana)", 3, new BigDecimal("30.50"), 1, 2, 0, BigDecimal.ZERO),
+                new ReporteVentasPorCajero.Fila(2L, "Luis (luis)", 1, new BigDecimal("9.5"), 0, 4, 1,
+                        new BigDecimal("12.00"))));
+
+        ReporteVentasPorCajero.Fila totales = reporte.totales();
+        assertThat(totales.cajeroId()).isNull();
+        assertThat(totales.cajero()).isEqualTo("Total");
+        assertThat(totales.cantidadVentas()).isEqualTo(4);
+        assertThat(totales.totalVendido().toPlainString()).isEqualTo("40.00");
+        assertThat(totales.ventasCanceladas()).isEqualTo(1);
+        assertThat(totales.lineasEliminadas()).isEqualTo(6);
+        assertThat(totales.facturasAnuladas()).isEqualTo(1);
+        assertThat(totales.montoAnulado().toPlainString()).isEqualTo("12.00");
+        assertThat(ReporteVentasPorCajero.de(ENCABEZADO, List.of()).totales().totalVendido().toPlainString())
+                .isEqualTo("0.00");
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP

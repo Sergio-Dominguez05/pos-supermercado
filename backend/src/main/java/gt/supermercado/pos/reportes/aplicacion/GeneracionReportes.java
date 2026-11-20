@@ -5,6 +5,8 @@ import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.reportes.dominio.Agrupacion;
+import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.EncabezadoReporte;
 import gt.supermercado.pos.reportes.dominio.FiltroAplicado;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
@@ -80,6 +82,28 @@ public class GeneracionReportes {
             aplicados.add(new FiltroAplicado("Agrupación", grupo.etiqueta()));
             EncabezadoReporte encabezado = encabezado(ReporteVentasPeriodo.TITULO, aplicados, sesion);
             return new Generado<>(ReporteVentasPeriodo.de(encabezado, filtros, grupo, repositorio.ventasPorDia(filtros)),
+                    encabezado);
+        });
+    }
+
+    /** HU-10.03 crit. 1: el resumen por cajero, filtrado por fechas, caja y cajero. */
+    public ReporteVentasPorCajero ventasPorCajero(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                                  SesionActiva sesion) {
+        return generar(ReporteVentasPorCajero.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, null);
+            EncabezadoReporte encabezado = encabezado(ReporteVentasPorCajero.TITULO, aplicados(filtros), sesion);
+            return new Generado<>(ReporteVentasPorCajero.de(encabezado, repositorio.ventasPorCajero(filtros)),
+                    encabezado);
+        });
+    }
+
+    /** HU-10.03 crit. 2: las ventas de un cajero; su generación también queda en la bitácora. */
+    public DetalleVentasCajero detalleDeCajero(long cajeroId, LocalDate desde, LocalDate hasta, Long cajaId,
+                                               SesionActiva sesion) {
+        return generar(DetalleVentasCajero.TITULO, sesion, desde, hasta, cajaId, cajeroId, () -> {
+            FiltrosReporte filtros = new FiltrosReporte(desde, hasta, cajaId, cajeroId, null);
+            EncabezadoReporte encabezado = encabezado(DetalleVentasCajero.TITULO, aplicados(filtros), sesion);
+            return new Generado<>(new DetalleVentasCajero(encabezado, repositorio.ventasDeCajero(filtros)),
                     encabezado);
         });
     }

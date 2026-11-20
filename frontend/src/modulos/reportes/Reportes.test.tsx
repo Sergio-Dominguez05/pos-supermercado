@@ -13,7 +13,9 @@ import {
 } from '../../api/reportes'
 import { CLAVE_SESION } from '../login/sesion'
 import { filtrosIniciales } from './filtros'
-import { FormularioFiltros, PaginaReportes, TablaVentasPeriodo } from './Reportes'
+import { FormularioFiltros } from './ComunesReporte'
+import { PaginaReportes, SelectorDeReportes } from './Reportes'
+import { TablaVentasPeriodo } from './VentasPeriodo'
 
 const SUPERVISOR: Partial<UsuarioSesion> = {
   rol: 'SUPERVISOR',
@@ -119,6 +121,11 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
     const supervisor = renderizar(<PaginaReportes />)
     expect(supervisor).toContain('Filtros del reporte')
     expect(supervisor).toContain('Generar reporte')
+    // Una pestaña por reporte; abre en ventas por período, con su agrupación.
+    expect(supervisor).toContain('role="tab" aria-selected="true">Ventas por período</button>')
+    expect(supervisor).toContain('role="tab" aria-selected="false">Ventas por cajero</button>')
+    expect(supervisor).toContain('Agrupar por')
+    expect(renderizar(<SelectorDeReportes opciones={OPCIONES} inicial="VENTAS_CAJERO" />)).not.toContain('Agrupar por')
 
     const cajero = renderizar(<PaginaReportes />, CAJERO)
     expect(cajero).toContain('No tiene permiso para consultar reportes.')
@@ -144,11 +151,13 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
   })
 
   it('filtra por caja y cajero, y agrupa por día, semana o mes (HU-10.01 crit. 2, HU-10.02 crit. 2)', () => {
-    const html = renderizar(<FormularioFiltros opciones={OPCIONES} onGenerar={() => {}} />)
+    const html = renderizar(<FormularioFiltros opciones={OPCIONES} conAgrupacion onGenerar={() => {}} />)
 
     expect(html).toContain('<option value="" selected="">Todas</option><option value="1">Caja 1</option>')
     expect(html).toContain('<option value="7">Lucía Méndez (lucia.mendez)</option>')
     for (const agrupacion of ['Día', 'Semana', 'Mes']) expect(html).toContain(`>${agrupacion}</option>`)
+    // Los reportes que no agrupan no muestran ese filtro.
+    expect(renderizar(<FormularioFiltros opciones={OPCIONES} onGenerar={() => {}} />)).not.toContain('Agrupar por')
   })
 
   it('muestra los filtros aplicados en el encabezado y las columnas del reporte (HU-10.01 crit. 4, HU-10.02 crit. 1)', () => {

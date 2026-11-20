@@ -1,12 +1,17 @@
 package gt.supermercado.pos.reportes.infraestructura;
 
+import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.VentasDelDia;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +48,90 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                         fila.getBigDecimal("total")),
                 filtros.desde(), filtros.hasta(), filtros.cajaId(), filtros.cajaId(), filtros.cajeroId(),
                 filtros.cajeroId());
+    }
+
+    /** La condición de que la columna caiga dentro del período, en hora de Guatemala; usa dos parámetros. */
+    private static String enPeriodo(String columna) {
+        return "%1$s >= (?::date)::timestamp AT TIME ZONE 'America/Guatemala' AND %1$s < (?::date + 1)::timestamp AT TIME ZONE 'America/Guatemala'"
+                .formatted(columna);
+    }
+
+    /** Los filtros de caja y cajero sobre una venta; usa cuatro parámetros. */
+    private static String deCajaYCajero(String venta) {
+        return "(?::bigint IS NULL OR %1$s.caja_id = ?::bigint) AND (?::bigint IS NULL OR %1$s.usuario_id = ?::bigint)"
+                .formatted(venta);
+    }
+
+    private static List<Object> parametros(FiltrosReporte filtros) {
+        List<Object> valores = new ArrayList<>(List.of(filtros.desde(), filtros.hasta()));
+        valores.addAll(Arrays.asList(filtros.cajaId(), filtros.cajaId(), filtros.cajeroId(), filtros.cajeroId()));
+        return valores;
+    }
+
+    @Override
+    public List<ReporteVentasPorCajero.Fila> ventasPorCajero(FiltrosReporte filtros) {
+        String sql = """
+                WITH finalizadas AS (
+                    SELECT v.usuario_id,
+                           count(*) FILTER (WHERE f.estado IS DISTINCT FROM 'ANULADA') AS ventas,
+                           coalesce(sum(v.total) FILTER (WHERE f.estado IS DISTINCT FROM 'ANULADA'), 0) AS total,
+                           count(*) FILTER (WHERE f.estado = 'ANULADA') AS anuladas,
+                           coalesce(sum(v.total) FILTER (WHERE f.estado = 'ANULADA'), 0) AS monto_anulado
+                    FROM venta v LEFT JOIN factura f ON f.venta_id = v.id
+                    WHERE v.estado = 'FINALIZADA' AND %s AND %s
+                    GROUP BY v.usuario_id),
+                canceladas AS (
+                    SELECT v.usuario_id, count(*) AS canceladas FROM venta v
+                    WHERE v.estado = 'CANCELADA' AND %s AND %s
+                    GROUP BY v.usuario_id),
+                eliminadas AS (
+                    SELECT v.usuario_id, count(*) AS eliminadas
+                    FROM venta_linea l JOIN venta v ON v.id = l.venta_id
+                    WHERE l.eliminada_en IS NOT NULL AND %s AND %s
+                    GROUP BY v.usuario_id)
+                SELECT u.id, u.nombre_completo, u.username,
+                       coalesce(fi.ventas, 0) AS ventas, coalesce(fi.total, 0) AS total,
+                       coalesce(ca.canceladas, 0) AS canceladas, coalesce(el.eliminadas, 0) AS eliminadas,
+                       coalesce(fi.anuladas, 0) AS anuladas, coalesce(fi.monto_anulado, 0) AS monto_anulado
+                FROM usuario u
+                LEFT JOIN finalizadas fi ON fi.usuario_id = u.id
+                LEFT JOIN canceladas ca ON ca.usuario_id = u.id
+                LEFT JOIN eliminadas el ON el.usuario_id = u.id
+                WHERE fi.usuario_id IS NOT NULL OR ca.usuario_id IS NOT NULL OR el.usuario_id IS NOT NULL
+                ORDER BY lower(u.nombre_completo), u.username""".formatted(
+                enPeriodo("v.finalizada_en"), deCajaYCajero("v"),
+                enPeriodo("v.creada_en"), deCajaYCajero("v"),
+                enPeriodo("l.eliminada_en"), deCajaYCajero("v"));
+        List<Object> valores = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            valores.addAll(parametros(filtros));
+        }
+        return jdbc.query(sql, (fila, i) -> new ReporteVentasPorCajero.Fila(fila.getLong("id"),
+                fila.getString("nombre_completo") + " (" + fila.getString("username") + ")", fila.getLong("ventas"),
+                fila.getBigDecimal("total").setScale(2), fila.getLong("canceladas"), fila.getLong("eliminadas"),
+                fila.getLong("anuladas"), fila.getBigDecimal("monto_anulado").setScale(2)), valores.toArray());
+    }
+
+    @Override
+    public List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros) {
+        String sql = """
+                SELECT v.id, v.numero, v.estado, v.total, c.nombre AS caja, f.estado AS estado_factura,
+                       CASE WHEN f.serie IS NOT NULL THEN f.serie || '-' || f.numero END AS factura,
+                       CASE WHEN v.estado = 'FINALIZADA' THEN v.finalizada_en ELSE v.creada_en END AS fecha,
+                       (SELECT count(*) FROM venta_linea l WHERE l.venta_id = v.id AND l.eliminada_en IS NOT NULL)
+                           AS eliminadas
+                FROM venta v
+                JOIN caja c ON c.id = v.caja_id
+                LEFT JOIN factura f ON f.venta_id = v.id
+                WHERE ((v.estado = 'FINALIZADA' AND %s) OR (v.estado = 'CANCELADA' AND %s)) AND %s
+                ORDER BY fecha, v.numero""".formatted(enPeriodo("v.finalizada_en"), enPeriodo("v.creada_en"),
+                deCajaYCajero("v"));
+        List<Object> valores = new ArrayList<>(List.of(filtros.desde(), filtros.hasta()));
+        valores.addAll(parametros(filtros));
+        return jdbc.query(sql, (fila, i) -> new DetalleVentasCajero.Venta(fila.getLong("id"), fila.getLong("numero"),
+                fila.getObject("fecha", OffsetDateTime.class), fila.getString("caja"), fila.getString("estado"),
+                fila.getBigDecimal("total"), fila.getString("estado_factura"), fila.getString("factura"),
+                fila.getLong("eliminadas")), valores.toArray());
     }
 
     @Override
