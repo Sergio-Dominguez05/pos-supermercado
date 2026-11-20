@@ -20,6 +20,7 @@ import { Inicio } from './modulos/inicio/Inicio'
 import { CambioCredencial } from './modulos/login/CambioCredencial'
 import { Login } from './modulos/login/Login'
 import { RutaProtegida } from './modulos/login/RutaProtegida'
+import { PaginaReportes } from './modulos/reportes/Reportes'
 import { EstadoSistema } from './modulos/sistema/EstadoSistema'
 import { EditarUsuario } from './modulos/usuarios/EditarUsuario'
 import { ListaUsuarios } from './modulos/usuarios/ListaUsuarios'
@@ -148,6 +149,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaFacturasRechazadas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/reportes"
+            element={
+              <RutaProtegida>
+                <PaginaReportes />
               </RutaProtegida>
             }
           />

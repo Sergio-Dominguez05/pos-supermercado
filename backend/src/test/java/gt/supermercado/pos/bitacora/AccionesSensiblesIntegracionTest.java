@@ -461,6 +461,14 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(PARAMETRO_MODIFICADO, false, adminId));   // código inválido
     }
 
+    @Test
+    void generacionDeReporteExitosaYRechazada() throws Exception {   // HU-10.15 crit. 3
+        assertThat(registrosDe(() -> enviar("/api/reportes/ventas?desde=2026-11-01&hasta=2026-11-20", "GET", null,
+                cookieAdmin))).containsExactly(new Registro(REPORTE_GENERADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/reportes/ventas?desde=2026-11-20&hasta=2026-11-01", "GET", null,
+                cookieAdmin))).containsExactly(new Registro(REPORTE_GENERADO, false, adminId));   // fechas invertidas
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test
