@@ -63,7 +63,11 @@ class AccesoDenegadoIntegracionTest {
         Map<String, Object> registro = ultimo(supervisor);
         assertThat(registro.get("rol")).isEqualTo("SUPERVISOR");
         assertThat(registro.get("exitoso")).isEqualTo(false);
-        assertThat(registro.get("descripcion")).isEqualTo("Acción sin permiso rechazada: GET /api/usuarios");
+        assertThat(registro.get("descripcion"))
+                .isEqualTo("Acción sin permiso rechazada: GET /api/usuarios (requiere USUARIO_ADMINISTRAR)");
+        // HU-11.04: el registro dice qué acción intentó y qué permiso le faltaba.
+        assertThat(registro.get("permiso")).isEqualTo("USUARIO_ADMINISTRAR");
+        assertThat(registro.get("ruta")).isEqualTo("/api/usuarios");
     }
 
     @Test
@@ -78,7 +82,8 @@ class AccesoDenegadoIntegracionTest {
 
         assertThat(respuesta.statusCode()).isEqualTo(403);
         assertThat(ultimo(cajero).get("descripcion"))
-                .isEqualTo("Acción sin permiso rechazada: POST /api/usuarios/" + objetivo + "/credencial");
+                .isEqualTo("Acción sin permiso rechazada: POST /api/usuarios/" + objetivo
+                        + "/credencial (requiere CREDENCIAL_RESTABLECER)");
         assertThat(jdbc.queryForObject("SELECT credencial_hash FROM usuario WHERE id = ?", String.class, objetivo))
                 .isEqualTo(hashAntes);
         assertThat(jdbc.queryForObject(
@@ -108,6 +113,27 @@ class AccesoDenegadoIntegracionTest {
     }
 
     @Test
+    void elIntentoQuedaConLaCajaDesdeDondeSeHizo() throws Exception {   // HU-11.04
+        String admin = login("/api/auth/login", "admin", "contrasena", InicioSesionIntegracionTest.CONTRASENA_ADMIN);
+        HttpResponse<String> caja = enviar("/api/cajas", "POST",
+                "{\"nombre\":\"Caja AD%d\"}".formatted(System.nanoTime() % 1_000_000), admin);
+        long cajaId = Long.parseLong(caja.body().replaceAll(".*?\"id\":(\\d+).*", "$1"));
+        String equipo = enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, admin).headers()
+                .allValues("Set-Cookie").stream().filter(c -> c.startsWith("POS_EQUIPO=")).findFirst().orElseThrow();
+        String setCookie = enviar("/api/auth/login-pin", "POST", "{\"username\":\"ad.cajero\",\"pin\":\"%s\"}"
+                .formatted(PIN), equipo.substring(0, equipo.indexOf(';'))).headers().allValues("Set-Cookie").stream()
+                .filter(c -> c.startsWith("POS_SESION=")).findFirst().orElseThrow();
+        long cajero = idDe("ad.cajero");
+
+        assertThat(enviar("/api/configuracion/impresoras", "GET", null, setCookie.substring(0, setCookie.indexOf(';')))
+                .statusCode()).isEqualTo(403);
+
+        Map<String, Object> registro = ultimo(cajero);
+        assertThat(registro.get("caja_id")).isEqualTo(cajaId);
+        assertThat(registro.get("permiso")).isEqualTo("CONFIGURACION_MODIFICAR");
+    }
+
+    @Test
     void sinSesionSeResponde401YNoHayActorQueRegistrar() throws Exception {
         int antes = jdbc.queryForObject("SELECT count(*) FROM bitacora WHERE accion = 'ACCESO_DENEGADO'", Integer.class);
 
@@ -134,7 +160,8 @@ class AccesoDenegadoIntegracionTest {
 
     private Map<String, Object> ultimo(long usuarioId) {
         return jdbc.queryForMap("""
-                SELECT rol, exitoso, descripcion FROM bitacora
+                SELECT rol, exitoso, descripcion, cambios->>'permisoRequerido' AS permiso,
+                       cambios->>'ruta' AS ruta, caja_id FROM bitacora
                 WHERE accion = 'ACCESO_DENEGADO' AND usuario_id = ? ORDER BY id DESC LIMIT 1""", usuarioId);
     }
 
