@@ -4,6 +4,8 @@ import { Link } from 'react-router'
 import { CLAVE_FILTROS_REPORTE, obtenerOpcionesDeFiltro, type OpcionesDeFiltro } from '../../api/reportes'
 import { useSesion } from '../login/sesion'
 import { PERMISO_REPORTES, REPORTES, type CodigoReporte } from './filtros'
+import { ReporteDeAnuladas } from './Anuladas'
+import { ReporteDeCierres } from './Cierres'
 import { ReporteIva } from './Iva'
 import { ReporteDeTarjetas } from './Tarjetas'
 import { ReporteDeVentas } from './VentasPeriodo'
@@ -67,6 +69,8 @@ export function SelectorDeReportes({
       {elegido === 'VENTAS_CAJERO' && <ReporteDeCajeros key={elegido} opciones={opciones} />}
       {elegido === 'TARJETAS' && <ReporteDeTarjetas key={elegido} opciones={opciones} />}
       {elegido === 'IVA' && <ReporteIva key={elegido} opciones={opciones} />}
+      {elegido === 'CIERRES' && <ReporteDeCierres key={elegido} opciones={opciones} />}
+      {elegido === 'ANULADAS' && <ReporteDeAnuladas key={elegido} opciones={opciones} />}
     </>
   )
 }

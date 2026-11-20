@@ -71,6 +71,7 @@ const OPCIONES: OpcionesDeFiltro = {
     { valor: 'SEMANA', etiqueta: 'Semana' },
     { valor: 'MES', etiqueta: 'Mes' },
   ],
+  anuladores: [{ valor: '3', etiqueta: 'Ana Supervisora (ana.sup)' }],
 }
 
 const fila = (periodo: string, desde: string, cantidadVentas: number, total: number) => ({
@@ -148,6 +149,8 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
       cajeroId: '',
       agrupacion: 'DIA',
       tipoTarjeta: '',
+      soloConDiferencias: false,
+      anuladaPorId: '',
     })
   })
 
@@ -198,6 +201,8 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
       cajeroId: '',
       agrupacion: 'MES',
       tipoTarjeta: 'CREDITO',
+      soloConDiferencias: true,
+      anuladaPorId: '3',
     })
 
     expect(respuesta).toHaveBeenCalledWith(

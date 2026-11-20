@@ -311,6 +311,97 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void listaLosCierresConSusDiferenciasYSumaFaltantesYSobrantes() throws Exception {   // HU-10.08 crit. 1 y 2
+        Caja caja = caja();
+        caja.cierre("2025-10-01T23:00:00Z", "500.00", "500.00", null);
+        caja.cierre("2025-10-02T23:00:00Z", "300.00", "290.50", "Voucher extraviado");      // faltante
+        caja.cierre("2025-10-03T23:00:00Z", "200.00", "205.00", "Cobro duplicado en la terminal");   // sobrante
+        caja.cierre("2025-11-01T23:00:00Z", "100.00", "90.00", "Fuera del período");
+
+        JsonNode reporte = ok(get("/api/reportes/cierres?desde=2025-10-01&hasta=2025-10-31&cajaId=" + caja.id));
+
+        List<JsonNode> cierres = new ArrayList<>();
+        reporte.get("cierres").forEach(cierres::add);
+        assertThat(cierres).hasSize(3);
+        JsonNode faltante = cierres.get(1);
+        assertThat(faltante.get("caja").asString()).isEqualTo(caja.nombre);
+        assertThat(faltante.get("cajero").asString()).isEqualTo("Usuario " + caja.cajero + " (" + caja.cajero + ")");
+        assertThat(faltante.get("totalRegistrado").decimalValue()).isEqualByComparingTo("300.00");
+        assertThat(faltante.get("totalLote").decimalValue()).isEqualByComparingTo("290.50");
+        assertThat(faltante.get("diferencia").decimalValue()).isEqualByComparingTo("-9.50");
+        assertThat(faltante.get("justificacion").asString()).isEqualTo("Voucher extraviado");
+        assertThat(reporte.get("cierresConDiferencia").asLong()).isEqualTo(2);
+        assertThat(reporte.get("totalFaltantes").decimalValue()).isEqualByComparingTo("9.50");
+        assertThat(reporte.get("totalSobrantes").decimalValue()).isEqualByComparingTo("5.00");
+    }
+
+    @Test
+    void puedeMostrarSoloLosCierresConDiferencias() throws Exception {   // HU-10.08 crit. 3
+        Caja caja = caja();
+        caja.cierre("2025-10-01T23:00:00Z", "500.00", "500.00", null);
+        caja.cierre("2025-10-02T23:00:00Z", "300.00", "290.50", "Voucher extraviado");
+
+        JsonNode reporte = ok(get("/api/reportes/cierres?desde=2025-10-01&hasta=2025-10-31&soloConDiferencias=true"
+                + "&cajaId=" + caja.id));
+
+        List<JsonNode> cierres = new ArrayList<>();
+        reporte.get("cierres").forEach(cierres::add);
+        assertThat(cierres).extracting(c -> c.get("justificacion").asString()).containsExactly("Voucher extraviado");
+        List<String> filtros = new ArrayList<>();
+        reporte.get("encabezado").get("filtros").forEach(f -> filtros.add(f.get("etiqueta").asString() + ": "
+                + f.get("valor").asString()));
+        assertThat(filtros).contains("Cierres: Solo con diferencias");
+    }
+
+    @Test
+    void listaLasFacturasAnuladasEnElPeriodoConQuienLasEmitioYQuienLasAnulo() throws Exception {   // HU-10.09
+        Caja caja = caja();
+        long anuladaPorSupervisor = caja.venta("FINALIZADA", "2025-10-05T15:00:00Z", "45.00", "ANULADA");
+        caja.anular(anuladaPorSupervisor, "2025-10-05T16:00:00Z", "Error de digitación", supervisorId);
+        String otro = usuario(2, CONTRASENA);
+        long otroId = idDeUsuario(otro);
+        long anuladaPorOtro = caja.venta("FINALIZADA", "2025-10-06T15:00:00Z", "30.00", "ANULADA");
+        caja.anular(anuladaPorOtro, "2025-10-07T15:00:00Z", "Cliente devolvió todo", otroId);
+        long fuera = caja.venta("FINALIZADA", "2025-09-30T15:00:00Z", "10.00", "ANULADA");   // emitida antes,
+        caja.anular(fuera, "2025-10-01T15:00:00Z", "Anulada el 1 de octubre", supervisorId);    // anulada en el período
+        caja.venta("FINALIZADA", "2025-10-05T17:00:00Z", "99.00", "CERTIFICADA");
+
+        JsonNode reporte = ok(get("/api/reportes/anuladas?desde=2025-10-01&hasta=2025-10-31&cajaId=" + caja.id));
+
+        List<JsonNode> facturas = new ArrayList<>();
+        reporte.get("facturas").forEach(facturas::add);
+        assertThat(facturas).extracting(f -> f.get("motivo").asString()).containsExactly("Anulada el 1 de octubre",
+                "Error de digitación", "Cliente devolvió todo");
+        JsonNode primera = facturas.get(1);
+        assertThat(primera.get("serie").asString()).isEqualTo("SERIE");
+        assertThat(primera.get("numero").asString()).isEqualTo(String.valueOf(anuladaPorSupervisor));
+        assertThat(primera.get("monto").decimalValue()).isEqualByComparingTo("45.00");
+        assertThat(primera.get("cajero").asString()).isEqualTo("Usuario " + caja.cajero + " (" + caja.cajero + ")");
+        assertThat(primera.get("anuladaPor").asString()).endsWith("(" + usernameDe(supervisorId) + ")");
+        assertThat(primera.get("emitidaEn").asString()).isNotBlank();
+        assertThat(primera.get("anuladaEn").asString()).isNotBlank();
+        assertThat(reporte.get("cantidad").asLong()).isEqualTo(3);
+        assertThat(reporte.get("monto").decimalValue()).isEqualByComparingTo("85.00");
+
+        JsonNode delOtro = ok(get("/api/reportes/anuladas?desde=2025-10-01&hasta=2025-10-31&anuladaPorId=%d&cajaId=%d"
+                .formatted(otroId, caja.id)));
+        assertThat(delOtro.get("cantidad").asLong()).isEqualTo(1);
+        List<String> filtros = new ArrayList<>();
+        delOtro.get("encabezado").get("filtros").forEach(f -> filtros.add(f.get("etiqueta").asString() + ": "
+                + f.get("valor").asString()));
+        assertThat(filtros).contains("Anuladas: Del 01/10/2025 al 31/10/2025",
+                "Anulada por: Usuario " + otro + " (" + otro + ")");
+        assertError(get("/api/reportes/anuladas?desde=2025-10-01&hasta=2025-10-31&anuladaPorId=999999999"),
+                "FILTRO_ANULADOR_INEXISTENTE");
+
+        JsonNode opciones = ok(get("/api/reportes/filtros"));
+        List<String> anuladores = new ArrayList<>();
+        opciones.get("anuladores").forEach(a -> anuladores.add(a.get("etiqueta").asString()));
+        assertThat(anuladores).contains("Usuario " + otro + " (" + otro + ")").noneMatch(a -> a.endsWith(
+                "(" + caja.cajero + ")"));
+    }
+
+    @Test
     void lasOpcionesTraenLosRangosRapidosConLaFechaDelServidor() throws Exception {   // HU-10.01 crit. 2 y 3
         Caja caja = caja();
         JsonNode opciones = ok(get("/api/reportes/filtros"));
@@ -380,13 +471,13 @@ class ReportesIntegracionTest {
         assertThat(enviar("/api/reportes/cajeros/%d/ventas?desde=2025-04-01&hasta=2025-04-10".formatted(cajeroId),
                 sesion).statusCode()).isEqualTo(403);
         for (String ruta : List.of("/api/reportes/tarjetas", "/api/reportes/tarjetas/DEBITO/pagos", "/api/reportes/iva",
-                "/api/reportes/iva/facturas")) {
+                "/api/reportes/iva/facturas", "/api/reportes/cierres", "/api/reportes/anuladas")) {
             assertThat(enviar(ruta + "?desde=2025-04-01&hasta=2025-04-10", sesion).statusCode()).as(ruta)
                     .isEqualTo(403);
         }
         assertThat(jdbc.queryForList("""
                 SELECT cambios->>'permisoRequerido' FROM bitacora WHERE accion = 'ACCESO_DENEGADO' AND usuario_id = ?""",
-                String.class, cajeroId)).hasSize(8).containsOnly("REPORTE_CONSULTAR");
+                String.class, cajeroId)).hasSize(10).containsOnly("REPORTE_CONSULTAR");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bitacora WHERE accion = 'REPORTE_GENERADO' AND usuario_id = ?",
                 Integer.class, cajeroId)).isZero();
     }
@@ -457,6 +548,25 @@ class ReportesIntegracionTest {
                     VALUES (?, ?, ?, ?, ?, '4242', ?, CASE WHEN ? THEN now() END, CASE WHEN ? THEN ?::bigint END)""",
                     venta, turnoId, cajeroId, tipo, autorizacion, new BigDecimal(monto), eliminado, eliminado,
                     cajeroId);
+        }
+
+        /** Un turno cerrado de este cajero en esta caja, con sus totales y su justificación. */
+        long cierre(String cerradoEn, String registrado, String lote, String justificacion) {
+            BigDecimal diferencia = new BigDecimal(lote).subtract(new BigDecimal(registrado));
+            return jdbc.queryForObject("""
+                    INSERT INTO turno (caja_id, usuario_id, estado, abierto_en, cerrado_en, cerrado_por,
+                                       total_registrado, total_lote, diferencia, justificacion)
+                    VALUES (?, ?, 'CERRADO', ?::timestamptz - interval '8 hours', ?::timestamptz, ?, ?, ?, ?, ?)
+                    RETURNING id""", Long.class, id, cajeroId, cerradoEn, cerradoEn, cajeroId,
+                    new BigDecimal(registrado), new BigDecimal(lote), diferencia, justificacion);
+        }
+
+        /** Anula la factura de la venta: la anulación queda a nombre de {@code usuarioId}. */
+        void anular(long venta, String anuladaEn, String motivo, long usuarioId) {
+            jdbc.update("""
+                    INSERT INTO anulacion (factura_id, motivo, usuario_id, turno_id, anulada_en, respuesta_fel)
+                    SELECT f.id, ?, ?, ?, ?::timestamptz, '{}'::jsonb FROM factura f WHERE f.venta_id = ?""",
+                    motivo, usuarioId, turnoId, anuladaEn, venta);
         }
 
         /** Una línea eliminada de la venta en el momento indicado. */

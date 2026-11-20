@@ -90,6 +90,7 @@ const OPCIONES: OpcionesDeFiltro = {
     { valor: 'CREDITO', etiqueta: 'Crédito' },
   ],
   agrupaciones: [],
+  anuladores: [],
 }
 
 const html = (contenido: ReactNode) => renderToString(contenido).replaceAll('<!-- -->', '')
@@ -157,7 +158,15 @@ describe('IVA cobrado (HU-10.07)', () => {
   it('pide cada reporte solo con los filtros que le aplican', async () => {
     const respuesta = vi.fn(async () => new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', respuesta)
-    const filtros = { desde: '2026-11-01', hasta: '2026-11-20', cajaId: '', cajeroId: '7', agrupacion: 'MES' as const }
+    const filtros = {
+      desde: '2026-11-01',
+      hasta: '2026-11-20',
+      cajaId: '',
+      cajeroId: '7',
+      agrupacion: 'MES' as const,
+      soloConDiferencias: true,
+      anuladaPorId: '3',
+    }
 
     await generarReporteTarjetas({ ...filtros, tipoTarjeta: 'CREDITO' })
     await generarDetalleTarjeta('DEBITO', { ...filtros, tipoTarjeta: 'CREDITO' })
