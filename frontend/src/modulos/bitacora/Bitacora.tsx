@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router'
 import {
   buscarEnBitacora,
   claveDetalleEvento,
+  exportarBitacora,
+  type FormatoBitacora,
   CLAVE_OPCIONES_BITACORA,
   obtenerDetalleEvento,
   obtenerOpcionesBitacora,
@@ -35,7 +37,7 @@ export function Bitacora() {
       </p>
       {usuario.permisos.includes('BITACORA_CONSULTAR') ? (
         <>
-          <ConsultaRegistros />
+          <ConsultaRegistros esAdministrador={usuario.rol === 'ADMIN'} />
           <VerificarIntegridad />
         </>
       ) : (
@@ -45,7 +47,7 @@ export function Bitacora() {
   )
 }
 
-function ConsultaRegistros() {
+function ConsultaRegistros({ esAdministrador }: { esAdministrador: boolean }) {
   const opciones = useQuery({ queryKey: CLAVE_OPCIONES_BITACORA, queryFn: obtenerOpcionesBitacora })
   const [filtros, setFiltros] = useState<FiltrosBitacora>(() => filtrosDeHoy())
   const [pagina, setPagina] = useState(0)
@@ -74,8 +76,38 @@ function ConsultaRegistros() {
           {registros.error.message}
         </p>
       )}
+      {/* HU-11.09 crit. 3: solo el Administrador ve la exportación (el servidor también lo exige). */}
+      {esAdministrador && registros.data && registros.data.total > 0 && (
+        <ExportarBitacora filtros={filtros} total={registros.data.total} />
+      )}
       {registros.data && <TablaBitacora pagina={registros.data} onPagina={setPagina} />}
     </>
+  )
+}
+
+/** HU-11.09 crit. 1: exporta a Excel o CSV los registros de la búsqueda actual, con los mismos filtros. */
+export function ExportarBitacora({ filtros, total }: { filtros: FiltrosBitacora; total: number }) {
+  const descarga = useMutation({ mutationFn: (formato: FormatoBitacora) => exportarBitacora(filtros, formato) })
+  return (
+    <div className="tarjeta exportar">
+      <div className="acciones" role="group" aria-label="Exportar la bitácora">
+        <span>
+          Exportar {total === 1 ? 'el registro filtrado' : `los ${total} registros filtrados`}:
+        </span>
+        <button type="button" disabled={descarga.isPending} onClick={() => descarga.mutate('XLSX')}>
+          {descarga.isPending && descarga.variables === 'XLSX' ? 'Exportando…' : 'Excel'}
+        </button>
+        <button type="button" disabled={descarga.isPending} onClick={() => descarga.mutate('CSV')}>
+          {descarga.isPending && descarga.variables === 'CSV' ? 'Exportando…' : 'CSV'}
+        </button>
+      </div>
+      {descarga.error && (
+        <p className="error" role="alert">
+          {descarga.error.message}
+        </p>
+      )}
+      {descarga.data && <p role="status">Se descargó {descarga.data}. La exportación quedó en la bitácora.</p>}
+    </div>
   )
 }
 

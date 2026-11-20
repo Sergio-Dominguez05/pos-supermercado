@@ -89,7 +89,9 @@ public enum AccionSensible {
 
     // Bitácora (HU-11.06 crit. 4)
     /** Cada búsqueda en la bitácora, con sus filtros, y cada detalle abierto; también la búsqueda rechazada. */
-    BITACORA_CONSULTADA(Categoria.BITACORA, "bitacora");
+    BITACORA_CONSULTADA(Categoria.BITACORA, "bitacora"),
+    /** HU-11.09 crit. 2: cada exportación de la bitácora, con su formato y sus filtros; también la rechazada. */
+    BITACORA_EXPORTADA(Categoria.BITACORA, "bitacora");
 
     /** Los grupos de eventos del criterio 1 de HU-11.01, más los reportes (HU-10.15 crit. 3) y la bitácora. */
     public enum Categoria {
