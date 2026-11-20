@@ -13,6 +13,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR', ruta: '/venta' },
   // HU-09.08 a 09.10: cerrar la caja propia y reimprimir los cierres.
   { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA', ruta: '/caja' },
+  // HU-09.12: cerrar el turno que otro usuario dejó abierto (Supervisor y Administrador).
+  { etiqueta: 'Cerrar caja de otro usuario', permiso: 'CAJA_CERRAR_OTRA', ruta: '/caja/turnos' },
   { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR', ruta: '/clientes' },
   // HU-08.12 crit. 2: buscar y reimprimir facturas (el cajero, las de su turno).
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR', ruta: '/facturas' },
@@ -30,6 +32,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR', ruta: '/reportes' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
+  // HU-01.10: los permisos del Supervisor y del Cajero (solo el Administrador).
+  { etiqueta: 'Permisos por rol', permiso: 'PERMISO_CONFIGURAR', ruta: '/permisos' },
   // La configuración abre en las cajas (HU-12.05); desde ahí se llega al emisor (HU-12.01), al establecimiento
   // (HU-12.02) y a la conexión FEL (HU-12.03). El resto de EP-12 se agrega a NavConfiguracion.
   { etiqueta: 'Configuración', permiso: 'CONFIGURACION_MODIFICAR', ruta: '/configuracion/cajas' },

@@ -13,6 +13,8 @@ import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { PaginaParametrosOperacion } from './modulos/configuracion/ParametrosOperacion'
 import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
+import { PaginaTurnosAbiertos } from './modulos/caja/TurnosAbiertos'
+import { PaginaPermisos } from './modulos/usuarios/PermisosPorRol'
 import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
 import { PaginaContingencia } from './modulos/facturas/Contingencia'
 import { PaginaFacturas } from './modulos/facturas/Facturas'
@@ -129,6 +131,22 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaCierreCaja />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja/turnos"
+            element={
+              <RutaProtegida>
+                <PaginaTurnosAbiertos />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/permisos"
+            element={
+              <RutaProtegida>
+                <PaginaPermisos />
               </RutaProtegida>
             }
           />

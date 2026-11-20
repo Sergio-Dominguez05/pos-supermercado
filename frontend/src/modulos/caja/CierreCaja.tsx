@@ -76,11 +76,16 @@ export function FormularioCierre({
   cierreCiego = false,
   cajaNombre,
   onCerrada,
+  titulo = 'Cerrar la caja',
+  cerrar = cerrarCaja,
 }: {
   resumen: ResumenDeTurno | null
   cierreCiego?: boolean
   cajaNombre: string
   onCerrada: (hecho: CierreHecho) => void
+  /** HU-09.12: el supervisor usa el mismo formulario para cerrar el turno de otro usuario. */
+  titulo?: string
+  cerrar?: (totalLote: number, justificacion: string) => Promise<CierreHecho>
 }) {
   const clienteConsultas = useQueryClient()
   const [lote, setLote] = useState('')
@@ -100,7 +105,7 @@ export function FormularioCierre({
     onSuccess: (resultado, totalLote) => setComparacion({ totalLote, ...resultado }),
   })
   const cierre = useMutation({
-    mutationFn: ({ totalLote, motivo }: { totalLote: number; motivo: string }) => cerrarCaja(totalLote, motivo),
+    mutationFn: ({ totalLote, motivo }: { totalLote: number; motivo: string }) => cerrar(totalLote, motivo),
     onSuccess: async (hecho) => {
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_TURNO_ACTUAL })
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_CIERRES })
@@ -116,8 +121,8 @@ export function FormularioCierre({
   })
 
   return (
-    <section className="tarjeta formulario" aria-label="Cerrar la caja">
-      <h2>Cerrar la caja</h2>
+    <section className="tarjeta formulario" aria-label={titulo}>
+      <h2>{titulo}</h2>
       {resumenVisible ? <ResumenCobrado resumen={resumenVisible} /> : (
         <p>Ingrese y confirme el total del cierre de lote para compararlo con lo registrado en el POS.</p>
       )}
@@ -186,7 +191,7 @@ export function FormularioCierre({
   )
 }
 
-function CierreTerminado({ hecho }: { hecho: CierreHecho }) {
+export function CierreTerminado({ hecho }: { hecho: CierreHecho }) {
   const { cierre } = hecho.comprobante
   return (
     <section className="tarjeta" aria-label="Cierre terminado">

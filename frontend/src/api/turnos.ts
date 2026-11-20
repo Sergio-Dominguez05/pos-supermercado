@@ -97,6 +97,30 @@ export const cerrarCaja = (totalLote: number, justificacion: string) =>
     body: JSON.stringify({ totalLote, justificacion: justificacion.trim() || null }),
   })
 
+/** HU-09.12: un turno abierto de otro usuario, que el supervisor puede cerrar. */
+export interface TurnoAbierto {
+  id: number
+  cajaId: number
+  cajaNombre: string
+  usuarioId: number
+  usuarioNombre: string
+  abiertoEn: string
+}
+
+export const CLAVE_TURNOS_POR_CERRAR = ['turnos', 'por-cerrar'] as const
+
+/** HU-09.12 crit. 1: los turnos abiertos de los demás usuarios, para cerrarlos. */
+export const listarTurnosPorCerrar = () => pedir<TurnoAbierto[]>('/api/turnos/por-cerrar')
+
+export const obtenerResumenDeTurno = (turnoId: number) => pedir<ResumenDeTurno>(`/api/turnos/${turnoId}/cierre`)
+
+/** HU-09.12 crit. 1 y 2: cierra el turno de otro usuario con las mismas reglas del cierre propio. */
+export const cerrarTurnoDeOtro = (turnoId: number, totalLote: number, justificacion: string) =>
+  pedir<CierreHecho>(`/api/turnos/${turnoId}/cerrar`, {
+    method: 'POST',
+    body: JSON.stringify({ totalLote, justificacion: justificacion.trim() || null }),
+  })
+
 /** HU-09.10 crit. 3: los cierres anteriores (el cajero, los suyos). */
 export const listarCierres = () => pedir<CierreDeTurno[]>('/api/turnos/cierres')
 

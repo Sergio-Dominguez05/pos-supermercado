@@ -677,3 +677,14 @@ kbd {
   gap: 6px;
   padding-left: 32px;
 }
+
+/* HU-01.10: las casillas de cada rol, centradas bajo su columna. */
+.tabla-permisos th:not(:first-child),
+.tabla-permisos td:not(:first-child) {
+  width: 120px;
+  text-align: center;
+}
+
+.barra-guardar {
+  margin: 16px 0;
+}
