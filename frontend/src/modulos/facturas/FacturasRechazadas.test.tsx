@@ -88,6 +88,7 @@ describe('rechazos del certificador (HU-08.06)', () => {
     expect(rotuloRechazadas(0)).toBe('Facturas rechazadas')
     expect(opcionesPara(['FACTURA_ANULAR'])).toEqual([
       expect.objectContaining({ etiqueta: 'Facturas rechazadas', ruta: '/facturas/rechazadas' }),
+      expect.objectContaining({ etiqueta: 'Historial de facturas', ruta: '/facturas/historial' }),   // HU-08.13
       expect.objectContaining({ etiqueta: 'Anular facturas', ruta: '/facturas/anular' }),
       expect.objectContaining({ etiqueta: 'Contingencia', ruta: '/facturas/contingencia' }),
     ])
