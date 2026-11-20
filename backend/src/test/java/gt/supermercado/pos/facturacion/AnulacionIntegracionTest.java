@@ -130,7 +130,10 @@ class AnulacionIntegracionTest {
     @Test
     void conElTurnoDeLaVentaCerradoNoSeAnula() throws Exception {   // crit. 6 y decisión D2
         Vendida vendida = ventaCertificada();
-        jdbc.update("UPDATE turno SET estado = 'CERRADO', cerrado_en = now() WHERE id = ?", vendida.turnoId());
+        jdbc.update("""
+                UPDATE turno SET estado = 'CERRADO', cerrado_en = now(), cerrado_por = usuario_id, total_registrado = 0,
+                                 total_lote = 0, diferencia = 0
+                WHERE id = ?""", vendida.turnoId());
 
         HttpResponse<String> respuesta = anular(vendida, "Error de digitación");
 
