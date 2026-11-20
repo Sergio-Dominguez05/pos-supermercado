@@ -9,29 +9,39 @@ import java.time.LocalDate;
  * @param agrupacion         HU-10.02; {@code null} = por día
  * @param soloConDiferencias HU-10.08 crit. 3
  * @param anuladaPorId       HU-10.09 crit. 2; {@code null} = cualquiera
+ * @param ordenProductos     HU-10.05 crit. 2; {@code null} = por cantidad
+ * @param limite             HU-10.05 crit. 3; {@code null} = {@value ReporteProductosMasVendidos#LIMITE_POR_OMISION}
  */
 public record ParametrosReporte(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
                                 TipoTarjetaReporte tipoTarjeta, Agrupacion agrupacion, boolean soloConDiferencias,
-                                Long anuladaPorId) {
+                                Long anuladaPorId, OrdenProductos ordenProductos, Integer limite) {
 
     public static ParametrosReporte comunes(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId) {
-        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, null, null, false, null);
+        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, null, null, false, null, null, null);
     }
 
     public ParametrosReporte conTarjeta(TipoTarjetaReporte tipo) {
-        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipo, agrupacion, soloConDiferencias, anuladaPorId);
+        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipo, agrupacion, soloConDiferencias, anuladaPorId,
+                ordenProductos, limite);
     }
 
     public ParametrosReporte conAgrupacion(Agrupacion grupo) {
-        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, grupo, soloConDiferencias, anuladaPorId);
+        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, grupo, soloConDiferencias, anuladaPorId,
+                ordenProductos, limite);
     }
 
     public ParametrosReporte conSoloDiferencias(boolean solo) {
-        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion, solo, anuladaPorId);
+        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion, solo, anuladaPorId,
+                ordenProductos, limite);
     }
 
     public ParametrosReporte conAnuladaPor(Long usuarioId) {
         return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion, soloConDiferencias,
-                usuarioId);
+                usuarioId, ordenProductos, limite);
+    }
+
+    public ParametrosReporte conProductos(OrdenProductos orden, Integer cuantos) {
+        return new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion, soloConDiferencias,
+                anuladaPorId, orden, cuantos);
     }
 }

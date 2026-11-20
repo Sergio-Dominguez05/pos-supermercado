@@ -8,8 +8,9 @@ import {
   type FiltrosVentas,
   type FormatoExportacion,
   type OpcionesDeFiltro,
+  type OrdenProductos,
 } from '../../api/reportes'
-import { fechaHora, filtrosIniciales } from './filtros'
+import { fechaHora, filtrosIniciales, LIMITES_PRODUCTOS, ORDENES_PRODUCTOS } from './filtros'
 
 /**
  * HU-10.01: los filtros comunes de los reportes, con los rangos rápidos (crit. 3). La agrupación y el tipo de tarjeta
@@ -22,6 +23,7 @@ export function FormularioFiltros({
   conTarjeta = false,
   conDiferencias = false,
   conAnulador = false,
+  conProductos = false,
   onGenerar,
 }: {
   opciones: OpcionesDeFiltro
@@ -32,6 +34,8 @@ export function FormularioFiltros({
   conDiferencias?: boolean
   /** HU-10.09 crit. 2: el filtro por quien anuló. */
   conAnulador?: boolean
+  /** HU-10.05 crit. 2 y 3: el orden (cantidad o monto) y cuántos productos mostrar. */
+  conProductos?: boolean
   onGenerar: (filtros: FiltrosVentas) => void
 }) {
   const [filtros, setFiltros] = useState(() => filtrosIniciales(opciones))
@@ -150,6 +154,34 @@ export function FormularioFiltros({
             />
             Solo con diferencias
           </label>
+        )}
+        {conProductos && (
+          <>
+            <label>
+              Ordenar por
+              <select
+                name="ordenarPor"
+                value={filtros.ordenarPor}
+                onChange={(evento) => cambiar({ ordenarPor: evento.target.value as OrdenProductos })}
+              >
+                {ORDENES_PRODUCTOS.map((orden) => (
+                  <option key={orden.valor} value={orden.valor}>
+                    {orden.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Mostrar
+              <select name="limite" value={filtros.limite} onChange={(evento) => cambiar({ limite: evento.target.value })}>
+                {LIMITES_PRODUCTOS.map((limite) => (
+                  <option key={limite} value={String(limite)}>
+                    Los {limite} primeros
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
         )}
         {conAgrupacion && (
           <label>

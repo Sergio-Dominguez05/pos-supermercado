@@ -23,6 +23,8 @@ import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
+import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.TablasDeReportes;
@@ -103,6 +105,14 @@ public class GeneracionReportes {
                                                   SesionActiva sesion) {
         return (ReporteVentasPorCajero) generar(CodigoReporte.VENTAS_CAJERO,
                 ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
+    }
+
+    /** HU-10.05: los productos más vendidos, por cantidad (por omisión) o por monto, limitados a {@code limite}. */
+    public ReporteProductosMasVendidos productosMasVendidos(LocalDate desde, LocalDate hasta, Long cajaId,
+                                                            Long cajeroId, OrdenProductos orden, Integer limite,
+                                                            SesionActiva sesion) {
+        return (ReporteProductosMasVendidos) generar(CodigoReporte.PRODUCTOS,
+                ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId).conProductos(orden, limite), sesion);
     }
 
     /** HU-10.03 crit. 2: las ventas de un cajero; su generación también queda en la bitácora. */
@@ -229,6 +239,11 @@ public class GeneracionReportes {
         switch (codigo) {
             case VENTAS_PERIODO -> aplicados.add(new FiltroAplicado("Agrupación", agrupacion(p).etiqueta()));
             case DETALLE_CAJERO -> exigir(p.cajeroId() != null, "Indique el cajero del detalle.");
+            case PRODUCTOS -> {
+                aplicados.add(new FiltroAplicado("Ordenado por", ordenProductos(p).etiqueta()));
+                aplicados.add(new FiltroAplicado("Mostrar",
+                        "Los " + ReporteProductosMasVendidos.limiteValido(p.limite()) + " primeros"));
+            }
             case DETALLE_TARJETA -> exigir(p.tipoTarjeta() != null, "Indique el tipo de tarjeta del detalle.");
             case CIERRES -> {
                 if (p.soloConDiferencias()) {
@@ -251,6 +266,11 @@ public class GeneracionReportes {
                     repositorio.ventasPorDia(filtros));
             case VENTAS_CAJERO -> ReporteVentasPorCajero.de(encabezado, repositorio.ventasPorCajero(filtros));
             case DETALLE_CAJERO -> new DetalleVentasCajero(encabezado, repositorio.ventasDeCajero(filtros));
+            case PRODUCTOS -> {
+                int limite = ReporteProductosMasVendidos.limiteValido(p.limite());
+                yield ReporteProductosMasVendidos.de(encabezado, ordenProductos(p), limite,
+                        repositorio.productosMasVendidos(filtros, ordenProductos(p), limite));
+            }
             case TARJETAS -> ReporteTarjetas.de(encabezado, filtros.tipoTarjeta(), repositorio.pagosPorTipo(filtros));
             case DETALLE_TARJETA -> new DetallePagosTarjeta(encabezado, repositorio.pagosDeTarjeta(filtros));
             case IVA -> ReporteIva.de(encabezado, repositorio.ivaPorDia(filtros), repositorio.sinCertificar(filtros));
@@ -263,6 +283,10 @@ public class GeneracionReportes {
 
     private static Agrupacion agrupacion(ParametrosReporte p) {
         return p.agrupacion() == null ? Agrupacion.DIA : p.agrupacion();
+    }
+
+    private static OrdenProductos ordenProductos(ParametrosReporte p) {
+        return p.ordenProductos() == null ? OrdenProductos.CANTIDAD : p.ordenProductos();
     }
 
     private static void exigir(boolean condicion, String mensaje) {

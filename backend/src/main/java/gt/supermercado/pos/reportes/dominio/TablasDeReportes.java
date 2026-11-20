@@ -33,6 +33,7 @@ public final class TablasDeReportes {
             case VENTAS_PERIODO -> ventasPeriodo((ReporteVentasPeriodo) reporte);
             case VENTAS_CAJERO -> ventasPorCajero((ReporteVentasPorCajero) reporte);
             case DETALLE_CAJERO -> detalleCajero((DetalleVentasCajero) reporte);
+            case PRODUCTOS -> productos((ReporteProductosMasVendidos) reporte);
             case TARJETAS -> tarjetas((ReporteTarjetas) reporte);
             case DETALLE_TARJETA -> detalleTarjeta((DetallePagosTarjeta) reporte);
             case IVA -> iva((ReporteIva) reporte);
@@ -69,6 +70,22 @@ public final class TablasDeReportes {
     private static List<Object> filaCajero(ReporteVentasPorCajero.Fila fila) {
         return fila(fila.cajero(), fila.cantidadVentas(), fila.totalVendido(), fila.ventasCanceladas(),
                 fila.lineasEliminadas(), fila.facturasAnuladas(), fila.montoAnulado());
+    }
+
+    private static TablaReporte productos(ReporteProductosMasVendidos reporte) {
+        return tabla(CodigoReporte.PRODUCTOS, reporte.encabezado(),
+                List.of(new Dato("Productos distintos vendidos en el período", reporte.productosVendidos(), ENTERO)),
+                columnas("N.º", ENTERO, "Código", TEXTO, "Descripción", TEXTO, "Cantidad vendida", ENTERO,
+                        "Monto vendido", DINERO),
+                reporte.filas().stream().map(TablasDeReportes::filaProducto).toList(),
+                List.of(filaProducto(reporte.totales())),
+                List.of("Líneas vigentes de las ventas finalizadas en el período, sin las de facturas anuladas. El "
+                        + "monto incluye IVA; el total suma los productos mostrados."));
+    }
+
+    private static List<Object> filaProducto(ReporteProductosMasVendidos.Fila fila) {
+        return fila(fila.posicion() == null ? null : fila.posicion().longValue(), fila.codigo(),
+                fila.descripcion(), fila.cantidad(), fila.monto());
     }
 
     private static TablaReporte detalleCajero(DetalleVentasCajero detalle) {

@@ -17,6 +17,8 @@ import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
+import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
@@ -74,6 +76,23 @@ public class ReportesController {
             @RequestParam(required = false) Long cajeroId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.ventasPorCajero(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /**
+     * HU-10.05: los productos más vendidos; {@code ordenarPor} es {@code CANTIDAD} (por omisión) o {@code MONTO} y
+     * {@code limite} cuántos mostrar (20 por omisión, entre 1 y 500; 422 fuera de ese rango).
+     */
+    @GetMapping("/api/reportes/productos")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteProductosMasVendidos productosMasVendidos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @RequestParam(required = false) OrdenProductos ordenarPor,
+            @RequestParam(required = false) Integer limite,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.productosMasVendidos(desde, hasta, cajaId, cajeroId, ordenarPor, limite, sesion);
     }
 
     /** HU-10.03 crit. 2: el detalle de las ventas de un cajero en el período. */
@@ -155,9 +174,11 @@ public class ReportesController {
             @RequestParam(required = false) Agrupacion agrupacion,
             @RequestParam(defaultValue = "false") boolean soloConDiferencias,
             @RequestParam(required = false) Long anuladaPorId,
+            @RequestParam(required = false) OrdenProductos ordenarPor,
+            @RequestParam(required = false) Integer limite,
             @AuthenticationPrincipal SesionActiva sesion) {
         ParametrosReporte parametros = new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion,
-                soloConDiferencias, anuladaPorId);
+                soloConDiferencias, anuladaPorId, ordenarPor, limite);
         GeneracionReportes.ArchivoReporte archivo = reportes.exportar(codigo, parametros, formato, sesion);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(archivo.tipoContenido()))

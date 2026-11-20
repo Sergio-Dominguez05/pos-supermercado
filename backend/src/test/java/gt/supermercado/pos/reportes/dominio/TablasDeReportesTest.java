@@ -38,6 +38,21 @@ class TablasDeReportesTest {
     }
 
     @Test
+    void losProductosMasVendidosSeExportanConSuPosicionYElTotalDeLosMostrados() {   // HU-10.05
+        ReporteProductosMasVendidos reporte = ReporteProductosMasVendidos.de(ENCABEZADO, OrdenProductos.CANTIDAD, 20,
+                new ReporteProductosMasVendidos.Resultado(1, List.of(new ReporteProductosMasVendidos.Fila(1, 10L,
+                        "750100", "Arroz 1 lb", 3, new BigDecimal("33.60")))));
+
+        TablaReporte tabla = TablasDeReportes.de(CodigoReporte.PRODUCTOS, reporte);
+
+        assertThat(tabla.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("N.º", "Código",
+                "Descripción", "Cantidad vendida", "Monto vendido");
+        assertThat(tabla.filas().getFirst()).containsExactly(1L, "750100", "Arroz 1 lb", 3L, new BigDecimal("33.60"));
+        assertThat(tabla.pie().getFirst()).containsExactly(null, null, "Total", 3L, new BigDecimal("33.60"));
+        assertThat(tabla.resumen()).extracting(TablaReporte.Dato::valor).containsExactly(1L);
+    }
+
+    @Test
     void lasTarjetasSeparanCantidadYMontoAnuladosEnDosColumnasNumericas() {
         ReporteTarjetas reporte = ReporteTarjetas.de(ENCABEZADO, null, List.of(
                 new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, true, 1, new BigDecimal("25.00"))));

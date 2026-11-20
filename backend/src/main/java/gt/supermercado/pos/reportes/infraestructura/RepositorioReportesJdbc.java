@@ -11,6 +11,8 @@ import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
+import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.VentasDelDia;
@@ -119,6 +121,36 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                 fila.getString("nombre_completo") + " (" + fila.getString("username") + ")", fila.getLong("ventas"),
                 fila.getBigDecimal("total").setScale(2), fila.getLong("canceladas"), fila.getLong("eliminadas"),
                 fila.getLong("anuladas"), fila.getBigDecimal("monto_anulado").setScale(2)), valores.toArray());
+    }
+
+    @Override
+    public ReporteProductosMasVendidos.Resultado productosMasVendidos(FiltrosReporte filtros, OrdenProductos orden,
+                                                                     int limite) {
+        // El orden solo puede ser uno de estos dos textos fijos: nunca viene del usuario.
+        String criterio = orden == OrdenProductos.MONTO ? "monto DESC, cantidad DESC" : "cantidad DESC, monto DESC";
+        String sql = """
+                WITH vendidos AS (
+                    SELECT l.producto_id, sum(l.cantidad) AS cantidad, round(sum(l.subtotal_con_iva), 2) AS monto
+                    FROM venta_linea l
+                    JOIN venta v ON v.id = l.venta_id
+                    LEFT JOIN factura f ON f.venta_id = v.id
+                    WHERE l.eliminada_en IS NULL AND v.estado = 'FINALIZADA' AND f.estado IS DISTINCT FROM 'ANULADA'
+                      AND %s AND %s
+                    GROUP BY l.producto_id)
+                SELECT p.id, p.codigo_barras, p.descripcion, ve.cantidad, ve.monto, count(*) OVER () AS productos
+                FROM vendidos ve
+                JOIN producto p ON p.id = ve.producto_id
+                ORDER BY %s, lower(p.descripcion), p.id
+                LIMIT ?""".formatted(enPeriodo("v.finalizada_en"), deCajaYCajero("v"), criterio);
+        List<Object> valores = parametros(filtros);
+        valores.add(limite);
+        long[] productos = {0};
+        List<ReporteProductosMasVendidos.Fila> filas = jdbc.query(sql, (fila, i) -> {
+            productos[0] = fila.getLong("productos");
+            return new ReporteProductosMasVendidos.Fila(i + 1, fila.getLong("id"), fila.getString("codigo_barras"),
+                    fila.getString("descripcion"), fila.getLong("cantidad"), fila.getBigDecimal("monto"));
+        }, valores.toArray());
+        return new ReporteProductosMasVendidos.Resultado(productos[0], filas);
     }
 
     @Override
