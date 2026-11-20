@@ -4,6 +4,7 @@ import {
   generarDetalleCajero,
   generarReporteCajeros,
   type DetalleVentasCajero,
+  type Exportacion,
   type FilaVentasCajero,
   type FiltrosVentas,
   type OpcionesDeFiltro,
@@ -37,12 +38,22 @@ export function ReporteDeCajeros({ opciones }: { opciones: OpcionesDeFiltro }) {
       {generacion.data && filtros && (
         <TablaVentasPorCajero
           reporte={generacion.data}
+          exportacion={{ codigo: 'VENTAS_CAJERO', filtros }}
           cargandoDetalle={detalle.isPending}
           onVerDetalle={(cajeroId) => detalle.mutate({ cajeroId, filtros })}
         />
       )}
       <ErrorDeReporte error={detalle.error} />
-      {detalle.data && <TablaDetalleCajero detalle={detalle.data} />}
+      {detalle.data && detalle.variables && (
+        <TablaDetalleCajero
+          detalle={detalle.data}
+          exportacion={{
+            codigo: 'DETALLE_CAJERO',
+            filtros: detalle.variables.filtros,
+            cajeroId: detalle.variables.cajeroId,
+          }}
+        />
+      )}
     </>
   )
 }
@@ -63,16 +74,18 @@ const celdas = (fila: FilaVentasCajero) => (
 /** HU-10.03 crit. 1: por cajero, ventas, total, canceladas, líneas eliminadas y facturas anuladas. */
 export function TablaVentasPorCajero({
   reporte,
+  exportacion,
   cargandoDetalle = false,
   onVerDetalle,
 }: {
   reporte: ReporteVentasPorCajero
+  exportacion?: Exportacion
   cargandoDetalle?: boolean
   onVerDetalle: (cajeroId: number) => void
 }) {
   return (
     <section aria-label="Ventas por cajero">
-      <EncabezadoDeReporte encabezado={reporte.encabezado} />
+      <EncabezadoDeReporte encabezado={reporte.encabezado} exportacion={exportacion} />
       {reporte.filas.length === 0 ? (
         <p className="tarjeta">No hay actividad de cajeros con estos filtros.</p>
       ) : (
@@ -131,10 +144,16 @@ export function TablaVentasPorCajero({
 }
 
 /** HU-10.03 crit. 2: las ventas finalizadas y canceladas de un cajero, en orden. */
-export function TablaDetalleCajero({ detalle }: { detalle: DetalleVentasCajero }) {
+export function TablaDetalleCajero({
+  detalle,
+  exportacion,
+}: {
+  detalle: DetalleVentasCajero
+  exportacion?: Exportacion
+}) {
   return (
     <section aria-label="Detalle de ventas del cajero">
-      <EncabezadoDeReporte encabezado={detalle.encabezado} />
+      <EncabezadoDeReporte encabezado={detalle.encabezado} exportacion={exportacion} />
       {detalle.ventas.length === 0 ? (
         <p className="tarjeta">El cajero no tiene ventas finalizadas ni canceladas con estos filtros.</p>
       ) : (

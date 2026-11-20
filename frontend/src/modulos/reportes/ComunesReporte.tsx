@@ -1,5 +1,14 @@
+import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
-import type { Agrupacion, EncabezadoReporte, FiltrosVentas, OpcionesDeFiltro } from '../../api/reportes'
+import {
+  descargarReporte,
+  type Agrupacion,
+  type EncabezadoReporte,
+  type Exportacion,
+  type FiltrosVentas,
+  type FormatoExportacion,
+  type OpcionesDeFiltro,
+} from '../../api/reportes'
 import { fechaHora, filtrosIniciales } from './filtros'
 
 /**
@@ -167,10 +176,20 @@ export function FormularioFiltros({
 }
 
 /** HU-10.01 crit. 4: el título, los filtros aplicados, quién lo generó y cuándo. */
-export function EncabezadoDeReporte({ encabezado }: { encabezado: EncabezadoReporte }) {
+export function EncabezadoDeReporte({
+  encabezado,
+  exportacion,
+}: {
+  encabezado: EncabezadoReporte
+  /** HU-10.13 y HU-10.14: con qué filtros exportar lo que se ve; sin esto no se muestran los botones. */
+  exportacion?: Exportacion
+}) {
   return (
     <header className="tarjeta" aria-label="Encabezado del reporte">
-      <h2>{encabezado.titulo}</h2>
+      <div className="encabezado-reporte">
+        <h2>{encabezado.titulo}</h2>
+        {exportacion && <BotonesExportar exportacion={exportacion} />}
+      </div>
       <ul>
         {encabezado.filtros.map((filtro) => (
           <li key={filtro.etiqueta}>
@@ -184,6 +203,28 @@ export function EncabezadoDeReporte({ encabezado }: { encabezado: EncabezadoRepo
         </small>
       </p>
     </header>
+  )
+}
+
+/** HU-10.13 y HU-10.14: exportar el reporte a PDF o a Excel con los mismos filtros. */
+export function BotonesExportar({ exportacion }: { exportacion: Exportacion }) {
+  const descarga = useMutation({ mutationFn: (formato: FormatoExportacion) => descargarReporte(exportacion, formato) })
+  return (
+    <div className="exportar">
+      <div className="acciones" role="group" aria-label="Exportar el reporte">
+        <button type="button" disabled={descarga.isPending} onClick={() => descarga.mutate('PDF')}>
+          {descarga.isPending && descarga.variables === 'PDF' ? 'Exportando…' : 'Exportar a PDF'}
+        </button>
+        <button type="button" disabled={descarga.isPending} onClick={() => descarga.mutate('XLSX')}>
+          {descarga.isPending && descarga.variables === 'XLSX' ? 'Exportando…' : 'Exportar a Excel'}
+        </button>
+      </div>
+      {descarga.error && (
+        <p className="error" role="alert">
+          {descarga.error.message}
+        </p>
+      )}
+    </div>
   )
 }
 

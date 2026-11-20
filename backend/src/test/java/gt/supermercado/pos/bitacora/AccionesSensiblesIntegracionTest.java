@@ -469,6 +469,16 @@ class AccionesSensiblesIntegracionTest {
                 cookieAdmin))).containsExactly(new Registro(REPORTE_GENERADO, false, adminId));   // fechas invertidas
     }
 
+    @Test
+    void exportacionDeReporteExitosaYRechazada() throws Exception {   // HU-10.13, HU-10.14 y HU-10.15 crit. 3
+        assertThat(registrosDe(() -> enviar("/api/reportes/exportar/VENTAS_PERIODO?formato=PDF&desde=2026-11-01"
+                + "&hasta=2026-11-20", "GET", null, cookieAdmin)))
+                .containsExactly(new Registro(REPORTE_EXPORTADO, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/reportes/exportar/VENTAS_PERIODO?formato=XLSX&desde=2026-11-20"
+                + "&hasta=2026-11-01", "GET", null, cookieAdmin)))
+                .containsExactly(new Registro(REPORTE_EXPORTADO, false, adminId));   // fechas invertidas
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test

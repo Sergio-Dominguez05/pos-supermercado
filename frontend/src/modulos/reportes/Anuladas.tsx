@@ -1,5 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
-import { generarReporteAnuladas, type OpcionesDeFiltro, type ReporteAnuladas } from '../../api/reportes'
+import {
+  generarReporteAnuladas,
+  type Exportacion,
+  type OpcionesDeFiltro,
+  type ReporteAnuladas,
+} from '../../api/reportes'
 import { formatoQuetzales } from '../catalogo/textos'
 import { EncabezadoDeReporte, ErrorDeReporte, FormularioFiltros } from './ComunesReporte'
 import { fechaHora } from './filtros'
@@ -16,16 +21,18 @@ export function ReporteDeAnuladas({ opciones }: { opciones: OpcionesDeFiltro }) 
         onGenerar={generacion.mutate}
       />
       <ErrorDeReporte error={generacion.error} />
-      {generacion.data && <TablaAnuladas reporte={generacion.data} />}
+      {generacion.data && generacion.variables && (
+        <TablaAnuladas reporte={generacion.data} exportacion={{ codigo: 'ANULADAS', filtros: generacion.variables }} />
+      )}
     </>
   )
 }
 
 /** HU-10.09 crit. 1: cada anulación con sus fechas, su factura, el monto, el motivo, el cajero y quién anuló. */
-export function TablaAnuladas({ reporte }: { reporte: ReporteAnuladas }) {
+export function TablaAnuladas({ reporte, exportacion }: { reporte: ReporteAnuladas; exportacion?: Exportacion }) {
   return (
     <section aria-label="Facturas anuladas">
-      <EncabezadoDeReporte encabezado={reporte.encabezado} />
+      <EncabezadoDeReporte encabezado={reporte.encabezado} exportacion={exportacion} />
       {reporte.facturas.length === 0 ? (
         <p className="tarjeta">No hay facturas anuladas con estos filtros.</p>
       ) : (

@@ -1,4 +1,4 @@
-import { pedir } from './cliente'
+import { ErrorDeApi, pedir, type ErrorApi } from './cliente'
 
 /** Una opción de una lista de filtros: el valor que se envía y el texto que se muestra. */
 export interface OpcionFiltro {
@@ -274,6 +274,86 @@ export const generarReporteAnuladas = (filtros: FiltrosVentas) =>
   pedir<ReporteAnuladas>(
     `/api/reportes/anuladas?${consultaDe({ ...sinAgrupacion(filtros), anuladaPorId: filtros.anuladaPorId })}`,
   )
+
+/** HU-10.13 y HU-10.14: los reportes y detalles que se exportan, con el código que usa el servidor. */
+export type CodigoExportable =
+  | 'VENTAS_PERIODO'
+  | 'VENTAS_CAJERO'
+  | 'DETALLE_CAJERO'
+  | 'TARJETAS'
+  | 'DETALLE_TARJETA'
+  | 'IVA'
+  | 'DETALLE_IVA'
+  | 'CIERRES'
+  | 'ANULADAS'
+
+export type FormatoExportacion = 'PDF' | 'XLSX'
+
+/**
+ * Lo que hace falta para exportar lo que se ve: el reporte, los filtros con que se generó y, en los detalles, el
+ * cajero o el tipo de tarjeta de la fila elegida.
+ */
+export interface Exportacion {
+  codigo: CodigoExportable
+  filtros: FiltrosVentas
+  cajeroId?: number
+  tipoTarjeta?: TipoTarjeta
+}
+
+/** Los mismos filtros que usó la pantalla, para que el archivo tenga los mismos datos (HU-10.13 crit. 3). */
+export const rutaExportacion = (
+  { codigo, filtros, cajeroId, tipoTarjeta }: Exportacion,
+  formato: FormatoExportacion,
+) => {
+  const propios = (): Record<string, string> => {
+    switch (codigo) {
+      case 'VENTAS_PERIODO':
+        return { agrupacion: filtros.agrupacion }
+      case 'TARJETAS':
+        return { tipoTarjeta: filtros.tipoTarjeta }
+      case 'CIERRES':
+        return { soloConDiferencias: filtros.soloConDiferencias ? 'true' : '' }
+      case 'ANULADAS':
+        return { anuladaPorId: filtros.anuladaPorId }
+      case 'DETALLE_CAJERO':
+        return { cajeroId: String(cajeroId ?? '') }
+      case 'DETALLE_TARJETA':
+        return { tipoTarjeta: tipoTarjeta ?? '' }
+      default:
+        return {}
+    }
+  }
+  return `/api/reportes/exportar/${codigo}?${consultaDe({ formato, ...sinAgrupacion(filtros), ...propios() })}`
+}
+
+/** El nombre que el servidor da al archivo, o uno genérico. */
+export const nombreDeArchivo = (disposicion: string | null, formato: FormatoExportacion) =>
+  /filename="?([^";]+)"?/.exec(disposicion ?? '')?.[1] ?? `reporte.${formato === 'PDF' ? 'pdf' : 'xlsx'}`
+
+/**
+ * Pide el archivo y lo descarga. La exportación queda en la bitácora (HU-10.15 crit. 3); con filtros inválidos el
+ * servidor responde con el error en JSON, como el resto de la API.
+ */
+export async function descargarReporte(exportacion: Exportacion, formato: FormatoExportacion) {
+  const respuesta = await fetch(rutaExportacion(exportacion, formato), { credentials: 'include' })
+  if (!respuesta.ok) {
+    const error: ErrorApi = await respuesta.json().catch(() => ({
+      codigo: 'SIN_RESPUESTA',
+      mensaje: 'No se pudo exportar el reporte.',
+      detalles: [],
+    }))
+    throw new ErrorDeApi(respuesta.status, error)
+  }
+  const nombre = nombreDeArchivo(respuesta.headers.get('Content-Disposition'), formato)
+  const enlace = document.createElement('a')
+  enlace.href = URL.createObjectURL(await respuesta.blob())
+  enlace.download = nombre
+  document.body.append(enlace)
+  enlace.click()
+  enlace.remove()
+  setTimeout(() => URL.revokeObjectURL(enlace.href), 1000)
+  return nombre
+}
 
 /** Cada generación queda en la bitácora (HU-10.15 crit. 3). */
 export const generarReporteVentas = (filtros: FiltrosVentas) =>

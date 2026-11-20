@@ -1,6 +1,16 @@
 package gt.supermercado.pos.reportes;
 
+import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import gt.supermercado.pos.TestcontainersConfiguration;
+import gt.supermercado.pos.facturacion.FacturacionDePrueba;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -402,6 +413,120 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void exportaAPdfConLaEmpresaLosFiltrosYLosMismosTotales() throws Exception {   // HU-10.13 crit. 1 a 3
+        FacturacionDePrueba.configurarEmisorYEstablecimiento(jdbc);
+        Caja caja = caja();
+        caja.venta("FINALIZADA", "2025-03-03T15:00:00Z", "100.00", null);
+        caja.venta("FINALIZADA", "2025-03-04T15:00:00Z", "11.20", null);
+
+        HttpResponse<byte[]> respuesta = bytes("/api/reportes/exportar/VENTAS_PERIODO?formato=PDF&desde=2025-03-03"
+                + "&hasta=2025-03-04&cajaId=" + caja.id);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.headers().firstValue("Content-Type")).hasValue("application/pdf");
+        assertThat(respuesta.headers().firstValue("Content-Disposition").orElseThrow())
+                .contains("attachment", "ventas-por-periodo_2025-03-03_2025-03-04.pdf");
+        assertThat(new String(respuesta.body(), 0, 5)).isEqualTo("%PDF-");
+        String texto = new PdfTextExtractor(new PdfReader(respuesta.body())).getTextFromPage(1);
+        var emisor = jdbc.queryForMap("SELECT nombre_comercial, razon_social, nit FROM emisor WHERE id = 1");
+        assertThat(texto).contains((String) emisor.get("nombre_comercial"), (String) emisor.get("razon_social"),
+                "NIT " + emisor.get("nit"));   // crit. 2
+        assertThat(texto).contains("Ventas por período", "Período: Del 03/03/2025 al 04/03/2025",
+                "Caja: " + caja.nombre, "Agrupación: Día", "Generado el");
+        assertThat(texto).contains("03/03/2025", "04/03/2025", "Q100.00", "Q11.20", "Q111.20", "Q55.60");   // crit. 3
+        assertThat(texto.indexOf("03/03/2025 1")).isLessThan(texto.indexOf("04/03/2025 1"));
+
+        var registro = jdbc.queryForMap("""
+                SELECT descripcion, cambios->>'formato' AS formato FROM bitacora
+                WHERE accion = 'REPORTE_EXPORTADO' AND exitoso AND usuario_id = ? ORDER BY secuencia DESC LIMIT 1""",
+                supervisorId);
+        assertThat(registro.get("formato")).isEqualTo("PDF");
+        assertThat((String) registro.get("descripcion")).startsWith("Reporte \"Ventas por período\" exportado a PDF");
+    }
+
+    @Test
+    void exportaAExcelConNumerosYFechasDeVerdad() throws Exception {   // HU-10.14 crit. 1 a 3
+        Caja caja = caja();
+        long venta = caja.venta("FINALIZADA", "2025-09-01T15:00:00Z", "112.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-09-02T15:00:00Z", "22.40", "CERTIFICADA");
+
+        HttpResponse<byte[]> respuesta = bytes("/api/reportes/exportar/DETALLE_IVA?formato=XLSX&desde=2025-09-01"
+                + "&hasta=2025-09-30&cajaId=" + caja.id);
+
+        assertThat(respuesta.statusCode()).isEqualTo(200);
+        assertThat(respuesta.headers().firstValue("Content-Disposition").orElseThrow())
+                .contains("iva-por-factura_2025-09-01_2025-09-30.xlsx");
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(respuesta.body()))) {
+            Sheet hoja = libro.getSheetAt(0);
+            DataFormatter formato = new DataFormatter();
+            List<String> textos = new ArrayList<>();
+            hoja.forEach(fila -> fila.forEach(celda -> textos.add(formato.formatCellValue(celda))));
+            assertThat(textos).contains("Detalle de IVA por factura", "Período", "Del 01/09/2025 al 30/09/2025",
+                    "Caja", caja.nombre);   // crit. 3
+            Row titulos = buscarFila(hoja, "Emitida");
+            Row primera = hoja.getRow(titulos.getRowNum() + 1);
+            Cell emitida = primera.getCell(0);
+            assertThat(emitida.getCellType()).isEqualTo(CellType.NUMERIC);   // crit. 2: fecha de verdad
+            assertThat(DateUtil.isCellDateFormatted(emitida)).isTrue();
+            assertThat(emitida.getLocalDateTimeCellValue()).isEqualTo("2025-09-01T09:00");   // hora de Guatemala
+            assertThat(primera.getCell(1).getStringCellValue()).isEqualTo("SERIE-" + venta);
+            Cell total = primera.getCell(8);
+            assertThat(total.getCellType()).isEqualTo(CellType.NUMERIC);    // crit. 2: monto como número
+            assertThat(total.getNumericCellValue()).isEqualTo(112.00);
+            assertThat(primera.getCell(6).getNumericCellValue()).isEqualTo(100.00);
+            assertThat(hoja.getRow(titulos.getRowNum() + 2).getCell(8).getNumericCellValue()).isEqualTo(22.40);
+        }
+    }
+
+    @Test
+    void exportaCadaReporteYDetalleEnLosDosFormatos() throws Exception {   // HU-10.13 crit. 1, HU-10.14 crit. 1
+        Caja caja = caja();
+        long venta = caja.venta("FINALIZADA", "2025-10-05T15:00:00Z", "45.00", "ANULADA");
+        caja.pago(venta, "DEBITO", "45.00", "AUT-9", false);
+        caja.anular(venta, "2025-10-05T16:00:00Z", "Error de digitación", supervisorId);
+        caja.cierre("2025-10-05T23:00:00Z", "45.00", "40.00", "Faltó un voucher");
+        String filtros = "&desde=2025-10-01&hasta=2025-10-31&cajaId=" + caja.id;
+        List<String> rutas = List.of("VENTAS_PERIODO?agrupacion=SEMANA", "VENTAS_CAJERO?x=1",
+                "DETALLE_CAJERO?cajeroId=" + caja.cajeroId, "TARJETAS?tipoTarjeta=DEBITO",
+                "DETALLE_TARJETA?tipoTarjeta=DEBITO", "IVA?x=1", "DETALLE_IVA?x=1", "CIERRES?soloConDiferencias=true",
+                "ANULADAS?anuladaPorId=" + supervisorId);
+
+        for (String ruta : rutas) {
+            for (String formato : List.of("PDF", "XLSX")) {
+                HttpResponse<byte[]> respuesta = bytes("/api/reportes/exportar/" + ruta + "&formato=" + formato + filtros);
+                assertThat(respuesta.statusCode()).as(ruta + " " + formato).isEqualTo(200);
+                assertThat(respuesta.body().length).as(ruta + " " + formato).isGreaterThan(500);
+            }
+        }
+        String cierres = new PdfTextExtractor(new PdfReader(bytes("/api/reportes/exportar/CIERRES?formato=PDF"
+                + filtros).body())).getTextFromPage(1);
+        assertThat(cierres).contains("Total de faltantes: Q5.00", "-Q5.00", "Faltó un voucher");
+        String anuladas = new PdfTextExtractor(new PdfReader(bytes("/api/reportes/exportar/ANULADAS?formato=PDF"
+                + filtros).body())).getTextFromPage(1);
+        assertThat(anuladas).contains("Error de digitación", "1 factura anulada", "Q45.00");
+    }
+
+    @Test
+    void laExportacionRechazaLosFiltrosInvalidosYQuedaEnLaBitacora() throws Exception {   // HU-10.15 crit. 3
+        assertError(get("/api/reportes/exportar/VENTAS_PERIODO?formato=PDF&desde=2025-04-10&hasta=2025-04-01"),
+                "FILTRO_FECHAS_INVERTIDAS");
+        assertError(get("/api/reportes/exportar/DETALLE_CAJERO?formato=XLSX&desde=2025-04-01&hasta=2025-04-10"),
+                "FILTRO_DETALLE_INCOMPLETO");
+        assertThat(get("/api/reportes/exportar/VENTAS_PERIODO?formato=CSV&desde=2025-04-01&hasta=2025-04-10")
+                .statusCode()).isEqualTo(400);
+        assertThat(get("/api/reportes/exportar/INVENTARIO?formato=PDF&desde=2025-04-01&hasta=2025-04-10")
+                .statusCode()).isEqualTo(400);
+
+        assertThat(jdbc.queryForList("""
+                SELECT descripcion FROM bitacora WHERE accion = 'REPORTE_EXPORTADO' AND NOT exitoso AND usuario_id = ?
+                ORDER BY secuencia""", String.class, supervisorId)).containsExactly(
+                "Exportación a PDF del reporte \"Ventas por período\" rechazada: La fecha final no puede ser anterior a "
+                        + "la fecha inicial.",
+                "Exportación a XLSX del reporte \"Detalle de ventas del cajero\" rechazada: Indique el cajero del "
+                        + "detalle.");
+    }
+
+    @Test
     void lasOpcionesTraenLosRangosRapidosConLaFechaDelServidor() throws Exception {   // HU-10.01 crit. 2 y 3
         Caja caja = caja();
         JsonNode opciones = ok(get("/api/reportes/filtros"));
@@ -471,15 +596,17 @@ class ReportesIntegracionTest {
         assertThat(enviar("/api/reportes/cajeros/%d/ventas?desde=2025-04-01&hasta=2025-04-10".formatted(cajeroId),
                 sesion).statusCode()).isEqualTo(403);
         for (String ruta : List.of("/api/reportes/tarjetas", "/api/reportes/tarjetas/DEBITO/pagos", "/api/reportes/iva",
-                "/api/reportes/iva/facturas", "/api/reportes/cierres", "/api/reportes/anuladas")) {
-            assertThat(enviar(ruta + "?desde=2025-04-01&hasta=2025-04-10", sesion).statusCode()).as(ruta)
+                "/api/reportes/iva/facturas", "/api/reportes/cierres", "/api/reportes/anuladas",
+                "/api/reportes/exportar/VENTAS_PERIODO")) {
+            assertThat(enviar(ruta + "?formato=PDF&desde=2025-04-01&hasta=2025-04-10", sesion).statusCode()).as(ruta)
                     .isEqualTo(403);
         }
         assertThat(jdbc.queryForList("""
                 SELECT cambios->>'permisoRequerido' FROM bitacora WHERE accion = 'ACCESO_DENEGADO' AND usuario_id = ?""",
-                String.class, cajeroId)).hasSize(10).containsOnly("REPORTE_CONSULTAR");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bitacora WHERE accion = 'REPORTE_GENERADO' AND usuario_id = ?",
-                Integer.class, cajeroId)).isZero();
+                String.class, cajeroId)).hasSize(11).containsOnly("REPORTE_CONSULTAR");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE accion IN ('REPORTE_GENERADO', 'REPORTE_EXPORTADO')
+                AND usuario_id = ?""", Integer.class, cajeroId)).isZero();
     }
 
     @Test
@@ -639,6 +766,22 @@ class ReportesIntegracionTest {
         String setCookie = http.send(peticion, HttpResponse.BodyHandlers.ofString()).headers().firstValue("Set-Cookie")
                 .orElseThrow();
         return setCookie.substring(0, setCookie.indexOf(';'));
+    }
+
+    private HttpResponse<byte[]> bytes(String ruta) throws Exception {
+        return http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + puerto + ruta))
+                .header("Cookie", supervisor).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+    }
+
+    private static Row buscarFila(Sheet hoja, String primeraCelda) {
+        for (Row fila : hoja) {
+            Cell celda = fila.getCell(0);
+            if (celda != null && celda.getCellType() == CellType.STRING
+                    && celda.getStringCellValue().equals(primeraCelda)) {
+                return fila;
+            }
+        }
+        throw new AssertionError("No se encontró la fila " + primeraCelda);
     }
 
     private HttpResponse<String> enviar(String ruta, String cookie) throws Exception {

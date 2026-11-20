@@ -18,6 +18,8 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<archunit.version>1.5.1</archunit.version>
 		<bouncycastle.version>1.86</bouncycastle.version>
+		<openpdf.version>2.4.0</openpdf.version>
+		<poi.version>5.5.1</poi.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -54,6 +56,20 @@
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
 			<version>${bouncycastle.version}</version>
+		</dependency>
+
+		<dependency>
+			<!-- HU-10.13: exportar los reportes a PDF (Architecture.md §3) -->
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>${openpdf.version}</version>
+		</dependency>
+
+		<dependency>
+			<!-- HU-10.14: exportar los reportes a Excel (.xlsx) -->
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>${poi.version}</version>
 		</dependency>
 
 		<dependency>

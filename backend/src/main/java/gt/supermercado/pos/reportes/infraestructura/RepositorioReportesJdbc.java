@@ -1,5 +1,6 @@
 package gt.supermercado.pos.reportes.infraestructura;
 
+import gt.supermercado.pos.reportes.dominio.DatosEmpresa;
 import gt.supermercado.pos.reportes.dominio.DetalleFacturasIva;
 import gt.supermercado.pos.reportes.dominio.DetallePagosTarjeta;
 import gt.supermercado.pos.reportes.dominio.DetalleVentasCajero;
@@ -291,6 +292,19 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                 ORDER BY lower(u.nombre_completo), u.username""",
                 (fila, i) -> new Opcion(String.valueOf(fila.getLong("id")),
                         fila.getString("nombre_completo") + " (" + fila.getString("username") + ")"));
+    }
+
+    @Override
+    public DatosEmpresa empresa() {
+        // V1 tiene una sola sucursal (Matriz); su establecimiento es el de menor id.
+        return jdbc.query("""
+                SELECT e.nombre_comercial, e.razon_social, e.nit, s.nombre AS establecimiento, s.direccion
+                FROM (SELECT 1) uno
+                LEFT JOIN emisor e ON e.id = 1
+                LEFT JOIN (SELECT nombre, direccion FROM establecimiento ORDER BY sucursal_id LIMIT 1) s ON true""",
+                (fila, i) -> new DatosEmpresa(fila.getString("nombre_comercial"), fila.getString("razon_social"),
+                        fila.getString("nit"), fila.getString("establecimiento"), fila.getString("direccion")))
+                .stream().findFirst().orElse(DatosEmpresa.SIN_CONFIGURAR);
     }
 
     @Override

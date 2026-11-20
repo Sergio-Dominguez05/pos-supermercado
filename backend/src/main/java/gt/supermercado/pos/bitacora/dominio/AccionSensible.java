@@ -84,7 +84,7 @@ public enum AccionSensible {
     // Reportes (HU-10.15 crit. 3)
     /** Cada reporte generado, con sus filtros; también el intento con filtros inválidos (HU-10.15). */
     REPORTE_GENERADO(Categoria.REPORTES, "reportes"),
-    /** Cada reporte exportado a PDF o Excel. Pendiente: HU-10.13 y HU-10.14. */
+    /** Cada reporte exportado a PDF o Excel, con su formato; también el intento con filtros inválidos (HU-10.13/14). */
     REPORTE_EXPORTADO(Categoria.REPORTES, "reportes");
 
     /** Los grupos de eventos del criterio 1 de HU-11.01, más los reportes (HU-10.15 crit. 3). */
