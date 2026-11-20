@@ -72,18 +72,24 @@ class InicioSesionIntegracionTest {
     @Test
     void elAdministradorInicialSeCreaConContrasenaTemporalYPuedeEntrar() throws Exception {
         var admin = jdbc.queryForMap(
-                "SELECT rol_id, credencial_hash, credencial_temporal, activo FROM usuario WHERE username = 'admin'");
+                "SELECT rol_id, credencial_hash, activo FROM usuario WHERE username = 'admin'");
         assertThat(((Number) admin.get("rol_id")).intValue()).isEqualTo(1);
         assertThat((String) admin.get("credencial_hash")).startsWith("$argon2id$").doesNotContain(CONTRASENA_ADMIN);
-        assertThat(admin.get("credencial_temporal")).isEqualTo(true);
         assertThat(admin.get("activo")).isEqualTo(true);
+        // Se crea con contraseña temporal (usuario.credencial_temporal es true por omisión, V2), pero
+        // TestcontainersConfiguration la da por cambiada para las demás pruebas (HU-01.15): aquí se vuelve a marcar como
+        // temporal y se restaura al terminar.
+        jdbc.update("UPDATE usuario SET credencial_temporal = true WHERE username = 'admin'");
+        try {
+            HttpResponse<String> respuesta = login("admin", CONTRASENA_ADMIN);
 
-        HttpResponse<String> respuesta = login("admin", CONTRASENA_ADMIN);
-
-        assertThat(respuesta.statusCode()).isEqualTo(200);
-        assertThat(respuesta.body())
-                .contains("\"rol\":\"ADMIN\"", "\"credencialTemporal\":true")
-                .contains("USUARIO_ADMINISTRAR", "CONFIGURACION_MODIFICAR");
+            assertThat(respuesta.statusCode()).isEqualTo(200);
+            assertThat(respuesta.body())
+                    .contains("\"rol\":\"ADMIN\"", "\"credencialTemporal\":true")
+                    .contains("USUARIO_ADMINISTRAR", "CONFIGURACION_MODIFICAR");
+        } finally {
+            jdbc.update("UPDATE usuario SET credencial_temporal = false WHERE username = 'admin'");
+        }
     }
 
     @Test
