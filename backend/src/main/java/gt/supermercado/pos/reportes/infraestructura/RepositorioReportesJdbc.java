@@ -14,6 +14,7 @@ import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
 import gt.supermercado.pos.reportes.dominio.OrdenProductos;
 import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorHora;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.VentasDelDia;
@@ -180,6 +181,20 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                     fila.getString("descripcion"), fila.getLong("cantidad"), fila.getBigDecimal("monto"));
         }, valores.toArray());
         return new ReporteProductosMasVendidos.Resultado(productos[0], filas);
+    }
+
+    @Override
+    public List<ReporteVentasPorHora.VentasDeLaHora> ventasPorHora(FiltrosReporte filtros) {
+        return jdbc.query("""
+                SELECT extract(hour FROM v.finalizada_en AT TIME ZONE 'America/Guatemala')::int AS hora,
+                       count(*) AS cantidad, sum(v.total) AS total
+                FROM venta v LEFT JOIN factura f ON f.venta_id = v.id
+                WHERE v.estado = 'FINALIZADA' AND f.estado IS DISTINCT FROM 'ANULADA' AND %s AND %s
+                GROUP BY 1
+                ORDER BY 1""".formatted(enPeriodo("v.finalizada_en"), deCajaYCajero("v")),
+                (fila, i) -> new ReporteVentasPorHora.VentasDeLaHora(fila.getInt("hora"), fila.getLong("cantidad"),
+                        fila.getBigDecimal("total")),
+                parametros(filtros).toArray());
     }
 
     @Override

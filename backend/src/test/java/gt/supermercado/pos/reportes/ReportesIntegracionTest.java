@@ -184,6 +184,38 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void agrupaLasVentasPorHoraDeGuatemalaYPromediaUnPeriodo() throws Exception {   // HU-10.11 crit. 1 y 2
+        Caja caja = caja();
+        caja.venta("FINALIZADA", "2025-05-05T14:10:00Z", "10.00", null);    // 08:10 en Guatemala
+        caja.venta("FINALIZADA", "2025-05-05T14:50:00Z", "20.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-05-05T14:55:00Z", "99.00", "ANULADA"); // no se cuenta
+        caja.venta("CANCELADA", "2025-05-05T15:00:00Z", "50.00", null);       // no es venta
+        caja.venta("FINALIZADA", "2025-05-06T05:30:00Z", "30.00", null);     // 23:30 del 5 de mayo
+        caja.venta("FINALIZADA", "2025-05-06T14:00:00Z", "40.00", null);     // 08:00 del 6 de mayo
+
+        JsonNode dia = ok(get("/api/reportes/horas?desde=2025-05-05&hasta=2025-05-05&cajaId=" + caja.id));
+
+        assertThat(dia.get("encabezado").get("titulo").asString()).isEqualTo("Ventas por hora");
+        assertThat(dia.get("promedio").asBoolean()).isFalse();
+        List<JsonNode> horas = filas(dia);
+        assertThat(horas).hasSize(24);
+        assertThat(horas.get(8).get("cantidadVentas").asLong()).isEqualTo(2);
+        assertThat(horas.get(8).get("totalVendido").decimalValue()).isEqualByComparingTo("30.00");
+        assertThat(horas.get(23).get("cantidadVentas").asLong()).isEqualTo(1);
+        assertThat(horas.get(9).get("cantidadVentas").asLong()).isZero();
+        assertThat(dia.get("horaPico").asInt()).isEqualTo(8);
+        assertThat(dia.get("totales").get("cantidadVentas").asLong()).isEqualTo(3);
+
+        JsonNode periodo = ok(get("/api/reportes/horas?desde=2025-05-05&hasta=2025-05-06&cajaId=" + caja.id));
+        assertThat(periodo.get("promedio").asBoolean()).isTrue();
+        assertThat(periodo.get("dias").asLong()).isEqualTo(2);
+        JsonNode ocho = filas(periodo).get(8);
+        assertThat(ocho.get("cantidadVentas").asLong()).isEqualTo(3);
+        assertThat(ocho.get("promedioVentas").decimalValue()).isEqualByComparingTo("1.5");
+        assertThat(ocho.get("promedioTotal").decimalValue()).isEqualByComparingTo("35.00");
+    }
+
+    @Test
     void resumePorCajaLasVentasElTotalYLosTurnos() throws Exception {   // HU-10.04 crit. 1
         Caja caja = caja();
         caja.venta("FINALIZADA", "2025-08-04T15:00:00Z", "100.00", "CERTIFICADA");
@@ -610,7 +642,7 @@ class ReportesIntegracionTest {
         caja.anular(venta, "2025-10-05T16:00:00Z", "Error de digitación", supervisorId);
         caja.cierre("2025-10-05T23:00:00Z", "45.00", "40.00", "Faltó un voucher");
         String filtros = "&desde=2025-10-01&hasta=2025-10-31&cajaId=" + caja.id;
-        List<String> rutas = List.of("VENTAS_PERIODO?agrupacion=SEMANA", "VENTAS_CAJERO?x=1", "VENTAS_CAJA?x=1",
+        List<String> rutas = List.of("VENTAS_PERIODO?agrupacion=SEMANA", "VENTAS_CAJERO?x=1", "VENTAS_CAJA?x=1", "VENTAS_HORA?x=1",
                 "PRODUCTOS?ordenarPor=MONTO&limite=50",
                 "DETALLE_CAJERO?cajeroId=" + caja.cajeroId, "TARJETAS?tipoTarjeta=DEBITO",
                 "DETALLE_TARJETA?tipoTarjeta=DEBITO", "IVA?x=1", "DETALLE_IVA?x=1", "CIERRES?soloConDiferencias=true",

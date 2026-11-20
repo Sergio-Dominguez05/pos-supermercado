@@ -29,6 +29,12 @@ public interface RepositorioReportes {
     ReporteProductosMasVendidos.Resultado productosMasVendidos(FiltrosReporte filtros, OrdenProductos orden,
                                                               int limite);
 
+    /**
+     * HU-10.11: las ventas finalizadas en el período, sin las de facturas anuladas, agrupadas por la hora de
+     * finalización en hora de Guatemala (0 a 23). Solo las horas con ventas.
+     */
+    List<ReporteVentasPorHora.VentasDeLaHora> ventasPorHora(FiltrosReporte filtros);
+
     /** HU-10.03 crit. 2: las ventas finalizadas y canceladas del cajero de los filtros, en orden cronológico. */
     List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros);
 
