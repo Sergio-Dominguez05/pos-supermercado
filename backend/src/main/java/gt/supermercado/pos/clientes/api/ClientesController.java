@@ -4,6 +4,8 @@ import gt.supermercado.pos.clientes.aplicacion.GestionClientes;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.BusquedaNit;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.SolicitudCliente;
 import gt.supermercado.pos.clientes.dominio.Cliente;
+import gt.supermercado.pos.clientes.dominio.FiltroClientes;
+import gt.supermercado.pos.clientes.dominio.PaginaClientes;
 import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +41,15 @@ public class ClientesController {
     }
 
     public record SolicitudAsignacion(Long clienteId) {}
+
+    /** HU-05.10: lista paginada, con búsqueda por NIT, CUI o nombre. */
+    @GetMapping("/api/clientes")
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
+    public PaginaClientes listar(@RequestParam(required = false) String q,
+                                 @RequestParam(defaultValue = "0") int pagina,
+                                 @RequestParam(defaultValue = "25") int tamano) {
+        return gestion.listar(new FiltroClientes(q, pagina, tamano));
+    }
 
     /**
      * HU-05.02 y HU-05.04: el cliente con ese NIT (con o sin guion). Si no está registrado se consulta al certificador.

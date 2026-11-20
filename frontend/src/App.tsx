@@ -5,6 +5,7 @@ import { BuscarProducto } from './modulos/catalogo/BuscarProducto'
 import { EditarProducto } from './modulos/catalogo/EditarProducto'
 import { ListaProductos } from './modulos/catalogo/ListaProductos'
 import { NuevoProducto } from './modulos/catalogo/NuevoProducto'
+import { ListaClientes } from './modulos/clientes/ListaClientes'
 import { PaginaConexionFel } from './modulos/configuracion/ConexionFel'
 import { PaginaEmisor } from './modulos/configuracion/DatosEmisor'
 import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimiento'
@@ -224,6 +225,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <Bitacora />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/clientes"
+            element={
+              <RutaProtegida>
+                <ListaClientes />
               </RutaProtegida>
             }
           />

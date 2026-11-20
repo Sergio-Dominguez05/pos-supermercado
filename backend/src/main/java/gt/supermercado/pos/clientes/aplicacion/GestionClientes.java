@@ -4,6 +4,8 @@ import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.clientes.dominio.Cliente;
+import gt.supermercado.pos.clientes.dominio.FiltroClientes;
+import gt.supermercado.pos.clientes.dominio.PaginaClientes;
 import gt.supermercado.pos.clientes.dominio.RepositorioClientes;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.Nit;
@@ -37,7 +39,7 @@ import java.util.regex.Pattern;
  *   <li>HU-05.05: el registro pide NIT y nombre; la dirección es "Ciudad" si no se indica y el correo es opcional.
  *       Un NIT ya registrado no se duplica. Queda en la bitácora con quien lo registró.</li>
  * </ul>
- * El CUI (HU-05.06), el límite para CF (HU-05.07) y la edición y lista de clientes (HU-05.09 y 05.10) llegan después.
+ * El CUI (HU-05.06), el límite para CF (HU-05.07) y la edición de clientes (HU-05.09) llegan después.
  */
 @Service
 public class GestionClientes {
@@ -77,6 +79,12 @@ public class GestionClientes {
     public record BusquedaNit(Origen origen, String nit, Cliente cliente, String mensaje) {}
 
     public record SolicitudCliente(String nit, String nombre, String direccion, String correo) {}
+
+    /** HU-05.10: clientes registrados, con búsqueda y paginación. */
+    @Transactional(readOnly = true)
+    public PaginaClientes listar(FiltroClientes filtro) {
+        return clientes.listar(filtro);
+    }
 
     @Transactional
     public BusquedaNit buscar(String nit, SesionActiva sesion) {

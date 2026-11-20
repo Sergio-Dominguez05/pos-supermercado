@@ -5,6 +5,8 @@ import java.util.Optional;
 /** Los clientes registrados (EP-05). */
 public interface RepositorioClientes {
 
+    PaginaClientes listar(FiltroClientes filtro);
+
     /** {@code nit} ya normalizado. */
     Optional<Cliente> porNit(String nit);
 

@@ -34,6 +34,40 @@ export interface DatosCliente {
   correo: string
 }
 
+/** HU-05.10: cliente mostrado en el directorio. */
+export interface ClienteListado {
+  id: number
+  tipoIdentificacion: 'NIT' | 'CUI'
+  identificacion: string
+  nombre: string
+  direccion: string
+  correo: string | null
+  ultimaCompra: string | null
+}
+
+export interface FiltroClientes {
+  q: string
+  pagina: number
+}
+
+export const FILTRO_CLIENTES_INICIAL: FiltroClientes = { q: '', pagina: 0 }
+
+export interface PaginaClientes {
+  clientes: ClienteListado[]
+  pagina: number
+  tamano: number
+  total: number
+}
+
+export const claveListaClientes = (filtro: FiltroClientes) => ['clientes', 'lista', filtro] as const
+
+export function listarClientes(filtro: FiltroClientes) {
+  const parametros = new URLSearchParams()
+  if (filtro.q.trim()) parametros.set('q', filtro.q.trim())
+  if (filtro.pagina > 0) parametros.set('pagina', String(filtro.pagina))
+  return pedir<PaginaClientes>(`/api/clientes?${parametros}`)
+}
+
 export const claveClienteDeVenta = (ventaId: number) => ['ventas', ventaId, 'cliente'] as const
 
 export const buscarClientePorNit = (nit: string) =>

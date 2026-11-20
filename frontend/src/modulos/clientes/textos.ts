@@ -1,4 +1,4 @@
-import type { BusquedaNit, Cliente } from '../../api/clientes'
+import type { BusquedaNit, Cliente, ClienteListado } from '../../api/clientes'
 
 // Textos del cliente de la venta (EP-05), separados del componente para probarlos sin renderizar.
 
@@ -13,6 +13,25 @@ export const nitConGuion = (nit: string) => (nit.length > 1 ? `${nit.slice(0, -1
 
 export const describirCliente = (cliente: Cliente | null) =>
   cliente ? `NIT ${nitConGuion(cliente.nit)} · ${cliente.nombre} · ${cliente.direccion}` : CONSUMIDOR_FINAL
+
+export const identificacionCliente = (cliente: ClienteListado) =>
+  `${cliente.tipoIdentificacion} ${cliente.tipoIdentificacion === 'NIT'
+    ? nitConGuion(cliente.identificacion)
+    : cliente.identificacion}`
+
+export const fechaUltimaCompra = (iso: string | null) => iso
+  ? new Date(iso).toLocaleString('es-GT', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+      timeZone: 'America/Guatemala',
+    })
+  : 'Sin compras'
+
+export const resumenClientes = (pagina: number, tamano: number, total: number) => {
+  if (total === 0) return '0 clientes'
+  const paginas = Math.ceil(total / tamano)
+  return `Página ${pagina + 1} de ${paginas} · ${total} ${total === 1 ? 'cliente' : 'clientes'}`
+}
 
 /** Qué se le dice al cajero después de buscar el NIT. */
 export const avisoBusqueda = (busqueda: BusquedaNit) => {
