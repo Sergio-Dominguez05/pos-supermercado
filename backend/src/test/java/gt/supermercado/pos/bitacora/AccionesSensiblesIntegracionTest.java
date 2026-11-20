@@ -511,6 +511,14 @@ class AccionesSensiblesIntegracionTest {
                 .containsExactly(new Registro(REPORTE_EXPORTADO, false, adminId));   // fechas invertidas
     }
 
+    @Test
+    void consultaDeLaBitacoraExitosaYRechazada() throws Exception {   // HU-11.06 crit. 4
+        assertThat(registrosDe(() -> enviar("/api/bitacora?desde=2026-11-01&hasta=2026-11-20", "GET", null,
+                cookieAdmin))).containsExactly(new Registro(BITACORA_CONSULTADA, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/bitacora?desde=2026-11-20&hasta=2026-11-01", "GET", null,
+                cookieAdmin))).containsExactly(new Registro(BITACORA_CONSULTADA, false, adminId));   // fechas invertidas
+    }
+
     // Criterio 2: sin intervención del usuario, en el momento
 
     @Test
