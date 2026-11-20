@@ -126,3 +126,51 @@ export const listarCierres = () => pedir<CierreDeTurno[]>('/api/turnos/cierres')
 
 export const reimprimirCierre = (turnoId: number) =>
   pedir<ResultadoImpresionCierre>(`/api/turnos/${turnoId}/cierre/reimprimir`, { method: 'POST' })
+
+/** HU-09.13 crit. 2: los filtros de la consulta de cierres, como los escribe el formulario (vacío: sin filtro). */
+export interface FiltrosCierres {
+  desde: string
+  hasta: string
+  cajaId: string
+  cajeroId: string
+  soloConDiferencias: boolean
+}
+
+/** HU-09.13 crit. 1: una página de cierres, del más reciente al más antiguo. */
+export interface PaginaCierres {
+  cierres: CierreDeTurno[]
+  pagina: number
+  tamanoPagina: number
+  total: number
+}
+
+export interface OpcionesCierres {
+  cajas: { id: number; etiqueta: string }[]
+  cajeros: { id: number; etiqueta: string }[]
+}
+
+/** HU-09.13 crit. 3: el cierre completo con lo cobrado en el turno. */
+export interface DetalleCierre {
+  cierre: CierreDeTurno
+  resumen: ResumenDeTurno
+}
+
+export const CLAVE_OPCIONES_CIERRES = ['cierres', 'opciones'] as const
+export const claveDetalleCierre = (turnoId: number) => ['cierres', turnoId] as const
+
+export const rutaCierres = (filtros: FiltrosCierres, pagina: number) => {
+  const parametros = new URLSearchParams()
+  for (const nombre of ['desde', 'hasta', 'cajaId', 'cajeroId'] as const)
+    if (filtros[nombre].trim()) parametros.set(nombre, filtros[nombre].trim())
+  if (filtros.soloConDiferencias) parametros.set('soloConDiferencias', 'true')
+  if (pagina > 0) parametros.set('pagina', String(pagina))
+  const consulta = parametros.toString()
+  return `/api/cierres${consulta ? `?${consulta}` : ''}`
+}
+
+export const consultarCierres = (filtros: FiltrosCierres, pagina: number) =>
+  pedir<PaginaCierres>(rutaCierres(filtros, pagina))
+
+export const obtenerOpcionesCierres = () => pedir<OpcionesCierres>('/api/cierres/opciones')
+
+export const obtenerDetalleCierre = (turnoId: number) => pedir<DetalleCierre>(`/api/cierres/${turnoId}`)

@@ -6,6 +6,9 @@ import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
 import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.ComprobanteDeCierre;
 import gt.supermercado.pos.caja.dominio.EstadoTurno;
+import gt.supermercado.pos.caja.dominio.FiltrosCierres;
+import gt.supermercado.pos.caja.dominio.OpcionFiltro;
+import gt.supermercado.pos.caja.dominio.PaginaCierres;
 import gt.supermercado.pos.caja.dominio.ImpresionDeCierre;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
 import gt.supermercado.pos.caja.dominio.ResumenDeTurno;
@@ -201,6 +204,23 @@ public class CierreDeCaja {
     public List<CierreDeTurno> cierresAnteriores(SesionActiva sesion) {
         return repositorio.cierres(sesion.permisos().contains(VER_CIERRES) ? null : sesion.usuarioId(),
                 CIERRES_MAXIMOS);
+    }
+
+    /** Las cajas y los cajeros que se pueden elegir en los filtros de la consulta de cierres. */
+    public record OpcionesCierres(List<OpcionFiltro> cajas, List<OpcionFiltro> cajeros) {}
+
+    /**
+     * HU-09.13 crit. 1 y 2: los cierres anteriores de todas las cajas, para el supervisor, con fecha, caja, cajero,
+     * totales y diferencia; se filtran por fechas, caja, cajero y si tuvieron diferencia.
+     */
+    @Transactional(readOnly = true)
+    public PaginaCierres consultarCierres(FiltrosCierres filtros) {
+        return repositorio.buscarCierres(filtros);
+    }
+
+    @Transactional(readOnly = true)
+    public OpcionesCierres opcionesCierres() {
+        return new OpcionesCierres(repositorio.cajasConCierres(), repositorio.cajerosConCierres());
     }
 
     /** HU-09.10 crit. 3: reimprime un cierre anterior en la impresora de la caja desde donde se pide. */

@@ -3,6 +3,9 @@ package gt.supermercado.pos.caja.aplicacion;
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.EstadoTurno;
+import gt.supermercado.pos.caja.dominio.FiltrosCierres;
+import gt.supermercado.pos.caja.dominio.OpcionFiltro;
+import gt.supermercado.pos.caja.dominio.PaginaCierres;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
@@ -124,6 +127,21 @@ class GestionTurnosTest {
         @Override
         public List<Turno> abiertos() {
             return List.copyOf(abiertos);
+        }
+
+        @Override
+        public PaginaCierres buscarCierres(FiltrosCierres filtros) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<OpcionFiltro> cajasConCierres() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<OpcionFiltro> cajerosConCierres() {
+            throw new UnsupportedOperationException();
         }
 
         @Override

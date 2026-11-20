@@ -27,4 +27,13 @@ public interface RepositorioTurnos {
 
     /** HU-09.10 crit. 3: los cierres más recientes; solo los del usuario si {@code usuarioId} no es nulo. */
     List<CierreDeTurno> cierres(Long usuarioId, int limite);
+
+    /** HU-09.13 crit. 1 y 2: los cierres que cumplen los filtros, del más reciente al más antiguo. */
+    PaginaCierres buscarCierres(FiltrosCierres filtros);
+
+    /** HU-09.13 crit. 2: las cajas con algún cierre. */
+    List<OpcionFiltro> cajasConCierres();
+
+    /** HU-09.13 crit. 2: los cajeros con algún cierre. */
+    List<OpcionFiltro> cajerosConCierres();
 }
