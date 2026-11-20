@@ -197,6 +197,33 @@ class ReportesDominioTest {
     }
 
     @Test
+    void losProductosMasVendidosSumanLosMostradosEnLaFilaDeTotales() {   // HU-10.05 crit. 1
+        ReporteProductosMasVendidos reporte = ReporteProductosMasVendidos.de(ENCABEZADO, OrdenProductos.MONTO, 2,
+                new ReporteProductosMasVendidos.Resultado(5, List.of(
+                        new ReporteProductosMasVendidos.Fila(1, 10L, "750100", "Arroz 1 lb", 3, new BigDecimal("33.60")),
+                        new ReporteProductosMasVendidos.Fila(2, 11L, "750200", "Frijol 1 lb", 4, new BigDecimal("20.00")))));
+
+        assertThat(reporte.productosVendidos()).isEqualTo(5);
+        assertThat(reporte.limite()).isEqualTo(2);
+        assertThat(reporte.ordenarPor()).isEqualTo(OrdenProductos.MONTO);
+        assertThat(reporte.totales().descripcion()).isEqualTo("Total");
+        assertThat(reporte.totales().posicion()).isNull();
+        assertThat(reporte.totales().cantidad()).isEqualTo(7);
+        assertThat(reporte.totales().monto().toPlainString()).isEqualTo("53.60");
+    }
+
+    @Test
+    void elLimiteDeProductosEsVeintePorOmisionYVaDeUnoAQuinientos() {   // HU-10.05 crit. 3
+        assertThat(ReporteProductosMasVendidos.limiteValido(null)).isEqualTo(20);
+        assertThat(ReporteProductosMasVendidos.limiteValido(50)).isEqualTo(50);
+        assertThat(ReporteProductosMasVendidos.limiteValido(1)).isEqualTo(1);
+        assertThat(ReporteProductosMasVendidos.limiteValido(500)).isEqualTo(500);
+        assertThatThrownBy(() -> ReporteProductosMasVendidos.limiteValido(0)).isInstanceOf(NegocioException.class)
+                .hasMessage("Indique cuántos productos mostrar, entre 1 y 500.");
+        assertThatThrownBy(() -> ReporteProductosMasVendidos.limiteValido(501)).isInstanceOf(NegocioException.class);
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP

@@ -7,6 +7,7 @@ import { PERMISO_REPORTES, REPORTES, type CodigoReporte } from './filtros'
 import { ReporteDeAnuladas } from './Anuladas'
 import { ReporteDeCierres } from './Cierres'
 import { ReporteIva } from './Iva'
+import { ReporteDeProductos } from './ProductosMasVendidos'
 import { ReporteDeTarjetas } from './Tarjetas'
 import { ReporteDeCajas } from './VentasPorCaja'
 import { ReporteDeVentas } from './VentasPeriodo'
@@ -69,6 +70,7 @@ export function SelectorDeReportes({
       {elegido === 'VENTAS_PERIODO' && <ReporteDeVentas key={elegido} opciones={opciones} />}
       {elegido === 'VENTAS_CAJERO' && <ReporteDeCajeros key={elegido} opciones={opciones} />}
       {elegido === 'VENTAS_CAJA' && <ReporteDeCajas key={elegido} opciones={opciones} />}
+      {elegido === 'PRODUCTOS' && <ReporteDeProductos key={elegido} opciones={opciones} />}
       {elegido === 'TARJETAS' && <ReporteDeTarjetas key={elegido} opciones={opciones} />}
       {elegido === 'IVA' && <ReporteIva key={elegido} opciones={opciones} />}
       {elegido === 'CIERRES' && <ReporteDeCierres key={elegido} opciones={opciones} />}

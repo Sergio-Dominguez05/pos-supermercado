@@ -67,7 +67,36 @@ export interface FiltrosVentas {
   soloConDiferencias: boolean
   /** HU-10.09 crit. 2: el usuario que anuló, o vacío (cualquiera). */
   anuladaPorId: string
+  /** HU-10.05 crit. 2: ordenar los productos por cantidad (por omisión) o por monto. */
+  ordenarPor?: OrdenProductos
+  /** HU-10.05 crit. 3: cuántos productos mostrar; vacío = 20. */
+  limite?: string
 }
+
+export type OrdenProductos = 'CANTIDAD' | 'MONTO'
+
+/** HU-10.05: un producto en su posición, o la fila de totales (`posicion` y `productoId` nulos). */
+export interface FilaProductoVendido {
+  posicion: number | null
+  productoId: number | null
+  codigo: string | null
+  descripcion: string
+  cantidad: number
+  monto: number
+}
+
+export interface ReporteProductosMasVendidos {
+  encabezado: EncabezadoReporte
+  ordenarPor: OrdenProductos
+  limite: number
+  /** Cuántos productos distintos se vendieron en el período, aunque no se muestren todos. */
+  productosVendidos: number
+  filas: FilaProductoVendido[]
+  totales: FilaProductoVendido
+}
+
+/** Los filtros propios del reporte de productos más vendidos. */
+const deProductos = (filtros: FiltrosVentas) => ({ ordenarPor: filtros.ordenarPor ?? '', limite: filtros.limite ?? '' })
 
 export const CLAVE_FILTROS_REPORTE = ['reportes', 'filtros'] as const
 
@@ -143,6 +172,11 @@ export const generarReporteCajeros = (filtros: FiltrosVentas) =>
 
 export const generarReporteCajas = (filtros: FiltrosVentas) =>
   pedir<ReporteVentasPorCaja>(`/api/reportes/cajas?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteProductos = (filtros: FiltrosVentas) =>
+  pedir<ReporteProductosMasVendidos>(
+    `/api/reportes/productos?${consultaDe({ ...sinAgrupacion(filtros), ...deProductos(filtros) })}`,
+  )
 
 /** El detalle usa las fechas y la caja del resumen; el cajero es el de la fila elegida. */
 export const generarDetalleCajero = (cajeroId: number, filtros: FiltrosVentas) =>
@@ -302,6 +336,7 @@ export type CodigoExportable =
   | 'VENTAS_CAJERO'
   | 'DETALLE_CAJERO'
   | 'VENTAS_CAJA'
+  | 'PRODUCTOS'
   | 'TARJETAS'
   | 'DETALLE_TARJETA'
   | 'IVA'
@@ -337,6 +372,8 @@ export const rutaExportacion = (
         return { soloConDiferencias: filtros.soloConDiferencias ? 'true' : '' }
       case 'ANULADAS':
         return { anuladaPorId: filtros.anuladaPorId }
+      case 'PRODUCTOS':
+        return deProductos(filtros)
       case 'DETALLE_CAJERO':
         return { cajeroId: String(cajeroId ?? '') }
       case 'DETALLE_TARJETA':

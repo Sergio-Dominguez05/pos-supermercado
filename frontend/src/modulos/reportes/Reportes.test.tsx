@@ -151,6 +151,8 @@ describe('reportes (HU-10.01, HU-10.02, HU-10.15)', () => {
       tipoTarjeta: '',
       soloConDiferencias: false,
       anuladaPorId: '',
+      ordenarPor: 'CANTIDAD',
+      limite: '20',
     })
   })
 
