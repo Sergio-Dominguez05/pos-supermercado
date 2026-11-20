@@ -15,6 +15,13 @@ public interface RepositorioReportes {
     /** HU-10.03 crit. 1: el resumen de cada cajero con actividad en el período (ver {@link ReporteVentasPorCajero}). */
     List<ReporteVentasPorCajero.Fila> ventasPorCajero(FiltrosReporte filtros);
 
+    /**
+     * HU-10.05: los productos de las líneas vigentes de las ventas finalizadas en el período (por caja y cajero), sin
+     * las ventas de facturas anuladas (crit. 4), ordenados por cantidad o monto y recortados a {@code limite}.
+     */
+    ReporteProductosMasVendidos.Resultado productosMasVendidos(FiltrosReporte filtros, OrdenProductos orden,
+                                                              int limite);
+
     /** HU-10.03 crit. 2: las ventas finalizadas y canceladas del cajero de los filtros, en orden cronológico. */
     List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros);
 
