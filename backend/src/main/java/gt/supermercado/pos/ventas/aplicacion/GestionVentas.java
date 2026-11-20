@@ -345,6 +345,8 @@ public class GestionVentas {
      */
     @Transactional
     public Venta finalizarCobrada(Venta venta) {
+        // HU-05.07 (decisión de Sergio): también al finalizar, porque el cliente se puede cambiar en el cobro.
+        clientes.validar(venta);
         if (!ventas.finalizar(venta.id(), venta.totales())) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
         }

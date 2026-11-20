@@ -103,7 +103,10 @@ public class CertificadorFelSimulado implements CertificadorFel {
                 : new ResultadoAnulacion(false, "SIM-404", "La factura no existe en el certificador (simulado).");
     }
 
-    /** ACEPTAR: un nombre simulado; RECHAZAR: la SAT no conoce el NIT; SIN_CONEXION: sin respuesta (HU-05.04). */
+    /**
+     * ACEPTAR: un nombre simulado; RECHAZAR: la SAT no conoce el NIT (o el CUI, HU-05.06); SIN_CONEXION: sin respuesta
+     * (HU-05.04).
+     */
     @Override
     public Optional<Contribuyente> consultarNit(String nit) {
         verificarConexion();
@@ -116,6 +119,9 @@ public class CertificadorFelSimulado implements CertificadorFel {
     @Override
     public Optional<Contribuyente> consultarCui(String cui) {
         verificarConexion();
+        if (escenario == Escenario.RECHAZAR) {
+            return Optional.empty();
+        }
         return Optional.of(new Contribuyente(cui, "PERSONA SIMULADA " + cui));
     }
 

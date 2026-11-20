@@ -66,6 +66,13 @@ public class ClientesController {
     }
 
     /** HU-05.05: registra al cliente, o devuelve el existente si el NIT ya está registrado. */
+    /** HU-05.06: búsqueda por CUI (13 dígitos); si no está registrado, consulta el nombre al certificador. */
+    @GetMapping("/api/clientes/cui/{cui}")
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
+    public BusquedaNit buscarCui(@PathVariable String cui, @AuthenticationPrincipal SesionActiva sesion) {
+        return gestion.buscarCui(cui, sesion);
+    }
+
     @PostMapping("/api/clientes")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")

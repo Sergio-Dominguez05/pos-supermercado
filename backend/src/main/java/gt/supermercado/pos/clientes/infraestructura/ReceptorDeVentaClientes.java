@@ -1,5 +1,6 @@
 package gt.supermercado.pos.clientes.infraestructura;
 
+import gt.supermercado.pos.clientes.dominio.Cliente;
 import gt.supermercado.pos.clientes.dominio.RepositorioClientes;
 import gt.supermercado.pos.facturacion.dominio.Receptor;
 import gt.supermercado.pos.facturacion.dominio.ReceptorDeVenta;
@@ -23,6 +24,12 @@ class ReceptorDeVentaClientes implements ReceptorDeVenta {
         this.ventas = ventas;
     }
 
+    /** HU-05.06 crit. 4: el cliente con CUI va a la factura con su CUI ({@code TipoEspecial="CUI"} en el DTE). */
+    static Receptor receptor(Cliente cliente) {
+        return new Receptor(Receptor.TipoReceptor.valueOf(cliente.tipoIdentificacion()), cliente.nit(),
+                cliente.nombre());
+    }
+
     @Override
     public Optional<String> correoDeFactura(long ventaId) {
         return ventas.correoFactura(ventaId);
@@ -31,7 +38,7 @@ class ReceptorDeVentaClientes implements ReceptorDeVenta {
     @Override
     public Receptor de(long ventaId) {
         return clientes.deLaVenta(ventaId)
-                .map(cliente -> new Receptor(Receptor.TipoReceptor.NIT, cliente.nit(), cliente.nombre()))
+                .map(ReceptorDeVentaClientes::receptor)
                 .orElseGet(Receptor::consumidorFinal);
     }
 }

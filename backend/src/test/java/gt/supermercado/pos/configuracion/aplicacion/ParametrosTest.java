@@ -36,6 +36,16 @@ class ParametrosTest {
             implements RepositorioParametros {
 
         @Override
+        public Optional<java.math.BigDecimal> decimal(String clave) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void guardarDecimal(String clave, java.math.BigDecimal valor) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Integer> entero(String clave) {
             return entero;
         }
