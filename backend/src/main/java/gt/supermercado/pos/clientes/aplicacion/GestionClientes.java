@@ -18,6 +18,8 @@ import gt.supermercado.pos.facturacion.dominio.Receptor;
 import gt.supermercado.pos.pagos.dominio.FacturaDeVenta;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import gt.supermercado.pos.ventas.aplicacion.GestionVentas;
+import gt.supermercado.pos.ventas.dominio.ValidadorClienteDeVenta;
+import gt.supermercado.pos.ventas.dominio.Venta;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,15 +57,18 @@ public class GestionClientes {
     private final Bitacora bitacora;
     private final ReenvioFacturas reenvio;
     private final TransactionOperations transacciones;
+    private final ValidadorClienteDeVenta validador;
 
     public GestionClientes(RepositorioClientes clientes, ConsultaContribuyentes contribuyentes, GestionVentas ventas,
-                           Bitacora bitacora, ReenvioFacturas reenvio, TransactionOperations transacciones) {
+                           Bitacora bitacora, ReenvioFacturas reenvio, TransactionOperations transacciones,
+                           ValidadorClienteDeVenta validador) {
         this.clientes = clientes;
         this.contribuyentes = contribuyentes;
         this.ventas = ventas;
         this.bitacora = bitacora;
         this.reenvio = reenvio;
         this.transacciones = transacciones;
+        this.validador = validador;
     }
 
     /** Cómo terminó la búsqueda por NIT. */
@@ -167,9 +172,15 @@ public class GestionClientes {
 
     /**
      * El cliente de la venta en curso (vacío si es a Consumidor Final) y el correo al que se le enviará la factura
-     * (HU-05.11), que puede faltar.
+     * (HU-05.11), que puede faltar. {@code aviso}: HU-05.08, si el cambio de cliente impedirá cobrar la venta (por
+     * ejemplo, Consumidor Final desde el límite de HU-05.07); {@code null} si no hay nada que advertir.
      */
-    public record ClienteYCorreo(Optional<Cliente> cliente, String correoFactura) {}
+    public record ClienteYCorreo(Optional<Cliente> cliente, String correoFactura, String aviso) {
+
+        public ClienteYCorreo(Optional<Cliente> cliente, String correoFactura) {
+            this(cliente, correoFactura, null);
+        }
+    }
 
     @Transactional(readOnly = true)
     public ClienteYCorreo deLaVentaActual(SesionActiva sesion) {
@@ -182,6 +193,17 @@ public class GestionClientes {
     /**
      * Asigna el cliente a la venta en curso; {@code null} vuelve a Consumidor Final (HU-05.01 crit. 2). HU-05.11 crit.
      * 4: la factura se enviará al correo del cliente, si lo tiene; a Consumidor Final, a ninguno.
+     *
+     * <p>HU-05.08 Cambiar el cliente de una venta antes de cobrar:
+     * <ul>
+     *   <li>Crit. 1: se cambia en cualquier momento mientras la venta esté en curso, también en el cobro con un pago ya
+     *       registrado. Si el cambio impide cobrar (Consumidor Final desde el límite, HU-05.07), se acepta igual
+     *       (el cajero puede estar corrigiendo) pero se devuelve el {@code aviso}; finalizar se seguirá rechazando.</li>
+     *   <li>Crit. 2: una vez finalizada la venta ya no hay venta en curso: el cambio se rechaza con
+     *       {@code SIN_VENTA_EN_CURSO} y para corregir el cliente hay que anular la factura (EP-08). La única
+     *       excepción es el reenvío de una factura rechazada por el receptor (HU-08.06), que no se emitió.</li>
+     * </ul>
+     * El cambio queda en la bitácora con el cliente anterior y el nuevo.
      */
     @Transactional
     public ClienteYCorreo asignar(Long clienteId, SesionActiva sesion) {
@@ -189,10 +211,48 @@ public class GestionClientes {
                 ? Optional.empty()
                 : Optional.of(clientes.porId(clienteId).orElseThrow(() -> new RecursoNoEncontradoException(
                         "CLIENTE_NO_ENCONTRADO", "El cliente no existe.")));
-        ventas.asignarCliente(sesion, clienteId);
+        Optional<Cliente> anterior = ventas.actual(sesion).flatMap(enCurso -> clientes.deLaVenta(enCurso.id()));
+        Venta venta;
+        try {
+            venta = ventas.asignarCliente(sesion, clienteId);
+        } catch (NegocioException error) {
+            if ("SIN_VENTA_EN_CURSO".equals(error.getCodigo())) {
+                throw new NegocioException("SIN_VENTA_EN_CURSO", "No hay una venta en curso. Si la factura ya se "
+                        + "emitió, el cliente ya no se puede cambiar: hay que anular la factura y volver a vender.");
+            }
+            throw error;
+        }
         String correo = cliente.map(Cliente::correo).orElse(null);
         ventas.asignarCorreoFactura(sesion, correo);
-        return new ClienteYCorreo(cliente, correo);
+        if (!anterior.map(Cliente::id).equals(cliente.map(Cliente::id))) {
+            registrarCambioDeCliente(venta, anterior, cliente, sesion);
+        }
+        return new ClienteYCorreo(cliente, correo, avisoAlCobrar(sesion));
+    }
+
+    /** HU-05.08: el motivo por el que la venta, con su cliente actual, no se podrá cobrar; {@code null} si se puede. */
+    private String avisoAlCobrar(SesionActiva sesion) {
+        try {
+            ventas.actual(sesion).ifPresent(validador::validar);
+            return null;
+        } catch (NegocioException error) {
+            return error.getMessage();
+        }
+    }
+
+    private void registrarCambioDeCliente(Venta venta, Optional<Cliente> anterior, Optional<Cliente> nuevo,
+                                          SesionActiva sesion) {
+        Map<String, Object> cambios = new LinkedHashMap<>();
+        cambios.put("venta", venta.numero());
+        cambios.put("cliente", EventoBitacora.cambio(receptor(anterior), receptor(nuevo)));
+        bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                AccionSensible.CLIENTE_VENTA_CAMBIADO, true, "Cliente de la venta N.º %d: %s → %s".formatted(
+                        venta.numero(), receptor(anterior), receptor(nuevo)), "venta", venta.id(), cambios));
+    }
+
+    private static String receptor(Optional<Cliente> cliente) {
+        return cliente.map(c -> c.tipoIdentificacion() + " " + c.nit() + " · " + c.nombre())
+                .orElse("Consumidor Final");
     }
 
     /**

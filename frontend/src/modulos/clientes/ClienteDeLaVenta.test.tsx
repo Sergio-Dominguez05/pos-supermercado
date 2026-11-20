@@ -199,6 +199,26 @@ describe('cliente de la venta (EP-05)', () => {
     })
   })
 
+  it('al cambiar el cliente avisa si la venta no se podrá cobrar así (HU-05.08 crit. 1)', () => {
+    const aviso =
+      'Las ventas de Q2,500.00 o más no se pueden facturar a Consumidor Final: la SAT exige el NIT o el CUI del comprador.'
+    const conAviso = renderizar(<ClienteDeLaVenta ventaId={31} />, {
+      consumidorFinal: true,
+      cliente: null,
+      correoFactura: null,
+      aviso,
+    })
+    expect(conAviso).toContain(`<p class="pendiente" role="alert">${aviso}</p>`)
+
+    const sinAviso = renderizar(<ClienteDeLaVenta ventaId={31} />, {
+      consumidorFinal: false,
+      cliente: FERRETERIA,
+      correoFactura: null,
+      aviso: null,
+    })
+    expect(sinAviso).not.toContain('class="pendiente" role="alert"')
+  })
+
   it('F6 ya no está pendiente: lleva al NIT del cliente (HU-06.17)', () => {
     expect(ATAJOS.find((atajo) => atajo.tecla === 'F6')?.accion).toBe('asignarCliente')
     expect(ACCIONES_PENDIENTES.asignarCliente).toBeUndefined()

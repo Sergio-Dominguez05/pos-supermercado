@@ -34,6 +34,8 @@ public enum AccionSensible {
     LINEA_VENTA_ELIMINADA(Categoria.VENTAS, "ventas"),
     /** Pendiente: HU-06.14. */
     VENTA_CANCELADA(Categoria.VENTAS, "ventas"),
+    /** HU-05.08: el cajero cambia el cliente de la venta en curso, con el anterior y el nuevo. */
+    CLIENTE_VENTA_CAMBIADO(Categoria.VENTAS, "clientes"),
     /** El cajero finaliza el cobro: la venta queda registrada con sus pagos (HU-07.08). */
     VENTA_FINALIZADA(Categoria.VENTAS, "pagos"),
     /** HU-05.05 crit. 4: un cliente nuevo, registrado a mano o con el nombre que dio el certificador (HU-05.04). */

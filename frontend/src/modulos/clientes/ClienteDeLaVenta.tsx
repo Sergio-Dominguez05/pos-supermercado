@@ -34,6 +34,7 @@ import {
  * - HU-05.04: un NIT nuevo se consulta al certificador; si no aparece o no responde, se escribe el nombre o se usa CF.
  * - HU-05.05: el cliente nuevo se registra sin salir de la venta (dirección "Ciudad" si se deja vacía).
  * - HU-05.06: sin NIT, el cliente se busca y se registra con su CUI (13 dígitos), elegido en el selector.
+ * - HU-05.08: el cliente se cambia hasta finalizar el cobro; si el cambio impide cobrar (límite de CF), se avisa.
  * - HU-05.11: el correo al que se envía la factura (HU-08.15), opcional.
  * F6 lleva al campo del NIT (HU-06.17).
  */
@@ -84,6 +85,12 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
       <p>
         <strong>{describirCliente(data?.cliente ?? null)}</strong>
       </p>
+      {/* HU-05.08 crit. 1: el cambio se acepta, pero se avisa si con este cliente no se podrá cobrar. */}
+      {data?.aviso && (
+        <p className="pendiente" role="alert">
+          {data.aviso}
+        </p>
+      )}
       {data && (
         <CorreoDeFactura
           key={data.correoFactura ?? ''}
