@@ -13,7 +13,7 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR', ruta: '/venta' },
   // HU-09.08 a 09.10: cerrar la caja propia y reimprimir los cierres.
   { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA', ruta: '/caja' },
-  { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR' },
+  { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR', ruta: '/clientes' },
   // HU-08.12 crit. 2: buscar y reimprimir facturas (el cajero, las de su turno).
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR', ruta: '/facturas' },
   // HU-08.06 crit. 3: las ventas pendientes de facturar, para quien gestiona facturas (Supervisor y Administrador).
