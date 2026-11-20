@@ -14,12 +14,20 @@ export interface Turno {
 }
 
 export const CLAVE_TURNO_ACTUAL = ['turnos', 'actual'] as const
+export const CLAVE_TURNOS_ABIERTOS = ['turnos', 'abiertos'] as const
+export const claveResumenTurno = (turnoId: number) => ['turnos', turnoId, 'resumen'] as const
 
 /** Turno abierto en la caja de este equipo, o `null` si está cerrada o el equipo no tiene caja (204). */
 export const turnoActual = async () => (await pedir<Turno | undefined>('/api/turnos/actual')) ?? null
 
 /** Abre el turno del usuario en la caja de este equipo. */
 export const abrirTurno = () => pedir<Turno>('/api/turnos', { method: 'POST' })
+
+/** HU-09.06: todos para un supervisor; únicamente el propio para un cajero. */
+export const listarTurnosAbiertos = () => pedir<Turno[]>('/api/turnos/abiertos')
+
+export const obtenerResumenTurno = (turnoId: number) =>
+  pedir<ResumenDeTurno>(`/api/turnos/${turnoId}/resumen`)
 
 /** HU-09.08 crit. 3: lo cobrado con tarjeta en el turno; las facturas anuladas se descuentan y se muestran aparte. */
 export interface ResumenDeTurno {

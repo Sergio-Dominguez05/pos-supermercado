@@ -13,6 +13,9 @@ public interface RepositorioTurnos {
 
     Optional<Turno> abiertoDeUsuario(long usuarioId);
 
+    /** HU-09.06: turnos abiertos que puede consultar un supervisor. */
+    List<Turno> abiertos();
+
     /** Abre el turno con la hora del servidor y devuelve su id. */
     long abrir(long cajaId, long usuarioId);
 
