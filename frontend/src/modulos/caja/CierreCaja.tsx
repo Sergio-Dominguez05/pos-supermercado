@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { ErrorDeApi } from '../../api/cliente'
 import {
   cerrarCaja,
   CLAVE_CIERRES,
   CLAVE_RESUMEN_CIERRE,
   CLAVE_TURNO_ACTUAL,
+  compararCierre,
   listarCierres,
   obtenerResumenCierre,
   reimprimirCierre,
@@ -49,7 +51,14 @@ function CargaResumen({ cajaNombre, onCerrada }: { cajaNombre: string; onCerrada
   const { data, error, isPending } = useQuery({ queryKey: CLAVE_RESUMEN_CIERRE, queryFn: obtenerResumenCierre })
   if (isPending) return <p className="tarjeta">Calculando lo cobrado en el turno…</p>
   if (error) return <p className="tarjeta error">{error.message}</p>
-  return <FormularioCierre resumen={data} cajaNombre={cajaNombre} onCerrada={onCerrada} />
+  return (
+    <FormularioCierre
+      resumen={data.resumen}
+      cierreCiego={data.cierreCiego}
+      cajaNombre={cajaNombre}
+      onCerrada={onCerrada}
+    />
+  )
 }
 
 /**
@@ -59,37 +68,63 @@ function CargaResumen({ cajaNombre, onCerrada }: { cajaNombre: string; onCerrada
  */
 export function FormularioCierre({
   resumen,
+  cierreCiego = false,
   cajaNombre,
   onCerrada,
 }: {
-  resumen: ResumenDeTurno
+  resumen: ResumenDeTurno | null
+  cierreCiego?: boolean
   cajaNombre: string
   onCerrada: (hecho: CierreHecho) => void
 }) {
   const clienteConsultas = useQueryClient()
   const [lote, setLote] = useState('')
   const [justificacion, setJustificacion] = useState('')
+  const [comparacion, setComparacion] = useState<{
+    totalLote: number
+    resumen: ResumenDeTurno
+    diferencia: number
+  }>()
   const valido = totalLoteValido(lote)
-  const diferencia = valido ? diferenciaDeCierre(Number(lote), resumen.totalRegistrado) : 0
+  const comparacionActual = comparacion?.totalLote === Number(lote) ? comparacion : undefined
+  const resumenVisible = comparacionActual?.resumen ?? resumen
+  const diferencia = comparacionActual?.diferencia
+    ?? (valido && resumenVisible ? diferenciaDeCierre(Number(lote), resumenVisible.totalRegistrado) : 0)
+  const comparar = useMutation({
+    mutationFn: compararCierre,
+    onSuccess: (resultado, totalLote) => setComparacion({ totalLote, ...resultado }),
+  })
   const cierre = useMutation({
-    mutationFn: () => cerrarCaja(Number(lote), justificacion),
+    mutationFn: ({ totalLote, motivo }: { totalLote: number; motivo: string }) => cerrarCaja(totalLote, motivo),
     onSuccess: async (hecho) => {
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_TURNO_ACTUAL })
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_CIERRES })
       onCerrada(hecho)
+    },
+    onError: (error, solicitud) => {
+      if (cierreCiego && error instanceof ErrorDeApi && error.codigo === 'JUSTIFICACION_REQUERIDA') {
+        comparar.mutate(solicitud.totalLote)
+      }
     },
   })
 
   return (
     <section className="tarjeta formulario" aria-label="Cerrar la caja">
       <h2>Cerrar la caja</h2>
-      <ResumenCobrado resumen={resumen} />
+      {resumenVisible ? <ResumenCobrado resumen={resumenVisible} /> : (
+        <p>Ingrese y confirme el total del cierre de lote para compararlo con lo registrado en el POS.</p>
+      )}
       <form
         className="formulario"
         onSubmit={(evento) => {
           evento.preventDefault()
-          if (!valido || !window.confirm(confirmacionCierre(cajaNombre, diferencia))) return
-          cierre.mutate()
+          if (!valido) return
+          if (cierreCiego && !comparacionActual) {
+            comparar.mutate(Number(lote))
+            return
+          }
+          if (!window.confirm(confirmacionCierre(cajaNombre, diferencia))) return
+          cierre.mutate({ totalLote: Number(lote), motivo: justificacion })
         }}
       >
         <label>
@@ -100,17 +135,22 @@ export function FormularioCierre({
             inputMode="decimal"
             pattern="[0-9]+(\.[0-9]{1,2})?"
             placeholder="0.00"
+            disabled={cierre.isPending || comparar.isPending}
             value={lote}
-            onChange={(evento) => setLote(evento.target.value)}
+            onChange={(evento) => {
+              setLote(evento.target.value)
+              setComparacion(undefined)
+              setJustificacion('')
+            }}
           />
         </label>
-        {valido && (
+        {valido && resumenVisible && (
           <p className={diferencia === 0 ? 'exito' : 'error'} role="status">
             Diferencia: {formatoQuetzales(diferencia)}
             {diferencia === 0 ? ' (coincide con lo registrado)' : ''}
           </p>
         )}
-        {valido && diferencia !== 0 && (
+        {valido && resumenVisible && diferencia !== 0 && (
           <label>
             Justificación de la diferencia
             <textarea
@@ -128,8 +168,11 @@ export function FormularioCierre({
             {cierre.error.message}
           </p>
         )}
-        <button type="submit" disabled={cierre.isPending || !valido}>
-          {cierre.isPending ? 'Cerrando…' : 'Cerrar la caja'}
+        {comparar.error && <p className="error" role="alert">{comparar.error.message}</p>}
+        <button type="submit" disabled={cierre.isPending || comparar.isPending || !valido}>
+          {comparar.isPending ? 'Comparando…'
+            : cierre.isPending ? 'Cerrando…'
+              : cierreCiego && !comparacionActual ? 'Confirmar monto' : 'Cerrar la caja'}
         </button>
       </form>
     </section>

@@ -659,14 +659,17 @@ class VentasIntegracionTest {
     void elLimiteEsElConfiguradoYHastaElNoSePideConfirmacion() throws Exception {   // crit. 4 y HU-12.13
         Cajero cajero = cajeroConTurnoAbierto();
         Producto arroz = nuevoProducto("Arroz 1 lb", "5.00");
-        assertThat(escanear(arroz.codigo(), 50, cajero).statusCode()).isEqualTo(200);
 
         String anterior = jdbc.queryForObject("SELECT valor::text FROM parametro WHERE clave = 'cantidad_max_linea'",
                 String.class);
         jdbc.update("UPDATE parametro SET valor = '10' WHERE clave = 'cantidad_max_linea'");
         try {
             assertThat(escanear(arroz.codigo(), 10, cajero).statusCode()).isEqualTo(200);
-            assertThat(escanear(arroz.codigo(), 11, cajero).body()).contains("CANTIDAD_POR_CONFIRMAR");
+            assertThat(escanear(arroz.codigo(), 1, cajero).body()).contains("CANTIDAD_POR_CONFIRMAR", "11", "10");
+            HttpResponse<String> confirmada = enviar("/api/ventas/actual/lineas", "POST",
+                    "{\"codigo\":\"%s\",\"cantidad\":1,\"confirmada\":true}".formatted(arroz.codigo()),
+                    cajero.sesion());
+            assertThat(confirmada.body()).contains("\"cantidad\":11");
         } finally {
             jdbc.update("UPDATE parametro SET valor = ?::jsonb WHERE clave = 'cantidad_max_linea'", anterior);
         }

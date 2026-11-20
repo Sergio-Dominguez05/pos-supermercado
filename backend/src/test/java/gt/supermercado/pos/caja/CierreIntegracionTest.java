@@ -37,6 +37,7 @@ class CierreIntegracionTest {
     /** La misma que usan las demás pruebas de integración, para compartir el contexto de Spring y el contenedor. */
     static final String CONTRASENA_ADMIN = "Inicial2026";
     static final String PIN = "4821";
+    static final String CONTRASENA_SUPERVISOR = "Clave2026segura";
     private static final Charset PAGINA_850 = Charset.forName("IBM850");
 
     private static final AtomicInteger SIGUIENTE = new AtomicInteger();
@@ -75,8 +76,38 @@ class CierreIntegracionTest {
         HttpResponse<String> resumen = enviar("/api/turnos/actual/cierre", "GET", null, cajero.sesion());
 
         assertThat(resumen.statusCode()).isEqualTo(200);
-        assertThat(resumen.body()).contains("\"ventas\":3", "\"debito\":10.00", "\"credito\":5.00", "\"anuladas\":1",
+        assertThat(resumen.body()).contains("\"cierreCiego\":false", "\"ventas\":3", "\"debito\":10.00",
+                "\"credito\":5.00", "\"anuladas\":1",
                 "\"totalAnulado\":3.00", "\"totalRegistrado\":15.00");
+    }
+
+    @Test
+    void elCierreCiegoOcultaElTotalAlCajeroHastaQueConfirmaSuMonto() throws Exception {   // 09.11 crit. 1 a 3
+        String anterior = jdbc.queryForObject("SELECT valor::text FROM parametro WHERE clave = 'cierre_ciego'",
+                String.class);
+        jdbc.update("UPDATE parametro SET valor = 'true'::jsonb WHERE clave = 'cierre_ciego'");
+        try {
+            Cajero cajero = cajeroConTurno();
+            vender(cajero, "10.00", "DEBITO");
+
+            HttpResponse<String> oculto = enviar("/api/turnos/actual/cierre", "GET", null, cajero.sesion());
+            assertThat(oculto.body()).contains("\"cierreCiego\":true", "\"resumen\":null")
+                    .doesNotContain("totalRegistrado", "debito", "credito");
+
+            HttpResponse<String> comparacion = enviar("/api/turnos/actual/cierre/comparar", "POST",
+                    "{\"totalLote\":8.00}", cajero.sesion());
+            assertThat(comparacion.statusCode()).isEqualTo(200);
+            assertThat(comparacion.body()).contains("\"totalRegistrado\":10.00", "\"diferencia\":-2.00");
+            assertThat(cerrar(cajero, "8.00", "Faltan dos quetzales en la terminal").body())
+                    .contains("\"totalRegistrado\":10.00", "\"diferencia\":-2.00");
+
+            Cajero supervisor = supervisorConTurno();
+            vender(supervisor, "7.00", "CREDITO");
+            assertThat(enviar("/api/turnos/actual/cierre", "GET", null, supervisor.sesion()).body())
+                    .contains("\"cierreCiego\":false", "\"totalRegistrado\":7.00");
+        } finally {
+            jdbc.update("UPDATE parametro SET valor = ?::jsonb WHERE clave = 'cierre_ciego'", anterior);
+        }
     }
 
     @Test
@@ -186,6 +217,14 @@ class CierreIntegracionTest {
 
     /** Un cajero con turno abierto en una caja nueva cuya impresora saca dos copias de cada cierre. */
     private Cajero cajeroConTurno() throws Exception {
+        return usuarioConTurno(false);
+    }
+
+    private Cajero supervisorConTurno() throws Exception {
+        return usuarioConTurno(true);
+    }
+
+    private Cajero usuarioConTurno(boolean supervisor) throws Exception {
         String host = "cierre-" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000 + ".local";
         long impresora = idDe(enviar("/api/configuracion/impresoras", "POST",
                 "{\"nombre\":\"Térmica %s\",\"host\":\"%s\",\"anchoMm\":80,\"copiasCierre\":2}".formatted(host, host),
@@ -194,11 +233,15 @@ class CierreIntegracionTest {
         long caja = idDe(enviar("/api/cajas", "POST",
                 "{\"nombre\":\"%s\",\"impresoraId\":%d}".formatted(nombre, impresora), cookieAdmin));
         String equipo = cookie(enviar("/api/cajas/" + caja + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
-        String username = "ci.c" + SIGUIENTE.incrementAndGet() + "." + System.nanoTime() % 1_000_000;
+        String username = "ci." + (supervisor ? "s" : "c") + SIGUIENTE.incrementAndGet() + "."
+                + System.nanoTime() % 1_000_000;
         jdbc.update("""
                 INSERT INTO usuario (username, nombre_completo, rol_id, credencial_hash, credencial_temporal)
-                VALUES (?, 'Cajero que cierra', 3, ?, false)""", username, codificador.encode(PIN));
-        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(username, "pin", PIN), equipo), "POS_SESION");
+                VALUES (?, ?, ?, ?, false)""", username, supervisor ? "Supervisor que cierra" : "Cajero que cierra",
+                supervisor ? 2 : 3, codificador.encode(supervisor ? CONTRASENA_SUPERVISOR : PIN));
+        String sesion = cookie(enviar(supervisor ? "/api/auth/login" : "/api/auth/login-pin", "POST",
+                login(username, supervisor ? "contrasena" : "pin", supervisor ? CONTRASENA_SUPERVISOR : PIN), equipo),
+                "POS_SESION");
         HttpResponse<String> turno = enviar("/api/turnos", "POST", null, sesion);
         assertThat(turno.statusCode()).isEqualTo(201);
         long usuarioId = jdbc.queryForObject("SELECT id FROM usuario WHERE username = ?", Long.class, username);

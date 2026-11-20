@@ -7,4 +7,11 @@ public interface RepositorioParametros {
 
     /** El valor entero del parámetro, si existe y es un número entero. */
     Optional<Integer> entero(String clave);
+
+    /** El valor booleano del parámetro, si existe y tiene ese tipo. */
+    Optional<Boolean> booleano(String clave);
+
+    void guardarEntero(String clave, int valor);
+
+    void guardarBooleano(String clave, boolean valor);
 }

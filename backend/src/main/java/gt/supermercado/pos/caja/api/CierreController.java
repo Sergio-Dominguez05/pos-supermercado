@@ -2,9 +2,10 @@ package gt.supermercado.pos.caja.api;
 
 import gt.supermercado.pos.caja.aplicacion.CierreDeCaja;
 import gt.supermercado.pos.caja.aplicacion.CierreDeCaja.CierreHecho;
+import gt.supermercado.pos.caja.aplicacion.CierreDeCaja.ComparacionCierre;
+import gt.supermercado.pos.caja.aplicacion.CierreDeCaja.PreparacionCierre;
 import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.ImpresionDeCierre;
-import gt.supermercado.pos.caja.dominio.ResumenDeTurno;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,11 +30,19 @@ public class CierreController {
 
     public record SolicitudCierre(BigDecimal totalLote, String justificacion) {}
 
-    /** HU-09.08 crit. 3: lo cobrado en el turno abierto, para comparar con el cierre de lote. */
+    /** HU-09.08 y HU-09.11: prepara el cierre sin exponer el total cuando corresponde un cierre ciego. */
     @GetMapping("/api/turnos/actual/cierre")
     @PreAuthorize("hasAuthority('CAJA_OPERAR_PROPIA')")
-    public ResumenDeTurno resumen(@AuthenticationPrincipal SesionActiva sesion) {
+    public PreparacionCierre resumen(@AuthenticationPrincipal SesionActiva sesion) {
         return cierre.resumen(sesion);
+    }
+
+    /** HU-09.11 crit. 2: compara después de que el cajero confirma el monto ingresado. */
+    @PostMapping("/api/turnos/actual/cierre/comparar")
+    @PreAuthorize("hasAuthority('CAJA_OPERAR_PROPIA')")
+    public ComparacionCierre comparar(@RequestBody SolicitudCierre solicitud,
+                                      @AuthenticationPrincipal SesionActiva sesion) {
+        return cierre.comparar(solicitud.totalLote(), sesion);
     }
 
     /** 422 con ventas por resolver, sin total de lote o con una diferencia sin justificar. */

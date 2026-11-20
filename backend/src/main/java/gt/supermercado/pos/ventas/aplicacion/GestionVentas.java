@@ -38,7 +38,7 @@ public class GestionVentas {
      * Tope técnico de unidades por línea (HU-06.04 crit. 3). Por encima de la cantidad máxima configurada ya se pide
      * confirmación (crit. 4); este tope evita, además, cantidades absurdas aunque se confirmen.
      */
-    public static final int CANTIDAD_MAXIMA = 9999;
+    public static final int CANTIDAD_MAXIMA = Parametros.CANTIDAD_MAXIMA_ABSOLUTA;
 
     private final RepositorioVentas ventas;
     private final GestionTurnos turnos;
@@ -115,7 +115,7 @@ public class GestionVentas {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
         validarCantidad(cantidad, confirmada);
         Producto producto = productos.paraVender(codigo, sesion);
-        return agregar(turno, producto, cantidad, sesion);
+        return agregar(turno, producto, cantidad, confirmada, sesion);
     }
 
     /**
@@ -127,7 +127,7 @@ public class GestionVentas {
     public Venta agregarProducto(long productoId, int cantidad, boolean confirmada, SesionActiva sesion) {
         Turno turno = turnos.exigirTurnoAbierto(sesion);
         validarCantidad(cantidad, confirmada);
-        return agregar(turno, productos.paraVender(productoId), cantidad, sesion);
+        return agregar(turno, productos.paraVender(productoId), cantidad, confirmada, sesion);
     }
 
     /**
@@ -178,7 +178,7 @@ public class GestionVentas {
      * nuevas van en otra línea con el precio nuevo (crit. 3). Si ya hay una línea del producto con el precio vigente,
      * se le suman (HU-06.02 crit. 2).
      */
-    private Venta agregar(Turno turno, Producto producto, int cantidad, SesionActiva sesion) {
+    private Venta agregar(Turno turno, Producto producto, int cantidad, boolean confirmada, SesionActiva sesion) {
         long ventaId = ventas.iniciar(turno.id(), turno.cajaId(), sesion.usuarioId(), TasaIva.VIGENTE.valor());
         if (!ventas.bloquearEnCurso(ventaId)) {
             throw new NegocioException("SIN_VENTA_EN_CURSO", "La venta ya no está en curso.");
@@ -189,11 +189,13 @@ public class GestionVentas {
         Optional<LineaVenta> existente = ventas.lineaDelProducto(ventaId, producto.id(), producto.precio());
         if (existente.isPresent()) {
             LineaVenta linea = existente.get();
-            if (linea.cantidad() + cantidad > CANTIDAD_MAXIMA) {
+            int cantidadFinal = linea.cantidad() + cantidad;
+            if (cantidadFinal > CANTIDAD_MAXIMA) {
                 throw cantidadInvalida();
             }
+            validarCantidad(cantidadFinal, confirmada);
             ventas.actualizarLinea(linea.id(),
-                    CalculadoraIva.linea(linea.precioUnitario(), linea.cantidad() + cantidad, tasa));
+                    CalculadoraIva.linea(linea.precioUnitario(), cantidadFinal, tasa));
         } else {
             ventas.agregarLinea(ventaId, producto.id(), producto.descripcion(),
                     CalculadoraIva.linea(producto.precio(), cantidad, tasa));
