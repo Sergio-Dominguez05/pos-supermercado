@@ -34,7 +34,7 @@ class CatalogoAccionesSensiblesTest {
             entry(CATALOGO_CARGADO, "HU-03.05"));
 
     private static final Set<String> MODULOS = Set.of(
-            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion");
+            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion", "reportes");
 
     @Test
     void elCatalogoTieneTodosLosEventosDelCriterio1() {
@@ -49,6 +49,8 @@ class CatalogoAccionesSensiblesTest {
         assertThat(porCategoria(Categoria.CONFIGURACION)).contains(PARAMETRO_MODIFICADO, CAJA_CREADA, CAJA_EDITADA);
         assertThat(porCategoria(Categoria.CATALOGO)).contains(PRODUCTO_CREADO, PRODUCTO_EDITADO, PRECIO_CAMBIADO,
                 PRODUCTO_ACTIVADO, PRODUCTO_DESACTIVADO, CATALOGO_CARGADO);
+        // HU-10.15 crit. 3: la generación y la exportación de reportes.
+        assertThat(porCategoria(Categoria.REPORTES)).contains(REPORTE_GENERADO, REPORTE_EXPORTADO);
     }
 
     @Test

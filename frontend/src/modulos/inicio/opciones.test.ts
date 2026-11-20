@@ -44,6 +44,12 @@ describe('opciones del menú por rol', () => {
     ])
   })
 
+  it('la opción Reportes lleva a los reportes, solo con su permiso (HU-10.15 crit. 1 y 2)', () => {
+    expect(opcionesPara(['REPORTE_CONSULTAR'])).toEqual([
+      expect.objectContaining({ etiqueta: 'Reportes', ruta: '/reportes' }),
+    ])
+  })
+
   it('sin permisos no hay opciones', () => {
     expect(opcionesPara([])).toEqual([])
   })

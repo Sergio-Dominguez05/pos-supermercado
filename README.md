@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** producto mínimo completo (`v0.6.0`) — vende, cobra con tarjeta, factura con FEL (con contingencia cuando no hay conexión, rechazos, anulación y reimpresión) y cierra la caja con su comprobante. La certificación se prueba con un certificador simulado (el certificador real aún no se elige). Faltan los reportes (Sprint 6) y las historias de prioridad media y baja.
+> **Estado:** producto mínimo con reportes (`v0.7.0`) — vende, cobra con tarjeta, factura con FEL (con contingencia, rechazos, anulación y reimpresión), cierra la caja con su comprobante y ofrece los reportes de ventas, cajeros, tarjetas, IVA, cierres y anuladas, exportables a PDF y Excel. La certificación se prueba con un certificador simulado (el certificador real aún no se elige). Faltan las historias de prioridad media y baja (Sprints 7 y 8).
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -44,6 +44,9 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | Anulación y reimpresión | El supervisor anula una factura con motivo mientras el turno de la venta siga abierto; reimprimir la última factura con F9 o buscar facturas anteriores, con la leyenda de copia | HU-08.10, 08.12, 09.02 | `v0.6.0` |
 | Impresión | Factura impresa en la impresora térmica de red de la caja (ESC/POS, 58 u 80 mm) con emisor, receptor, autorización, detalle, Subtotal, IVA y TOTAL, pago y certificador; si la impresora falla, la factura sigue válida | HU-08.05 | `v0.5.0` |
 | Configuración | Datos del emisor y del establecimiento SAT; conexión con el certificador (https, llave cifrada con AES-256-GCM, ambiente de pruebas o producción); impresoras por caja con página de prueba y copias | HU-12.01, 12.02, 12.03, 12.08, 12.15 | `v0.5.0` |
+| Reportes | Filtros comunes (fechas obligatorias, caja, cajero, tipo de tarjeta) con rangos rápidos según la fecha del servidor; ventas por período (por día, semana o mes), por cajero con el detalle de sus ventas, ingresos por tipo de tarjeta con sus transacciones, IVA de las facturas certificadas por día y por factura, cierres de caja con faltantes y sobrantes, y facturas anuladas; las anuladas no se suman a las ventas | HU-10.01 a 10.03, 10.06 a 10.09 | `v0.7.0` |
+| Exportación | Cada reporte y detalle se exporta a PDF (con los datos de la empresa, los filtros, la fecha y el usuario) y a Excel (montos como números y fechas como fechas), con los mismos totales que la pantalla | HU-10.13, 10.14 | `v0.7.0` |
+| Acceso a reportes | Solo el Administrador y el Supervisor (permiso de consultar reportes); cada generación y exportación queda en la bitácora | HU-10.15 | `v0.7.0` |
 
 Las reglas que dependen de módulos futuros (clientes, cobro, facturación, cierre de caja) quedan anotadas en sus Issues y se completan en su sprint.
 
@@ -109,6 +112,7 @@ Para una notación C4 específica de Mermaid y el mapa de módulos, consultar [d
 |---|---|---|
 | Frontend | React 19, TypeScript, Vite | Interfaz web para caja y administración |
 | Backend | Java 21, Spring Boot 4.1 | API REST, lógica de negocio y tareas programadas |
+| Exportación | OpenPDF, Apache POI | Reportes en PDF y en Excel (.xlsx) |
 | Base de datos | PostgreSQL 16 | Persistencia de ventas, caja, clientes y facturas |
 | Migraciones | Flyway | Versionado del esquema SQL |
 | Desarrollo | Docker Compose | Base de datos reproducible por integrante |
@@ -180,7 +184,7 @@ flowchart TB
 
     subgraph MEJORAS["Etapa 3 · Reportes y operación"]
         direction LR
-        S6["Sprint 6<br/>Reportes y exportación<br/>10 HU · Alta"] --> S7["Sprint 7<br/>Operación: suspendidas, cierres y correos<br/>14 HU · Media"] --> S8["Sprint 8<br/>Consultas, precios, bitácora y panel<br/>14 HU · Media/Baja"]
+        S6["✅ Sprint 6 · v0.7.0<br/>Reportes y exportación<br/>10 HU · Alta"] --> S7["Sprint 7<br/>Operación: suspendidas, cierres y correos<br/>14 HU · Media"] --> S8["Sprint 8<br/>Consultas, precios, bitácora y panel<br/>14 HU · Media/Baja"]
     end
 
     classDef base fill:#eaf5ff,stroke:#3275b3,color:#17324d;
@@ -243,4 +247,4 @@ Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](
 
 ---
 
-**Proyecto académico · Guatemala · Contingencia, anulación y cierre de caja del Sprint 5 (`v0.6.0`)**
+**Proyecto académico · Guatemala · Reportes y exportación del Sprint 6 (`v0.7.0`)**

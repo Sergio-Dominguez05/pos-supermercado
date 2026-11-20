@@ -560,3 +560,99 @@ kbd {
   justify-items: start;
   margin: 12px 0;
 }
+
+/* HU-10.01 crit. 3: los rangos rápidos de fechas de los reportes. */
+.rangos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rangos button {
+  font: inherit;
+  padding: 6px 12px;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rangos button[aria-pressed='true'] {
+  color: var(--texto);
+  font-weight: 600;
+  border-color: var(--ok);
+}
+
+.barra-filtros button.boton {
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.barra-filtros button.boton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* HU-10.02 crit. 1: la fila de totales del reporte. */
+.tabla tfoot th,
+.tabla tfoot td {
+  color: var(--texto);
+  font-weight: 700;
+  border-top: 2px solid var(--borde);
+}
+
+/* EP-10: una pestaña por reporte; se acomodan a medida que se agregan reportes. */
+.pestanas-reportes {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.pestanas-reportes button {
+  flex: 1 1 150px;
+}
+
+/* HU-10.08 crit. 3: la casilla "Solo con diferencias" en la barra de filtros. */
+.barra-filtros .casilla {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 9px;
+}
+
+/* Motivos y justificaciones: se ajustan en varias líneas en lugar de ensanchar la tabla. */
+.tabla td.texto-largo {
+  min-width: 220px;
+  white-space: normal;
+}
+
+/* HU-10.13 y HU-10.14: el título del reporte con los botones de exportar a la derecha. */
+.encabezado-reporte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.encabezado-reporte h2 {
+  margin: 0;
+}
+
+.exportar .acciones button {
+  font: inherit;
+  padding: 6px 12px;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.exportar .acciones button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
