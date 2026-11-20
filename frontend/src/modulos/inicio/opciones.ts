@@ -15,6 +15,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA', ruta: '/caja' },
   // HU-09.12: cerrar el turno que otro usuario dejó abierto (Supervisor y Administrador).
   { etiqueta: 'Cerrar caja de otro usuario', permiso: 'CAJA_CERRAR_OTRA', ruta: '/caja/turnos' },
+  // HU-09.13: los cierres anteriores de todas las cajas, con filtros (Supervisor y Administrador).
+  { etiqueta: 'Cierres de caja', permiso: 'CAJA_VER_CIERRES', ruta: '/caja/cierres' },
   { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR', ruta: '/clientes' },
   // HU-08.12 crit. 2: buscar y reimprimir facturas (el cajero, las de su turno).
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR', ruta: '/facturas' },

@@ -14,6 +14,7 @@ import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { PaginaParametrosOperacion } from './modulos/configuracion/ParametrosOperacion'
 import { PaginaServidorCorreo } from './modulos/configuracion/ServidorCorreo'
 import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
+import { PaginaConsultaCierres, PaginaDetalleCierre } from './modulos/caja/ConsultaCierres'
 import { PaginaTurnosAbiertos } from './modulos/caja/TurnosAbiertos'
 import { PaginaPermisos } from './modulos/usuarios/PermisosPorRol'
 import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
@@ -132,6 +133,22 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaParametrosOperacion />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja/cierres"
+            element={
+              <RutaProtegida>
+                <PaginaConsultaCierres />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/caja/cierres/:turnoId"
+            element={
+              <RutaProtegida>
+                <PaginaDetalleCierre />
               </RutaProtegida>
             }
           />

@@ -2,6 +2,9 @@ package gt.supermercado.pos.caja.infraestructura;
 
 import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.EstadoTurno;
+import gt.supermercado.pos.caja.dominio.FiltrosCierres;
+import gt.supermercado.pos.caja.dominio.OpcionFiltro;
+import gt.supermercado.pos.caja.dominio.PaginaCierres;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
 import gt.supermercado.pos.caja.dominio.Turno;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -10,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,6 +110,57 @@ class RepositorioTurnosJdbc implements RepositorioTurnos {
     @Override
     public Optional<CierreDeTurno> cierre(long turnoId) {
         return jdbc.query(SELECT_CIERRE + "  AND t.id = ?", CIERRE, turnoId).stream().findFirst();
+    }
+
+    @Override
+    public PaginaCierres buscarCierres(FiltrosCierres filtros) {
+        StringBuilder condiciones = new StringBuilder();
+        List<Object> argumentos = new ArrayList<>();
+        if (filtros.desde() != null) {
+            condiciones.append("  AND t.cerrado_en >= (?::date)::timestamp AT TIME ZONE 'America/Guatemala'\n");
+            argumentos.add(filtros.desde());
+        }
+        if (filtros.hasta() != null) {
+            condiciones.append("  AND t.cerrado_en < (?::date + 1)::timestamp AT TIME ZONE 'America/Guatemala'\n");
+            argumentos.add(filtros.hasta());
+        }
+        if (filtros.cajaId() != null) {
+            condiciones.append("  AND t.caja_id = ?\n");
+            argumentos.add(filtros.cajaId());
+        }
+        if (filtros.cajeroId() != null) {
+            condiciones.append("  AND t.usuario_id = ?\n");
+            argumentos.add(filtros.cajeroId());
+        }
+        if (filtros.soloConDiferencias()) {
+            condiciones.append("  AND t.diferencia <> 0\n");
+        }
+        long total = jdbc.queryForObject("SELECT count(*) FROM turno t WHERE t.estado = 'CERRADO'\n" + condiciones,
+                Long.class, argumentos.toArray());
+        List<Object> pagina = new ArrayList<>(argumentos);
+        pagina.add(FiltrosCierres.TAMANO_PAGINA);
+        pagina.add((long) filtros.pagina() * FiltrosCierres.TAMANO_PAGINA);
+        List<CierreDeTurno> cierres = jdbc.query(SELECT_CIERRE + condiciones
+                + "ORDER BY t.cerrado_en DESC, t.id DESC LIMIT ? OFFSET ?", CIERRE, pagina.toArray());
+        return new PaginaCierres(cierres, filtros.pagina(), FiltrosCierres.TAMANO_PAGINA, total);
+    }
+
+    @Override
+    public List<OpcionFiltro> cajasConCierres() {
+        return jdbc.query("""
+                SELECT c.id, c.nombre, c.activo FROM caja c
+                WHERE EXISTS (SELECT 1 FROM turno t WHERE t.caja_id = c.id AND t.estado = 'CERRADO')
+                ORDER BY lower(c.nombre)""", (rs, i) -> new OpcionFiltro(rs.getLong("id"),
+                rs.getString("nombre") + (rs.getBoolean("activo") ? "" : " (inactiva)")));
+    }
+
+    @Override
+    public List<OpcionFiltro> cajerosConCierres() {
+        return jdbc.query("""
+                SELECT u.id, u.nombre_completo, u.username FROM usuario u
+                WHERE EXISTS (SELECT 1 FROM turno t WHERE t.usuario_id = u.id AND t.estado = 'CERRADO')
+                ORDER BY u.nombre_completo, u.username""", (rs, i) -> new OpcionFiltro(rs.getLong("id"),
+                rs.getString("nombre_completo") + " (" + rs.getString("username") + ")"));
     }
 
     @Override
