@@ -3,16 +3,24 @@ package gt.supermercado.pos.caja.aplicacion;
 import gt.supermercado.pos.bitacora.aplicacion.Bitacora;
 import gt.supermercado.pos.bitacora.dominio.AccionSensible;
 import gt.supermercado.pos.bitacora.dominio.EventoBitacora;
+import gt.supermercado.pos.caja.dominio.EstadoTurno;
 import gt.supermercado.pos.caja.dominio.RepositorioTurnos;
+import gt.supermercado.pos.caja.dominio.ResumenDeTurno;
+import gt.supermercado.pos.caja.dominio.ResumenesDeTurno;
 import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.caja.dominio.VerificadorVentasSuspendidas;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
+import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
 import gt.supermercado.pos.configuracion.aplicacion.GestionCajas;
+import gt.supermercado.pos.configuracion.aplicacion.Parametros;
+import gt.supermercado.pos.seguridad.dominio.Rol;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,17 +30,23 @@ import java.util.Optional;
 @Service
 public class GestionTurnos {
 
+    private static final String VER_TURNOS_AJENOS = "CAJA_VER_CIERRES";
+
     private final RepositorioTurnos turnos;
+    private final ResumenesDeTurno resumenes;
     private final GestionCajas cajas;
     private final VerificadorVentasSuspendidas suspendidas;
     private final Bitacora bitacora;
+    private final Parametros parametros;
 
-    public GestionTurnos(RepositorioTurnos turnos, GestionCajas cajas, VerificadorVentasSuspendidas suspendidas,
-                         Bitacora bitacora) {
+    public GestionTurnos(RepositorioTurnos turnos, ResumenesDeTurno resumenes, GestionCajas cajas,
+                         VerificadorVentasSuspendidas suspendidas, Bitacora bitacora, Parametros parametros) {
         this.turnos = turnos;
+        this.resumenes = resumenes;
         this.cajas = cajas;
         this.suspendidas = suspendidas;
         this.bitacora = bitacora;
+        this.parametros = parametros;
     }
 
     /**
@@ -58,6 +72,37 @@ public class GestionTurnos {
     @Transactional(readOnly = true)
     public Optional<Turno> actualDeLaCaja(SesionActiva sesion) {
         return sesion.cajaId() == null ? Optional.empty() : turnos.abiertoEnCaja(sesion.cajaId());
+    }
+
+    /** HU-09.06: el supervisor ve todos los turnos abiertos; el cajero, únicamente el propio. */
+    @Transactional(readOnly = true)
+    public List<Turno> abiertosVisibles(SesionActiva sesion) {
+        if (sesion.permisos().contains(VER_TURNOS_AJENOS)) {
+            return turnos.abiertos();
+        }
+        if (resumenOculto(sesion)) {
+            return List.of();
+        }
+        return turnos.abiertoDeUsuario(sesion.usuarioId()).stream().toList();
+    }
+
+    /** HU-09.06: consulta sin cerrar la caja y evita que un cajero lea el turno de otra persona. */
+    @Transactional(readOnly = true)
+    public ResumenDeTurno resumen(long turnoId, SesionActiva sesion) {
+        Turno turno = turnos.buscarPorId(turnoId).filter(t -> t.estado() == EstadoTurno.ABIERTO)
+                .orElseThrow(() -> new RecursoNoEncontradoException("TURNO_ABIERTO_NO_ENCONTRADO",
+                        "El turno abierto no existe."));
+        if (!turno.esDe(sesion.usuarioId()) && !sesion.permisos().contains(VER_TURNOS_AJENOS)) {
+            throw new AccessDeniedException("No puede consultar el resumen de otro cajero.");
+        }
+        if (resumenOculto(sesion)) {
+            throw new AccessDeniedException("El resumen permanece oculto durante el cierre ciego.");
+        }
+        return resumenes.de(turno.id());
+    }
+
+    private boolean resumenOculto(SesionActiva sesion) {
+        return sesion.rol() == Rol.CAJERO && parametros.cierreCiego();
     }
 
     /**

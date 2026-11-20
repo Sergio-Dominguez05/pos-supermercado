@@ -2,6 +2,7 @@ package gt.supermercado.pos.caja.api;
 
 import gt.supermercado.pos.caja.aplicacion.GestionTurnos;
 import gt.supermercado.pos.caja.dominio.EstadoTurno;
+import gt.supermercado.pos.caja.dominio.ResumenDeTurno;
 import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.http.HttpStatus;
@@ -9,12 +10,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /** EP-09 Caja. HU-09.01: abrir el turno en la caja del equipo, con el permiso de operar la propia caja. */
 @RestController
@@ -43,6 +46,20 @@ public class TurnosController {
     public ResponseEntity<RespuestaTurno> actual(@AuthenticationPrincipal SesionActiva sesion) {
         return gestionTurnos.actualDeLaCaja(sesion).map(turno -> ResponseEntity.ok(RespuestaTurno.de(turno, sesion)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** HU-09.06: opciones visibles para consultar; un cajero solo recibe su turno. */
+    @GetMapping("/abiertos")
+    @PreAuthorize("hasAuthority('CAJA_OPERAR_PROPIA') or hasAuthority('CAJA_VER_CIERRES')")
+    public List<RespuestaTurno> abiertos(@AuthenticationPrincipal SesionActiva sesion) {
+        return gestionTurnos.abiertosVisibles(sesion).stream().map(turno -> RespuestaTurno.de(turno, sesion)).toList();
+    }
+
+    /** HU-09.06: lo vendido hasta ahora, sin cerrar ni modificar el turno. */
+    @GetMapping("/{turnoId}/resumen")
+    @PreAuthorize("hasAuthority('CAJA_OPERAR_PROPIA') or hasAuthority('CAJA_VER_CIERRES')")
+    public ResumenDeTurno resumen(@PathVariable long turnoId, @AuthenticationPrincipal SesionActiva sesion) {
+        return gestionTurnos.resumen(turnoId, sesion);
     }
 
     @PostMapping

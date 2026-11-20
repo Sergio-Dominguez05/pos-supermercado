@@ -4,9 +4,11 @@ import { Link } from 'react-router'
 import { ErrorDeApi } from '../../api/cliente'
 import {
   cerrarCaja,
+  claveResumenTurno,
   CLAVE_CIERRES,
   CLAVE_RESUMEN_CIERRE,
   CLAVE_TURNO_ACTUAL,
+  CLAVE_TURNOS_ABIERTOS,
   compararCierre,
   listarCierres,
   obtenerResumenCierre,
@@ -17,7 +19,9 @@ import {
 } from '../../api/turnos'
 import { formatoQuetzales } from '../catalogo/textos'
 import { useSesion } from '../login/sesion'
+import { ResumenCobrado } from './ResumenCobrado'
 import { confirmacionCierre, diferenciaDeCierre, totalLoteValido } from './textos'
+import { ResumenTurnosAbiertos } from './ResumenTurnos'
 import { useTurnoActual } from './turno'
 
 const fecha = (iso: string) => new Date(iso).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })
@@ -35,6 +39,7 @@ export function PaginaCierreCaja() {
       <p className="subtitulo">
         <Link to="/inicio">Inicio</Link> · Caja {usuario.cajaNombre ? `· ${usuario.cajaNombre}` : ''}
       </p>
+      <ResumenTurnosAbiertos />
       {hecho ? (
         <CierreTerminado hecho={hecho} />
       ) : turno?.propio ? (
@@ -99,6 +104,8 @@ export function FormularioCierre({
     onSuccess: async (hecho) => {
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_TURNO_ACTUAL })
       await clienteConsultas.invalidateQueries({ queryKey: CLAVE_CIERRES })
+      await clienteConsultas.invalidateQueries({ queryKey: CLAVE_TURNOS_ABIERTOS })
+      clienteConsultas.removeQueries({ queryKey: claveResumenTurno(hecho.comprobante.cierre.turnoId) })
       onCerrada(hecho)
     },
     onError: (error, solicitud) => {
@@ -176,33 +183,6 @@ export function FormularioCierre({
         </button>
       </form>
     </section>
-  )
-}
-
-export function ResumenCobrado({ resumen }: { resumen: ResumenDeTurno }) {
-  return (
-    <dl className="resumen">
-      <dt>Ventas</dt>
-      <dd>{resumen.ventas}</dd>
-      <dt>Tarjeta de débito</dt>
-      <dd>{formatoQuetzales(resumen.debito)}</dd>
-      <dt>Tarjeta de crédito</dt>
-      <dd>{formatoQuetzales(resumen.credito)}</dd>
-      <dt>Facturas anuladas ({resumen.anuladas})</dt>
-      <dd>{formatoQuetzales(resumen.totalAnulado)}</dd>
-      <dt>
-        <strong>Total registrado</strong>
-      </dt>
-      <dd>
-        <strong>{formatoQuetzales(resumen.totalRegistrado)}</strong>
-      </dd>
-      {resumen.contingencias > 0 && (
-        <>
-          <dt>En contingencia</dt>
-          <dd>{resumen.contingencias} por certificar</dd>
-        </>
-      )}
-    </dl>
   )
 }
 

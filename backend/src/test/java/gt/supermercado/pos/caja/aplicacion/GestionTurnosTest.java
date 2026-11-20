@@ -35,10 +35,10 @@ class GestionTurnosTest {
     /** Ventas suspendidas por turno, como las cuenta el módulo de ventas (HU-06.12 crit. 4). */
     private final Map<Long, Integer> suspendidas = new HashMap<>();
     // exigirTurnoAbierto no consulta las cajas ni escribe en la bitácora.
-    private final GestionTurnos gestion = new GestionTurnos(turnos, null,
+    private final GestionTurnos gestion = new GestionTurnos(turnos, null, null,
             turnoId -> suspendidas.getOrDefault(turnoId, 0), new Bitacora(evento -> {
         throw new AssertionError("No debe registrar en la bitácora: " + evento);
-    }));
+    }), null);
 
     @Test
     void conElTurnoPropioAbiertoDevuelveEseTurnoParaAsociarleLaVenta() {   // crit. 2
@@ -124,6 +124,11 @@ class GestionTurnosTest {
         @Override
         public Optional<Turno> abiertoDeUsuario(long usuarioId) {
             return abiertos.stream().filter(t -> t.usuarioId() == usuarioId).findFirst();
+        }
+
+        @Override
+        public List<Turno> abiertos() {
+            return List.copyOf(abiertos);
         }
 
         @Override

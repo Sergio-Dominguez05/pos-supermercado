@@ -14,7 +14,8 @@ import {
 } from '../../api/turnos'
 import { opcionesPara } from '../inicio/opciones'
 import { CLAVE_SESION } from '../login/sesion'
-import { FormularioCierre, ListaCierres, PaginaCierreCaja, ResumenCobrado } from './CierreCaja'
+import { FormularioCierre, ListaCierres, PaginaCierreCaja } from './CierreCaja'
+import { ResumenCobrado } from './ResumenCobrado'
 import { confirmacionCierre, diferenciaDeCierre, totalLoteValido } from './textos'
 
 const CAJERO: Partial<UsuarioSesion> = { rol: 'CAJERO', permisos: ['CAJA_OPERAR_PROPIA'], cajaNombre: null }

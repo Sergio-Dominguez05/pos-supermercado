@@ -57,6 +57,12 @@ class RepositorioTurnosJdbc implements RepositorioTurnos {
     }
 
     @Override
+    public List<Turno> abiertos() {
+        return jdbc.query(SELECT_TURNO
+                + "WHERE t.estado = 'ABIERTO' ORDER BY c.nombre, t.abierto_en, t.id", TURNO);
+    }
+
+    @Override
     public long abrir(long cajaId, long usuarioId) {
         return jdbc.queryForObject("INSERT INTO turno (caja_id, usuario_id) VALUES (?, ?) RETURNING id",
                 Long.class, cajaId, usuarioId);

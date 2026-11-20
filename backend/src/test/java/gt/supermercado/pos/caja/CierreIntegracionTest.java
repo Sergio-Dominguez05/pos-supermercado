@@ -82,6 +82,34 @@ class CierreIntegracionTest {
     }
 
     @Test
+    void elSupervisorConsultaCualquierTurnoAbiertoYElCajeroSoloElPropio() throws Exception {   // 09.06
+        Cajero cajero = cajeroConTurno();
+        vender(cajero, "10.00", "DEBITO");
+        vender(cajero, "5.00", "CREDITO");
+        Cajero supervisor = supervisorConTurno();
+
+        HttpResponse<String> abiertosSupervisor = enviar("/api/turnos/abiertos", "GET", null,
+                supervisor.sesion());
+        HttpResponse<String> resumenAjeno = enviar("/api/turnos/" + cajero.turnoId() + "/resumen", "GET", null,
+                supervisor.sesion());
+
+        assertThat(abiertosSupervisor.statusCode()).isEqualTo(200);
+        assertThat(abiertosSupervisor.body()).contains("\"id\":" + cajero.turnoId(),
+                "\"id\":" + supervisor.turnoId());
+        assertThat(resumenAjeno.statusCode()).isEqualTo(200);
+        assertThat(resumenAjeno.body()).contains("\"ventas\":2", "\"debito\":10.00", "\"credito\":5.00",
+                "\"totalRegistrado\":15.00");
+        assertThat(jdbc.queryForObject("SELECT estado FROM turno WHERE id = ?", String.class, cajero.turnoId()))
+                .isEqualTo("ABIERTO");
+
+        HttpResponse<String> abiertosCajero = enviar("/api/turnos/abiertos", "GET", null, cajero.sesion());
+        assertThat(abiertosCajero.body()).contains("\"id\":" + cajero.turnoId())
+                .doesNotContain("\"id\":" + supervisor.turnoId());
+        assertThat(enviar("/api/turnos/" + supervisor.turnoId() + "/resumen", "GET", null, cajero.sesion())
+                .statusCode()).isEqualTo(403);
+    }
+
+    @Test
     void elCierreCiegoOcultaElTotalAlCajeroHastaQueConfirmaSuMonto() throws Exception {   // 09.11 crit. 1 a 3
         String anterior = jdbc.queryForObject("SELECT valor::text FROM parametro WHERE clave = 'cierre_ciego'",
                 String.class);
@@ -93,6 +121,9 @@ class CierreIntegracionTest {
             HttpResponse<String> oculto = enviar("/api/turnos/actual/cierre", "GET", null, cajero.sesion());
             assertThat(oculto.body()).contains("\"cierreCiego\":true", "\"resumen\":null")
                     .doesNotContain("totalRegistrado", "debito", "credito");
+            assertThat(enviar("/api/turnos/abiertos", "GET", null, cajero.sesion()).body()).isEqualTo("[]");
+            assertThat(enviar("/api/turnos/" + cajero.turnoId() + "/resumen", "GET", null, cajero.sesion())
+                    .statusCode()).isEqualTo(403);
 
             HttpResponse<String> comparacion = enviar("/api/turnos/actual/cierre/comparar", "POST",
                     "{\"totalLote\":8.00}", cajero.sesion());
