@@ -32,7 +32,8 @@ class CatalogoAccionesSensiblesTest {
             entry(CATALOGO_CARGADO, "HU-03.05"));
 
     private static final Set<String> MODULOS = Set.of(
-            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion", "reportes");
+            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion", "reportes",
+            "bitacora");
 
     @Test
     void elCatalogoTieneTodosLosEventosDelCriterio1() {
@@ -49,6 +50,8 @@ class CatalogoAccionesSensiblesTest {
                 PRODUCTO_ACTIVADO, PRODUCTO_DESACTIVADO, CATALOGO_CARGADO);
         // HU-10.15 crit. 3: la generación y la exportación de reportes.
         assertThat(porCategoria(Categoria.REPORTES)).contains(REPORTE_GENERADO, REPORTE_EXPORTADO);
+        // HU-11.06 crit. 4: la consulta de la bitácora.
+        assertThat(porCategoria(Categoria.BITACORA)).contains(BITACORA_CONSULTADA);
     }
 
     @Test
