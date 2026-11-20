@@ -8,6 +8,7 @@ import type { AccionCaja } from '../../atajos/atajos'
 export const ACCIONES_DE_LA_VENTA = [
   'ayuda',
   'buscarProducto',
+  'consultarPrecio',
   'cambiarCantidad',
   'eliminarLinea',
   'asignarCliente',

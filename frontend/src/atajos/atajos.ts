@@ -39,9 +39,7 @@ export const ATAJOS: readonly Atajo[] = [
  * presionarla la caja avisa con qué historia llega, y la ayuda (F1) la muestra como pendiente. Cuando la historia
  * registre su manejador en la pantalla de venta, pasa de aquí a `ACCIONES_DE_LA_VENTA` (lo exige `teclado.test.ts`).
  */
-export const ACCIONES_PENDIENTES: Partial<Record<AccionCaja, string>> = {
-  consultarPrecio: 'HU-03.10 (#28)',
-}
+export const ACCIONES_PENDIENTES: Partial<Record<AccionCaja, string>> = {}
 
 /** Nombre de la tecla para mostrarlo en pantalla: el teclado en español rotula "Supr" a la tecla Delete. */
 export const rotuloDeTecla = (tecla: string) => (tecla === 'Delete' ? 'Supr' : tecla)

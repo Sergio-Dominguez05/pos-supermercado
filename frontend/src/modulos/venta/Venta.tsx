@@ -22,6 +22,7 @@ import { avisoSonoro } from '../catalogo/sonido'
 import { AyudaAtajos } from './AyudaAtajos'
 import { BusquedaEnVenta } from './BusquedaEnVenta'
 import { CantidadLinea } from './CantidadLinea'
+import { ConsultaPrecio } from './ConsultaPrecio'
 import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
@@ -78,6 +79,8 @@ export function Venta() {
   }
   const seleccionada = seleccion.id
   const [ayudaVisible, setAyudaVisible] = useState(false)
+  // HU-03.10: F3 abre el panel para consultar precios sin vender.
+  const [consultaVisible, setConsultaVisible] = useState(false)
   const [aviso, setAviso] = useState<string>()
   // HU-08.06: la factura de la última venta que rechazó el certificador, para corregirla sin volver a cobrar.
   const [rechazada, setRechazada] = useState<{ ventaId: number; numero: number; factura: FacturaDeVenta }>()
@@ -118,6 +121,7 @@ export function Venta() {
     const disponibles: Record<AccionDeLaVenta, Manejador> = {
       ayuda: () => setAyudaVisible((visible) => !visible),
       buscarProducto: () => enfocar('descripcion'),
+      consultarPrecio: () => setConsultaVisible((visible) => !visible),
       cambiarCantidad: () => {
         const campo = seleccionada === undefined ? null : controlDeLinea(seleccionada, 'cantidad')
         if (campo instanceof HTMLInputElement) {
@@ -143,9 +147,19 @@ export function Venta() {
         () => setAviso(avisoPendiente(atajo)),
       ]),
     )
-    // En el cobro solo queda la ayuda; Escape regresa a la venta (PasoDeCobro).
+    // En el cobro solo queda la ayuda; Escape regresa a la venta (PasoDeCobro). Mientras se consulta un precio, solo
+    // la ayuda y F3 para volver (HU-03.10 crit. 3): ningún atajo actúa sobre la venta.
+    if (habilitada && consultaVisible) {
+      return {
+        ayuda: disponibles.ayuda,
+        consultarPrecio: () => {
+          setConsultaVisible(false)
+          setTimeout(() => enfocar('codigo'))
+        },
+      }
+    }
     return habilitada && !enCobro ? { ...pendientes, ...disponibles } : { ayuda: disponibles.ayuda }
-  }, [habilitada, seleccionada, enCobro, cobrar, reimprimir])
+  }, [habilitada, seleccionada, enCobro, consultaVisible, cobrar, reimprimir])
   useAtajos(manejadores)
 
   // HU-06.17: en el campo del código, las flechas arriba y abajo eligen la línea (el campo es de una sola línea).
@@ -171,6 +185,16 @@ export function Venta() {
 
       {/* HU-06.17 crit. 2: los atajos, en una ayuda rápida que se abre y se cierra con F1. */}
       {ayudaVisible && <AyudaAtajos onCerrar={() => setAyudaVisible(false)} />}
+
+      {/* HU-03.10: consultar precios sin agregarlos a la venta (F3). */}
+      {habilitada && consultaVisible && (
+        <ConsultaPrecio
+          onCerrar={() => {
+            setConsultaVisible(false)
+            setTimeout(() => enfocar('codigo'))
+          }}
+        />
+      )}
 
       {/* HU-06.13: la lista de ventas en espera, con F8 o con su botón. */}
       {habilitada && listaVisible && (

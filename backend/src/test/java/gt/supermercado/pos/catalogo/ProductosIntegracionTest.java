@@ -336,6 +336,43 @@ class ProductosIntegracionTest {
         assertThat(enviar("/api/productos/999999999", "GET", null, cookieAdmin).statusCode()).isEqualTo(404);
     }
 
+    // HU-03.11 Consultar el historial de precios
+
+    @Test
+    void elSupervisorVeLosCambiosDePrecioDelMasRecienteAlMasAntiguo() throws Exception {   // 03.11 crit. 1 a 3
+        jdbc.update("""
+                INSERT INTO usuario (username, nombre_completo, rol_id, credencial_hash, credencial_temporal)
+                VALUES ('cat.supervisora', 'Supervisora del catálogo', 2, ?, false) ON CONFLICT (username) DO NOTHING""",
+                codificador.encode("Clave2026segura"));
+        String supervisora = cookie(login("/api/auth/login", "cat.supervisora", "contrasena", "Clave2026segura"),
+                "POS_SESION");
+        long id = idDe(crear(nuevoCodigo(), "Leche entera 1 L", "10.00"));
+        assertThat(editar(id, "Leche entera 1 L", "11.50").statusCode()).isEqualTo(200);
+        // Cambiar solo la descripción no es un cambio de precio.
+        assertThat(editar(id, "Leche entera 1 litro", "11.50").statusCode()).isEqualTo(200);
+        assertThat(editar(id, "Leche entera 1 litro", "12.25").statusCode()).isEqualTo(200);
+        // Un precio rechazado tampoco aparece.
+        assertThat(editar(id, "Leche entera 1 litro", "-1").statusCode()).isEqualTo(422);
+
+        HttpResponse<String> historial = enviar("/api/productos/" + id + "/precios", "GET", null, supervisora);
+
+        assertThat(historial.statusCode()).isEqualTo(200);
+        String cuerpo = historial.body();
+        assertThat(cuerpo).contains("\"anterior\":11.50,\"nuevo\":12.25", "\"anterior\":10.00,\"nuevo\":11.50",
+                "\"usuario\":", "(admin)", "\"cambiadoEn\"");
+        assertThat(cuerpo.indexOf("\"nuevo\":12.25")).as("el más reciente primero")
+                .isLessThan(cuerpo.indexOf("\"nuevo\":11.50"));
+        assertThat(cuerpo.split("\"anterior\"", -1)).hasSize(3);
+
+        String cajera = cookie(login("/api/auth/login-pin", "cat.cajera", "pin", PIN), "POS_SESION");
+        assertThat(enviar("/api/productos/" + id + "/precios", "GET", null, cajera).statusCode()).isEqualTo(403);
+        assertThat(enviar("/api/productos/999999999/precios", "GET", null, supervisora).statusCode()).isEqualTo(404);
+        // Crit. 3: los registros de la bitácora no se pueden modificar (HU-11.05).
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
+                "UPDATE bitacora SET descripcion = 'x' WHERE accion = 'PRECIO_CAMBIADO' AND entidad_id = ?", id))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
     // Apoyo
 
     private static String nuevoCodigo() {
