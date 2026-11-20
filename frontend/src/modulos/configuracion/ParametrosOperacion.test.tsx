@@ -15,7 +15,7 @@ import { FormularioParametros, PaginaParametrosOperacion } from './ParametrosOpe
 
 const ADMIN: Partial<UsuarioSesion> = { rol: 'ADMIN', permisos: ['CONFIGURACION_MODIFICAR'] }
 const CAJERO: Partial<UsuarioSesion> = { rol: 'CAJERO', permisos: ['VENTA_REGISTRAR'] }
-const GUARDADOS: ParametrosOperacion = { cantidadMaximaPorLinea: 50, cierreCiego: true }
+const GUARDADOS: ParametrosOperacion = { cantidadMaximaPorLinea: 50, cierreCiego: true, limiteConsumidorFinal: 2500 }
 
 const renderizar = (contenido: ReactNode, sesion: Partial<UsuarioSesion> = ADMIN) => {
   const cliente = new QueryClient()
@@ -61,5 +61,14 @@ describe('parámetros de caja y venta (HU-12.13)', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/configuracion/parametros')
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ method: 'PUT', body: JSON.stringify(GUARDADOS) })
     vi.unstubAllGlobals()
+  })
+
+  it('el límite para Consumidor Final se configura en quetzales (HU-12.07 crit. 1)', () => {
+    const html = renderizar(<FormularioParametros guardado={GUARDADOS} />)
+    const limite = html.match(/<input[^>]*name="limiteConsumidorFinal"[^>]*>/)?.[0] ?? ''
+
+    expect(limite).toContain('value="2500.00"')
+    expect(limite).toContain('step="0.01"')
+    expect(html).toContain('Límite para Consumidor Final (Q)')
   })
 })

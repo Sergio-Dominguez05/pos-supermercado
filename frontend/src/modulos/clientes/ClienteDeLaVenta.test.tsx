@@ -4,6 +4,7 @@ import { renderToString } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   asignarClienteAVenta,
+  buscarClientePorCui,
   buscarClientePorNit,
   cambiarCorreoDeFactura,
   claveClienteDeVenta,
@@ -19,11 +20,14 @@ import {
   avisoCorreoFactura,
   CONSUMIDOR_FINAL,
   correoValido,
+  cuiValido,
+  CUI_INVALIDO,
   describirCliente,
   nitConGuion,
 } from './textos'
 
-const FERRETERIA: Cliente = { id: 5, nit: '5769370', nombre: 'Ferretería El Clavo', direccion: 'Ciudad', correo: null }
+const FERRETERIA: Cliente = { id: 5, nit: '5769370', nombre: 'Ferretería El Clavo', direccion: 'Ciudad', correo: null,
+  tipoIdentificacion: 'NIT' }
 
 const renderizar = (contenido: ReactNode, deLaVenta: ClienteDeVenta) => {
   const cliente = new QueryClient()
@@ -37,7 +41,7 @@ const renderizar = (contenido: ReactNode, deLaVenta: ClienteDeVenta) => {
 const campo = (html: string, nombre: string) => html.match(new RegExp(`<input[^>]*name="${nombre}"[^>]*>`))?.[0] ?? ''
 const sinAccion = () => undefined
 const busqueda = (origen: BusquedaNit['origen'], cliente: Cliente | null, mensaje: string | null = null): BusquedaNit =>
-  ({ origen, nit: '5769370', cliente, mensaje })
+  ({ origen, nit: '5769370', cliente, mensaje, tipoIdentificacion: 'NIT' })
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -156,6 +160,43 @@ describe('cliente de la venta (EP-05)', () => {
     expect(ruta).toBe('/api/ventas/actual/cliente/correo')
     expect(opciones).toMatchObject({ method: 'PUT' })
     expect(JSON.parse(opciones?.body as string)).toEqual({ correo: 'ana@cliente.test' })
+  })
+
+  it('elige NIT o CUI; el CUI se valida con 13 dígitos (HU-05.06 crit. 1 y 2)', () => {
+    const html = renderizar(<ClienteDeLaVenta ventaId={31} />, {
+      consumidorFinal: true,
+      cliente: null,
+      correoFactura: null,
+    })
+    expect(html).toContain('name="tipoIdentificacion"')
+    expect(html).toContain('<option value="NIT" selected="">NIT</option>')
+    expect(html).toContain('<option value="CUI">CUI</option>')
+
+    for (const valido of ['1234567890101', '1234 56789 0101', '1234-56789-0101']) expect(cuiValido(valido)).toBe(true)
+    for (const invalido of ['123456789010', '12345678901012', '12345678901AB']) expect(cuiValido(invalido)).toBe(false)
+    expect(CUI_INVALIDO).toBe('El CUI debe tener 13 dígitos numéricos.')
+  })
+
+  it('el cliente con CUI se muestra con su CUI y se registra como CUI (HU-05.06 crit. 3)', async () => {
+    expect(describirCliente({ ...FERRETERIA, nit: '1234567890101', tipoIdentificacion: 'CUI' })).toBe(
+      'CUI 1234567890101 · Ferretería El Clavo · Ciudad',
+    )
+    const html = renderizar(
+      <RegistroCliente nit="1234567890101" tipo="CUI" onRegistrado={sinAccion} onConsumidorFinal={sinAccion} />,
+      { consumidorFinal: true, cliente: null, correoFactura: null },
+    )
+    expect(campo(html, 'nombreCliente')).toContain('required')
+
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{}', { status: 200 })))
+    await buscarClientePorCui('1234 56789 0101')
+    await registrarCliente({ tipoIdentificacion: 'CUI', nit: '1234567890101', nombre: 'Ana', direccion: '',
+      correo: '' })
+    const llamadas = vi.mocked(fetch).mock.calls
+    expect(llamadas[0][0]).toBe('/api/clientes/cui/1234567890101')
+    expect(JSON.parse(llamadas[1][1]?.body as string)).toMatchObject({
+      tipoIdentificacion: 'CUI',
+      nit: '1234567890101',
+    })
   })
 
   it('F6 ya no está pendiente: lleva al NIT del cliente (HU-06.17)', () => {

@@ -20,8 +20,16 @@ export const NIT_CLIENTE_INVALIDO = 'El NIT no es válido: revise los dígitos y
 /** El NIT como se acostumbra leer: con guion antes del verificador. */
 export const nitConGuion = (nit: string) => (nit.length > 1 ? `${nit.slice(0, -1)}-${nit.slice(-1)}` : nit)
 
-export const describirCliente = (cliente: Cliente | null) =>
-  cliente ? `NIT ${nitConGuion(cliente.nit)} · ${cliente.nombre} · ${cliente.direccion}` : CONSUMIDOR_FINAL
+export const describirCliente = (cliente: Cliente | null) => {
+  if (!cliente) return CONSUMIDOR_FINAL
+  const identificacion = cliente.tipoIdentificacion === 'CUI' ? `CUI ${cliente.nit}` : `NIT ${nitConGuion(cliente.nit)}`
+  return `${identificacion} · ${cliente.nombre} · ${cliente.direccion}`
+}
+
+/** HU-05.06 crit. 2: el CUI tiene 13 dígitos; se aceptan espacios y guiones al escribirlo. */
+export const normalizarCui = (cui: string) => cui.replace(/[\s-]/g, '')
+export const cuiValido = (cui: string) => /^\d{13}$/.test(normalizarCui(cui))
+export const CUI_INVALIDO = 'El CUI debe tener 13 dígitos numéricos.'
 
 export const identificacionCliente = (cliente: ClienteListado) =>
   `${cliente.tipoIdentificacion} ${cliente.tipoIdentificacion === 'NIT'
@@ -50,6 +58,9 @@ export const avisoBusqueda = (busqueda: BusquedaNit) => {
     case 'CONSULTADO':
       return `Nombre obtenido del certificador: ${busqueda.cliente?.nombre}. Se guardó para las próximas compras.`
     default:
-      return busqueda.mensaje ?? 'No se encontró el NIT. Escriba el nombre del cliente o facture como CF.'
+      return (
+        busqueda.mensaje ??
+        `No se encontró el ${busqueda.tipoIdentificacion}. Escriba el nombre del cliente o facture como CF.`
+      )
   }
 }

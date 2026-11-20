@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
   asignarClienteAVenta,
+  buscarClientePorCui,
   buscarClientePorNit,
   cambiarCorreoDeFactura,
   claveClienteDeVenta,
@@ -10,6 +11,7 @@ import {
   type BusquedaNit,
   type Cliente,
   type ClienteDeVenta,
+  type TipoIdentificacion,
 } from '../../api/clientes'
 import { nitValido, normalizarNit } from './nit'
 import {
@@ -17,6 +19,9 @@ import {
   avisoCorreoFactura,
   CORREO_INVALIDO,
   correoValido,
+  CUI_INVALIDO,
+  cuiValido,
+  normalizarCui,
   describirCliente,
   NIT_CLIENTE_INVALIDO,
 } from './textos'
@@ -28,6 +33,7 @@ import {
  * - HU-05.03: un NIT mal escrito se avisa y no se usa.
  * - HU-05.04: un NIT nuevo se consulta al certificador; si no aparece o no responde, se escribe el nombre o se usa CF.
  * - HU-05.05: el cliente nuevo se registra sin salir de la venta (dirección "Ciudad" si se deja vacía).
+ * - HU-05.06: sin NIT, el cliente se busca y se registra con su CUI (13 dígitos), elegido en el selector.
  * - HU-05.11: el correo al que se envía la factura (HU-08.15), opcional.
  * F6 lleva al campo del NIT (HU-06.17).
  */
@@ -35,6 +41,7 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
   const clave = claveClienteDeVenta(ventaId)
   const clienteConsultas = useQueryClient()
   const { data } = useQuery({ queryKey: clave, queryFn: obtenerClienteDeVenta })
+  const [tipo, setTipo] = useState<TipoIdentificacion>('NIT')
   const [nit, setNit] = useState('')
   const [problema, setProblema] = useState<string>()
   const [busqueda, setBusqueda] = useState<BusquedaNit>()
@@ -44,7 +51,7 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
     onSuccess: (actual) => clienteConsultas.setQueryData(clave, actual),
   })
   const consulta = useMutation({
-    mutationFn: () => buscarClientePorNit(nit),
+    mutationFn: () => (tipo === 'CUI' ? buscarClientePorCui(nit) : buscarClientePorNit(nit)),
     onMutate: () => setBusqueda(undefined),
     onSuccess: (resultado) => {
       setBusqueda(resultado)
@@ -54,8 +61,8 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
 
   const buscar = () => {
     asignacion.reset()
-    if (!nitValido(nit)) {
-      setProblema(NIT_CLIENTE_INVALIDO)
+    if (tipo === 'CUI' ? !cuiValido(nit) : !nitValido(nit)) {
+      setProblema(tipo === 'CUI' ? CUI_INVALIDO : NIT_CLIENTE_INVALIDO)
       return
     }
     setProblema(undefined)
@@ -92,12 +99,27 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
         }}
       >
         <label>
-          NIT
+          Identificación
+          <select
+            name="tipoIdentificacion"
+            value={tipo}
+            onChange={(evento) => {
+              setTipo(evento.target.value as TipoIdentificacion)
+              setProblema(undefined)
+              setBusqueda(undefined)
+            }}
+          >
+            <option value="NIT">NIT</option>
+            <option value="CUI">CUI</option>
+          </select>
+        </label>
+        <label>
+          {tipo}
           <input
             name="nit"
             autoComplete="off"
             maxLength={20}
-            placeholder="1234567-8"
+            placeholder={tipo === 'CUI' ? '1234 56789 0101' : '1234567-8'}
             value={nit}
             onChange={(evento) => setNit(evento.target.value)}
           />
@@ -126,8 +148,9 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
       )}
       {busqueda && !busqueda.cliente && (
         <RegistroCliente
-          key={busqueda.nit}
+          key={`${busqueda.tipoIdentificacion}-${busqueda.nit}`}
           nit={busqueda.nit}
+          tipo={busqueda.tipoIdentificacion}
           onRegistrado={(cliente) => {
             setBusqueda(undefined)
             asignacion.mutate(cliente)
@@ -223,10 +246,12 @@ export function CorreoDeFactura({
 /** HU-05.04 crit. 3 y HU-05.05: el nombre escrito a mano cuando el certificador no lo dio. */
 export function RegistroCliente({
   nit,
+  tipo = 'NIT',
   onRegistrado,
   onConsumidorFinal,
 }: {
   nit: string
+  tipo?: TipoIdentificacion
   onRegistrado: (cliente: Cliente) => void
   onConsumidorFinal: () => void
 }) {
@@ -234,7 +259,14 @@ export function RegistroCliente({
   const [direccion, setDireccion] = useState('')
   const [correo, setCorreo] = useState('')
   const registro = useMutation({
-    mutationFn: () => registrarCliente({ nit: normalizarNit(nit), nombre, direccion, correo }),
+    mutationFn: () =>
+      registrarCliente({
+        tipoIdentificacion: tipo,
+        nit: tipo === 'CUI' ? normalizarCui(nit) : normalizarNit(nit),
+        nombre,
+        direccion,
+        correo,
+      }),
     onSuccess: onRegistrado,
   })
 

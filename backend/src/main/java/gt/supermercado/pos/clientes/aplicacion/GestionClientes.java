@@ -40,7 +40,9 @@ import java.util.regex.Pattern;
  *   <li>HU-05.05: el registro pide NIT y nombre; la dirección es "Ciudad" si no se indica y el correo es opcional.
  *       Un NIT ya registrado no se duplica. Queda en la bitácora con quien lo registró.</li>
  * </ul>
- * El CUI (HU-05.06), el límite para CF (HU-05.07) y la edición de clientes (HU-05.09) llegan después.
+ * HU-05.06: sin NIT, el cliente se busca y se registra con su CUI (13 dígitos), cuyo nombre también se consulta al
+ * certificador; si la consulta falla, el cajero escribe el nombre. El límite para CF (HU-05.07) lo aplica
+ * {@code LimiteConsumidorFinal}. La edición de clientes (HU-05.09) llega después.
  */
 @Service
 public class GestionClientes {
@@ -76,10 +78,15 @@ public class GestionClientes {
         SIN_CONSULTA
     }
 
-    /** El resultado de buscar un NIT: el cliente si se encontró, o qué decirle al cajero. */
-    public record BusquedaNit(Origen origen, String nit, Cliente cliente, String mensaje) {}
+    /**
+     * El resultado de buscar un NIT o un CUI: el cliente si se encontró, o qué decirle al cajero. {@code nit} es la
+     * identificación normalizada y {@code tipoIdentificacion}, {@code NIT} o {@code CUI}.
+     */
+    public record BusquedaNit(Origen origen, String nit, Cliente cliente, String mensaje, String tipoIdentificacion) {}
 
-    public record SolicitudCliente(String nit, String nombre, String direccion, String correo) {}
+    /** {@code tipoIdentificacion} vacío es NIT; con {@code CUI}, {@code nit} lleva el CUI (HU-05.06). */
+    public record SolicitudCliente(String nit, String nombre, String direccion, String correo,
+                                   String tipoIdentificacion) {}
 
     /** HU-05.10: clientes registrados, con búsqueda y paginación. */
     @Transactional(readOnly = true)
@@ -90,32 +97,46 @@ public class GestionClientes {
     @Transactional
     public BusquedaNit buscar(String nit, SesionActiva sesion) {
         String valido = nitValido(nit);
-        Optional<Cliente> registrado = clientes.porNit(valido);
+        return buscar(Cliente.NIT, valido, clientes.porNit(valido), () -> contribuyentes.porNit(valido), sesion);
+    }
+
+    /** HU-05.06 crit. 2 y 3: el CUI debe tener 13 dígitos; su nombre se consulta al certificador. */
+    @Transactional
+    public BusquedaNit buscarCui(String cui, SesionActiva sesion) {
+        String valido = cuiValido(cui);
+        return buscar(Cliente.CUI, valido, clientes.porCui(valido), () -> contribuyentes.porCui(valido), sesion);
+    }
+
+    private BusquedaNit buscar(String tipo, String valido, Optional<Cliente> registrado,
+                               java.util.function.Supplier<ConsultaNit> consultar, SesionActiva sesion) {
         if (registrado.isPresent()) {
-            return new BusquedaNit(Origen.REGISTRADO, valido, registrado.get(), null);
+            return new BusquedaNit(Origen.REGISTRADO, valido, registrado.get(), null, tipo);
         }
-        ConsultaNit consulta = contribuyentes.porNit(valido);
+        ConsultaNit consulta = consultar.get();
         return switch (consulta.resultado()) {
             case ENCONTRADO -> new BusquedaNit(Origen.CONSULTADO, valido,
-                    registrar(valido, consulta.nombre(), Cliente.DIRECCION_POR_OMISION, null, sesion,
-                            "consultado en el certificador"), null);
+                    registrar(tipo, valido, consulta.nombre(), Cliente.DIRECCION_POR_OMISION, null, sesion,
+                            "consultado en el certificador"), null, tipo);
             case NO_EXISTE -> new BusquedaNit(Origen.NO_EXISTE, valido, null,
-                    "El certificador no encontró el NIT %s. Escriba el nombre del cliente o facture como CF."
-                            .formatted(valido));
+                    "El certificador no encontró el %s %s. Escriba el nombre del cliente o facture como CF."
+                            .formatted(tipo, valido), tipo);
             case NO_DISPONIBLE -> new BusquedaNit(Origen.SIN_CONSULTA, valido, null,
-                    "No se pudo consultar el NIT en este momento. Escriba el nombre del cliente o facture como CF.");
+                    "No se pudo consultar el %s en este momento. Escriba el nombre del cliente o facture como CF."
+                            .formatted(tipo), tipo);
         };
     }
 
     /** HU-05.05: registra al cliente; si el NIT ya está registrado, devuelve el existente sin duplicarlo (crit. 2). */
     @Transactional
     public Cliente registrar(SolicitudCliente solicitud, SesionActiva sesion) {
+        String tipo;
         String nit;
         String nombre;
         String direccion;
         String correo;
         try {
-            nit = nitValido(solicitud.nit());
+            tipo = Cliente.CUI.equalsIgnoreCase(texto(solicitud.tipoIdentificacion())) ? Cliente.CUI : Cliente.NIT;
+            nit = tipo.equals(Cliente.CUI) ? cuiValido(solicitud.nit()) : nitValido(solicitud.nit());
             nombre = texto(solicitud.nombre());
             if (nombre.isEmpty() || nombre.length() > 200) {
                 throw new NegocioException("NOMBRE_CLIENTE_REQUERIDO", "Escriba el nombre del cliente (hasta 200 caracteres).");
@@ -137,11 +158,11 @@ public class GestionClientes {
                     + error.getMessage(), null, null));
             throw error;
         }
-        Optional<Cliente> existente = clientes.porNit(nit);
+        Optional<Cliente> existente = tipo.equals(Cliente.CUI) ? clientes.porCui(nit) : clientes.porNit(nit);
         if (existente.isPresent()) {
             return existente.get();
         }
-        return registrar(nit, nombre, direccion, correo, sesion, "registrado por el cajero");
+        return registrar(tipo, nit, nombre, direccion, correo, sesion, "registrado por el cajero");
     }
 
     /**
@@ -199,7 +220,8 @@ public class GestionClientes {
         Receptor receptor = clienteId == null
                 ? Receptor.consumidorFinal()
                 : clientes.porId(clienteId)
-                        .map(cliente -> new Receptor(Receptor.TipoReceptor.NIT, cliente.nit(), cliente.nombre()))
+                        .map(cliente -> new Receptor(Receptor.TipoReceptor.valueOf(cliente.tipoIdentificacion()),
+                                cliente.nit(), cliente.nombre()))
                         .orElseThrow(() -> new RecursoNoEncontradoException("CLIENTE_NO_ENCONTRADO",
                                 "El cliente no existe."));
         transacciones.executeWithoutResult(transaccion -> {
@@ -209,28 +231,37 @@ public class GestionClientes {
         return reenvio.certificar(ventaId, sesion);
     }
 
-    private Cliente registrar(String nit, String nombre, String direccion, String correo, SesionActiva sesion,
-                              String como) {
+    private Cliente registrar(String tipo, String nit, String nombre, String direccion, String correo,
+                              SesionActiva sesion, String como) {
         long id;
         try {
-            id = clientes.registrar(nit, nombre, direccion, correo, sesion.usuarioId());
+            id = clientes.registrar(tipo, nit, nombre, direccion, correo, sesion.usuarioId());
         } catch (DuplicateKeyException e) {
             // Otra caja lo registró al mismo tiempo: se usa el existente (HU-05.05 crit. 2).
-            return clientes.porNit(nit).orElseThrow();
+            return (tipo.equals(Cliente.CUI) ? clientes.porCui(nit) : clientes.porNit(nit)).orElseThrow();
         }
         Map<String, Object> datos = new LinkedHashMap<>();
-        datos.put("nit", EventoBitacora.cambio("", nit));
+        datos.put(tipo.equals(Cliente.CUI) ? "cui" : "nit", EventoBitacora.cambio("", nit));
         datos.put("nombre", EventoBitacora.cambio("", nombre));
         datos.put("direccion", EventoBitacora.cambio("", direccion));
         if (correo != null) {
             datos.put("correo", EventoBitacora.cambio("", correo));
         }
-        bitacora.registrar(evento(sesion, true, "Cliente NIT %s registrado (%s): %s".formatted(nit, como, nombre), id,
+        bitacora.registrar(evento(sesion, true, "Cliente %s %s registrado (%s): %s".formatted(tipo, nit, como, nombre), id,
                 datos));
         return clientes.porId(id).orElseThrow();
     }
 
     /** HU-05.03: el NIT en formato uniforme, solo si su dígito verificador es correcto (crit. 1 a 3). */
+    /** HU-05.06 crit. 2: 13 dígitos; se aceptan espacios y guiones al escribirlo (por ejemplo "1234 56789 0101"). */
+    private static String cuiValido(String cui) {
+        String limpio = cui == null ? "" : cui.replaceAll("[\\s-]", "");
+        if (!limpio.matches("\\d{13}")) {
+            throw new NegocioException("CUI_INVALIDO", "El CUI debe tener 13 dígitos numéricos.");
+        }
+        return limpio;
+    }
+
     private static String nitValido(String nit) {
         return Nit.validar(nit).orElseThrow(() -> new NegocioException("NIT_INVALIDO",
                 "El NIT no es válido: revise los dígitos y el verificador (puede terminar en K)."));
