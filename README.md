@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** cobro y emisión FEL (`v0.5.0`) — cobro con tarjeta, factura electrónica (DTE) certificada al finalizar la venta, impresión en impresoras térmicas de red y cliente por NIT, sobre la pantalla de venta del Sprint 3. La certificación se prueba con un certificador simulado (el certificador real aún no se elige). Aún no incluye contingencia, anulación ni cierre de caja.
+> **Estado:** producto mínimo completo (`v0.6.0`) — vende, cobra con tarjeta, factura con FEL (con contingencia cuando no hay conexión, rechazos, anulación y reimpresión) y cierra la caja con su comprobante. La certificación se prueba con un certificador simulado (el certificador real aún no se elige). Faltan los reportes (Sprint 6) y las historias de prioridad media y baja.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -29,14 +29,19 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | Permisos | Matriz de permisos por rol; cada endpoint exige su permiso en el servidor y los accesos denegados quedan registrados | HU-01.11 | `v0.2.0` |
 | Configuración | Registrar cajas con su serie de facturación y vincular el equipo (navegador) de cada caja | HU-12.05 | `v0.2.0` |
 | Bitácora | Registro automático de las acciones sensibles, con usuario, rol, caja y valores anteriores y nuevos; inmutable, encadenada con hashes y con verificación de integridad | HU-11.01, 11.02, 11.05 | `v0.2.0` |
+| Bitácora | Los intentos sin permiso registran el permiso que faltaba y la caja; las acciones automáticas quedan a nombre del usuario técnico "sistema" | HU-11.04 | `v0.6.0` |
 | Catálogo | Registrar, editar (el código no cambia), activar y desactivar productos; lista con búsqueda, filtros y paginación; buscar por código o por descripción (sin tildes ni mayúsculas); códigos no encontrados para registrar después | HU-03.01 a 03.04, 03.06 a 03.09 | `v0.3.0` |
 | IVA | IVA del 12 % incluido en el precio; base e IVA con 6 decimales por línea y redondeo HALF_UP solo en los totales ([reglas](docs/arquitectura/calculo-iva.md)) | HU-04.01 a 04.05 | `v0.3.0` |
 | Caja | Abrir el turno en la caja del equipo (uno por caja y por cajero); sin turno abierto no se vende | HU-09.01 a 09.03 | `v0.3.0` |
+| Cierre de caja | Resumen por tarjeta (sin las anuladas), total del cierre de lote, diferencia con justificación obligatoria, turno cerrado inmodificable, comprobante con firmas y reimpresión de cierres anteriores | HU-09.08 a 09.10 | `v0.6.0` |
 | Venta | Pantalla de venta con número interno; agregar con lector, código escrito o búsqueda por descripción (F2); el precio de cada línea se mantiene aunque cambie en el catálogo; totales y desglose de IVA calculados por el servidor; cancelar con confirmación | HU-06.01 a 06.03, 06.09, 06.14 | `v0.3.0` (adelanto del Sprint 3) |
 | Venta | Totales siempre visibles; cantidad con `6*` antes del código o editando la línea, con confirmación por encima del límite configurado; quitar líneas (quedan en la bitácora, sin borrarse); dejar ventas en espera y retomarlas; atajos de teclado con ayuda (F1); pasar al cobro con el total (el registro del pago con tarjeta llega con EP-07) | HU-06.04, 06.07, 06.08, 06.12, 06.13, 06.15, 06.17 | `v0.4.0` |
 | Cobro | Cobrar con tarjeta (tipo, autorización y últimos 4, nunca el número completo); quitar un pago antes de finalizar; finalizar solo con el pago completo, en una transacción, y la caja queda lista para la siguiente venta | HU-07.03, 07.06, 07.07, 07.08 | `v0.5.0` |
 | Clientes | Cliente de la venta por NIT (con o sin guion, F6): se cargan sus datos o se consulta el nombre al certificador; registro sin duplicados; NIT validado con el módulo 11 de la SAT; volver a Consumidor Final con un clic | HU-05.01 a 05.05 | `v0.5.0` |
 | Facturación FEL | Documento de la factura (DTE tipo FACT, esquema FEL de la SAT) con los montos que guardó el POS; certificación al finalizar con tiempo límite (sin respuesta, queda en contingencia); identificador único por venta y consulta antes de reenviar, para no duplicar facturas | HU-08.01 a 08.04, 04.09 (parcial) | `v0.5.0` |
+| Rechazos FEL | Motivo del rechazo en lenguaje comprensible; el cajero corrige el cliente y reenvía sin volver a cobrar; los demás quedan en "Facturas rechazadas" para el supervisor | HU-08.06, 04.09 | `v0.6.0` |
+| Contingencia | Sin conexión con el certificador se emite el comprobante con número de acceso y se avisa en la venta; un proceso automático lo certifica después, en orden y con espera creciente; aviso al supervisor desde el día 12 de los 15 que da la SAT | HU-08.07 a 08.09 | `v0.6.0` |
+| Anulación y reimpresión | El supervisor anula una factura con motivo mientras el turno de la venta siga abierto; reimprimir la última factura con F9 o buscar facturas anteriores, con la leyenda de copia | HU-08.10, 08.12, 09.02 | `v0.6.0` |
 | Impresión | Factura impresa en la impresora térmica de red de la caja (ESC/POS, 58 u 80 mm) con emisor, receptor, autorización, detalle, Subtotal, IVA y TOTAL, pago y certificador; si la impresora falla, la factura sigue válida | HU-08.05 | `v0.5.0` |
 | Configuración | Datos del emisor y del establecimiento SAT; conexión con el certificador (https, llave cifrada con AES-256-GCM, ambiente de pruebas o producción); impresoras por caja con página de prueba y copias | HU-12.01, 12.02, 12.03, 12.08, 12.15 | `v0.5.0` |
 
@@ -170,7 +175,7 @@ flowchart TB
 
     subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
         direction LR
-        S3["🔄 Sprint 3 · v0.4.0<br/>Pantalla de venta ✅ y clientes<br/>18 HU · Alta"] --> S4["✅ Sprint 4 · v0.5.0<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["Sprint 5<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+        S3["🔄 Sprint 3 · v0.4.0<br/>Pantalla de venta ✅ y clientes<br/>18 HU · Alta"] --> S4["✅ Sprint 4 · v0.5.0<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["✅ Sprint 5 · v0.6.0<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
     end
 
     subgraph MEJORAS["Etapa 3 · Reportes y operación"]
@@ -238,4 +243,4 @@ Para diagnóstico, configuración avanzada y otros comandos: [guía de entorno](
 
 ---
 
-**Proyecto académico · Guatemala · Cobro y emisión FEL del Sprint 4 (`v0.5.0`)**
+**Proyecto académico · Guatemala · Contingencia, anulación y cierre de caja del Sprint 5 (`v0.6.0`)**
