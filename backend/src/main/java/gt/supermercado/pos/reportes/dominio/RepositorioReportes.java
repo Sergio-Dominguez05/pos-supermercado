@@ -29,6 +29,15 @@ public interface RepositorioReportes {
     ReporteProductosMasVendidos.Resultado productosMasVendidos(FiltrosReporte filtros, OrdenProductos orden,
                                                               int limite);
 
+    /** HU-10.12 crit. 1: los turnos abiertos ahora, con su caja y su cajero, del más antiguo al más reciente. */
+    List<PanelDelDia.CajaAbierta> cajasAbiertas();
+
+    /**
+     * HU-10.12 crit. 2: los comprobantes en contingencia (de cualquier día), los códigos no encontrados sin resolver
+     * del día y los cierres del día con diferencia; el día es en hora de Guatemala.
+     */
+    PanelDelDia.Alertas alertas(java.time.LocalDate dia);
+
     /** HU-10.03 crit. 2: las ventas finalizadas y canceladas del cajero de los filtros, en orden cronológico. */
     List<DetalleVentasCajero.Venta> ventasDeCajero(FiltrosReporte filtros);
 

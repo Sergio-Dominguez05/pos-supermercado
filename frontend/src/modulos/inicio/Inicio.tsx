@@ -6,6 +6,7 @@ import { useSesion } from '../login/sesion'
 import { AvisoContingenciaSupervisor } from '../facturas/Contingencia'
 import { rotuloRechazadas } from '../facturas/textos'
 import { opcionesPara } from './opciones'
+import { PanelDelDia } from './PanelDelDia'
 
 /** Pantalla principal tras iniciar sesión: muestra las opciones del rol (HU-01.01 crit. 1). */
 export function Inicio() {
@@ -21,6 +22,9 @@ export function Inicio() {
 
       {/* HU-09.01 crit. 1: en una caja cerrada se pide abrir el turno. */}
       <EstadoTurno />
+
+      {/* HU-10.12: el resumen del día, para quien consulta los reportes (Administrador y Supervisor). */}
+      {usuario.permisos.includes('REPORTE_CONSULTAR') && <PanelDelDia />}
 
       {/* HU-08.06 crit. 3: se avisa al supervisor de las ventas pendientes de facturar. */}
       {usuario.permisos.includes('FACTURA_ANULAR') && <AvisoRechazadas />}

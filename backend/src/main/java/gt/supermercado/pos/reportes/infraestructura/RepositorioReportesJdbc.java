@@ -12,6 +12,7 @@ import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
 import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.PanelDelDia;
 import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
@@ -180,6 +181,31 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                     fila.getString("descripcion"), fila.getLong("cantidad"), fila.getBigDecimal("monto"));
         }, valores.toArray());
         return new ReporteProductosMasVendidos.Resultado(productos[0], filas);
+    }
+
+    @Override
+    public List<PanelDelDia.CajaAbierta> cajasAbiertas() {
+        return jdbc.query("""
+                SELECT t.id, c.nombre AS caja, %s AS cajero, t.abierto_en
+                FROM turno t
+                JOIN caja c ON c.id = t.caja_id
+                JOIN usuario u ON u.id = t.usuario_id
+                WHERE t.estado = 'ABIERTO'
+                ORDER BY t.abierto_en, t.id""".formatted(NOMBRE.formatted("u")),
+                (fila, i) -> new PanelDelDia.CajaAbierta(fila.getLong("id"), fila.getString("caja"),
+                        fila.getString("cajero"), fila.getObject("abierto_en", OffsetDateTime.class)));
+    }
+
+    @Override
+    public PanelDelDia.Alertas alertas(LocalDate dia) {
+        return jdbc.queryForObject("""
+                SELECT (SELECT count(*) FROM factura WHERE estado = 'CONTINGENCIA') AS contingencia,
+                       (SELECT count(*) FROM codigo_no_encontrado n WHERE NOT n.resuelto AND %s) AS codigos,
+                       (SELECT count(*) FROM turno t WHERE t.estado = 'CERRADO' AND t.diferencia <> 0 AND %s) AS cierres
+                """.formatted(enPeriodo("n.ocurrido_en"), enPeriodo("t.cerrado_en")),
+                (fila, i) -> new PanelDelDia.Alertas(fila.getLong("contingencia"), fila.getLong("codigos"),
+                        fila.getLong("cierres")),
+                dia, dia, dia, dia);
     }
 
     @Override

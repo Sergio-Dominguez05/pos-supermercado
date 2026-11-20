@@ -4,6 +4,7 @@ import gt.supermercado.pos.reportes.aplicacion.GeneracionReportes;
 import gt.supermercado.pos.reportes.dominio.Agrupacion;
 import gt.supermercado.pos.reportes.dominio.CodigoReporte;
 import gt.supermercado.pos.reportes.dominio.FormatoExportacion;
+import gt.supermercado.pos.reportes.dominio.PanelDelDia;
 import gt.supermercado.pos.reportes.dominio.ParametrosReporte;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -77,6 +78,13 @@ public class ReportesController {
             @RequestParam(required = false) Long cajeroId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.ventasPorCajero(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.12: el panel resumen del día, con sus alertas; la pantalla lo vuelve a pedir cada minuto. */
+    @GetMapping("/api/reportes/panel")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public PanelDelDia panel() {
+        return reportes.panel();
     }
 
     /** HU-10.04: por caja, ventas, total vendido, turnos y participación, para compararlas en el mismo período. */

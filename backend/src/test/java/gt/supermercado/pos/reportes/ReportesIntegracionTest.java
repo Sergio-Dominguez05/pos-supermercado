@@ -184,6 +184,76 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void elPanelResumeLasVentasDeHoyLasCajasAbiertasYLasTarjetas() throws Exception {   // HU-10.12 crit. 1
+        JsonNode antes = ok(get("/api/reportes/panel"));
+        Caja caja = caja();
+        String ahora = java.time.OffsetDateTime.now().toString();
+        long venta = caja.venta("FINALIZADA", ahora, "112.00", "CERTIFICADA");
+        caja.pago(venta, "CREDITO", "112.00", "AUT-P1", false);
+        long anulada = caja.venta("FINALIZADA", ahora, "50.00", "ANULADA");    // no se cuenta
+        caja.pago(anulada, "CREDITO", "50.00", "AUT-P2", false);
+        long turnoAbierto = jdbc.queryForObject("""
+                INSERT INTO turno (caja_id, usuario_id, estado, abierto_en) VALUES (?, ?, 'ABIERTO', now())
+                RETURNING id""", Long.class, caja.id, caja.cajeroId);
+
+        JsonNode despues = ok(get("/api/reportes/panel"));
+
+        assertThat(despues.get("fecha").asString()).isEqualTo(LocalDate.now(ZoneId.of("America/Guatemala")).toString());
+        assertThat(despues.get("cantidadVentas").asLong() - antes.get("cantidadVentas").asLong()).isEqualTo(1);
+        assertThat(despues.get("totalVendido").decimalValue().subtract(antes.get("totalVendido").decimalValue()))
+                .isEqualByComparingTo("112.00");
+        assertThat(despues.get("ticketPromedio").decimalValue()).isNotNull();
+        List<Long> turnos = new ArrayList<>();
+        despues.get("cajasAbiertas").forEach(c -> turnos.add(c.get("turnoId").asLong()));
+        assertThat(turnos).contains(turnoAbierto);
+        JsonNode credito = tarjeta(despues, "CREDITO");
+        assertThat(credito.get("transacciones").asLong() - tarjeta(antes, "CREDITO").get("transacciones").asLong())
+                .isEqualTo(1);
+        assertThat(credito.get("monto").decimalValue().subtract(tarjeta(antes, "CREDITO").get("monto").decimalValue()))
+                .isEqualByComparingTo("112.00");
+        // El panel no llena la bitácora: se consulta cada minuto.
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE usuario_id = ? AND accion = 'REPORTE_GENERADO'""", Integer.class,
+                supervisorId)).isZero();
+    }
+
+    @Test
+    void elPanelAlertaContingenciasCodigosNoEncontradosYCierresConDiferencia() throws Exception {   // HU-10.12 crit. 2
+        JsonNode antes = ok(get("/api/reportes/panel")).get("alertas");
+        Caja caja = caja();
+        String ahora = java.time.OffsetDateTime.now().toString();
+        caja.venta("FINALIZADA", ahora, "20.00", "CONTINGENCIA");
+        jdbc.update("INSERT INTO codigo_no_encontrado (codigo, caja_id, usuario_id) VALUES ('PANEL-404', ?, ?)",
+                caja.id, caja.cajeroId);
+        jdbc.update("""
+                INSERT INTO codigo_no_encontrado (codigo, caja_id, usuario_id, resuelto) VALUES ('PANEL-OK', ?, ?, true)""",
+                caja.id, caja.cajeroId);   // resuelto: no alerta
+        caja.cierre(ahora, "100.00", "95.00", "Faltó un voucher");
+        caja.cierre(ahora, "100.00", "100.00", null);                     // sin diferencia: no alerta
+
+        JsonNode despues = ok(get("/api/reportes/panel")).get("alertas");
+
+        assertThat(despues.get("contingenciaPendientes").asLong() - antes.get("contingenciaPendientes").asLong())
+                .isEqualTo(1);
+        assertThat(despues.get("codigosNoEncontrados").asLong() - antes.get("codigosNoEncontrados").asLong())
+                .isEqualTo(1);
+        assertThat(despues.get("cierresConDiferencia").asLong() - antes.get("cierresConDiferencia").asLong())
+                .isEqualTo(1);
+        String cajero = usuario(3, PIN);
+        assertThat(enviar("/api/reportes/panel", login("/api/auth/login-pin", cajero, "pin", PIN)).statusCode())
+                .isEqualTo(403);
+    }
+
+    private static JsonNode tarjeta(JsonNode panel, String tipo) {
+        for (JsonNode fila : panel.get("ventasPorTarjeta")) {
+            if (fila.get("tipo").asString().equals(tipo)) {
+                return fila;
+            }
+        }
+        throw new AssertionError("Sin fila de " + tipo);
+    }
+
+    @Test
     void resumePorCajaLasVentasElTotalYLosTurnos() throws Exception {   // HU-10.04 crit. 1
         Caja caja = caja();
         caja.venta("FINALIZADA", "2025-08-04T15:00:00Z", "100.00", "CERTIFICADA");
