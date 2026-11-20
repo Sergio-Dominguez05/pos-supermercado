@@ -24,7 +24,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Contingencia', permiso: 'FACTURA_ANULAR', ruta: '/facturas/contingencia' },
   // HU-03.04: la lista del catálogo; desde ahí, quien tiene permiso crea y edita productos.
   { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR', ruta: '/catalogo' },
-  { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
+  // HU-10.01, 10.02 y 10.15: los reportes, solo para quien tiene el permiso (Administrador y Supervisor).
+  { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR', ruta: '/reportes' },
   { etiqueta: 'Bitácora', permiso: 'BITACORA_CONSULTAR', ruta: '/bitacora' },
   { etiqueta: 'Usuarios', permiso: 'USUARIO_ADMINISTRAR', ruta: '/usuarios' },
   // La configuración abre en las cajas (HU-12.05); desde ahí se llega al emisor (HU-12.01), al establecimiento

@@ -79,10 +79,18 @@ public enum AccionSensible {
     PRODUCTO_ACTIVADO(Categoria.CATALOGO, "catalogo"),
     PRODUCTO_DESACTIVADO(Categoria.CATALOGO, "catalogo"),
     /** Carga del catálogo desde un archivo. Pendiente: HU-03.05. */
-    CATALOGO_CARGADO(Categoria.CATALOGO, "catalogo");
+    CATALOGO_CARGADO(Categoria.CATALOGO, "catalogo"),
 
-    /** Los grupos de eventos del criterio 1 de HU-11.01. */
-    public enum Categoria { SESION, USUARIOS_Y_PERMISOS, VENTAS, FACTURACION, PAGOS, CAJA, CONFIGURACION, CATALOGO }
+    // Reportes (HU-10.15 crit. 3)
+    /** Cada reporte generado, con sus filtros; también el intento con filtros inválidos (HU-10.15). */
+    REPORTE_GENERADO(Categoria.REPORTES, "reportes"),
+    /** Cada reporte exportado a PDF o Excel. Pendiente: HU-10.13 y HU-10.14. */
+    REPORTE_EXPORTADO(Categoria.REPORTES, "reportes");
+
+    /** Los grupos de eventos del criterio 1 de HU-11.01, más los reportes (HU-10.15 crit. 3). */
+    public enum Categoria {
+        SESION, USUARIOS_Y_PERMISOS, VENTAS, FACTURACION, PAGOS, CAJA, CONFIGURACION, CATALOGO, REPORTES
+    }
 
     private final Categoria categoria;
     private final String modulo;
