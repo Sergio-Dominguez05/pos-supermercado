@@ -26,6 +26,7 @@ import { QuitarLinea } from './QuitarLinea'
 import { SuspenderVenta } from './SuspenderVenta'
 import { VentasSuspendidas } from './VentasSuspendidas'
 import { EscanerVenta } from './EscanerVenta'
+import { reimprimirUltima } from '../../api/facturas'
 import { CorregirFactura } from '../facturas/CorregirFactura'
 import { avisoFactura, avisoVentaFinalizada } from './cobro'
 import { PasoDeCobro } from './PasoDeCobro'
@@ -95,6 +96,13 @@ export function Venta() {
     onError: () => avisoSonoro(),
   })
   const cobrar = cobro.mutate
+  // HU-08.12 crit. 1: F9 reimprime la última factura de esta caja, como copia.
+  const reimpresion = useMutation({
+    mutationFn: () => reimprimirUltima(),
+    onSuccess: (resultado) => setAviso(resultado.mensaje ?? 'Se reimprimió la última factura.'),
+    onError: (error) => setAviso(error.message),
+  })
+  const reimprimir = reimpresion.mutate
   // Si la venta deja de tener productos (por ejemplo, se canceló desde otra pestaña), no hay nada que cobrar.
   if (enCobro && !venta?.lineas.length) setEnCobro(false)
   const regresarALaVenta = () => {
@@ -126,6 +134,7 @@ export function Venta() {
       retomarVenta: () => setListaVisible((visible) => !visible),
       cancelarVenta: () => document.querySelector<HTMLElement>('main [data-control="cancelar-venta"]')?.click(),
       cobrar: () => cobrar(),
+      reimprimirUltima: () => reimprimir(),
     }
     const pendientes: Manejadores = Object.fromEntries(
       ATAJOS.filter((atajo) => ACCIONES_PENDIENTES[atajo.accion]).map((atajo) => [
@@ -135,7 +144,7 @@ export function Venta() {
     )
     // En el cobro solo queda la ayuda; Escape regresa a la venta (PasoDeCobro).
     return habilitada && !enCobro ? { ...pendientes, ...disponibles } : { ayuda: disponibles.ayuda }
-  }, [habilitada, seleccionada, enCobro, cobrar])
+  }, [habilitada, seleccionada, enCobro, cobrar, reimprimir])
   useAtajos(manejadores)
 
   // HU-06.17: en el campo del código, las flechas arriba y abajo eligen la línea (el campo es de una sola línea).

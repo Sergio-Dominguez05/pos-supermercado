@@ -376,8 +376,19 @@ class AccionesSensiblesIntegracionTest {
                 SELECT entidad_id FROM bitacora WHERE accion = 'VENTA_FINALIZADA' AND exitoso AND usuario_id = ?""",
                 Long.class, id)).isEqualTo(venta);
 
-        // HU-08.10 crit. 5: la anulación de su factura, rechazada (sin motivo) y aceptada.
         long factura = jdbc.queryForObject("SELECT id FROM factura WHERE venta_id = ?", Long.class, venta);
+        // HU-08.12 crit. 4: la reimpresión, rechazada (la caja no tiene impresora) y hecha.
+        assertThat(registrosDe(() -> enviar("/api/facturas/ultima/reimprimir", "POST", null, sesion)))
+                .containsExactly(new Registro(FACTURA_REIMPRESA, false, id));
+        long impresora = idDe(enviar("/api/configuracion/impresoras", "POST",
+                "{\"nombre\":\"Auditada %s\",\"host\":\"auditada-%d.local\",\"anchoMm\":80}".formatted(nombre,
+                        SIGUIENTE.incrementAndGet()), cookieAdmin));
+        enviar("/api/cajas/" + cajaId, "PUT", "{\"nombre\":\"%s\",\"impresoraId\":%d}".formatted(nombre, impresora),
+                cookieAdmin);
+        assertThat(registrosDe(() -> enviar("/api/facturas/ultima/reimprimir", "POST", null, sesion)))
+                .containsExactly(new Registro(FACTURA_REIMPRESA, true, id));
+
+        // HU-08.10 crit. 5: la anulación de su factura, rechazada (sin motivo) y aceptada.
         assertThat(registrosDe(() -> enviar("/api/facturas/" + factura + "/anular", "POST", "{\"motivo\":\"\"}",
                 cookieAdmin))).containsExactly(new Registro(FACTURA_ANULADA, false, adminId));
         assertThat(registrosDe(() -> enviar("/api/facturas/" + factura + "/anular", "POST",

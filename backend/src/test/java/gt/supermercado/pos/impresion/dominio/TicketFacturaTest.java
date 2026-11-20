@@ -18,6 +18,7 @@ import java.nio.charset.Charset;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -62,6 +63,20 @@ class TicketFacturaTest {
         assertThat(conUltimos4).contains("Tarjeta de débito ****4321", "Aut. 778899");
         assertThat(sinUltimos4).contains("Tarjeta de débito\n").doesNotContain("****");
         assertThat(sinUltimos4).doesNotContain("NIT certificador");   // sin NIT configurado no se inventa
+    }
+
+    @Test
+    void laReimpresionLlevaLaLeyendaDeCopia() {   // HU-08.12 crit. 3
+        DatosTicketFactura original = datos(List.of(pagoDebito("4321")), "C", null);
+        DatosTicketFactura copia = new DatosTicketFactura(original.emisor(), original.establecimiento(),
+                original.receptorId(), original.receptorNombre(), original.autorizacion(), original.serie(),
+                original.numero(), original.certificadaEn(), original.emitidaEn(), original.venta(), original.pagos(),
+                original.certificador(), original.nitCertificador(), true);
+
+        assertThat(TicketFactura.armar(original, 80).texto()).doesNotContain("REIMPRESIÓN");
+        String texto = TicketFactura.armar(copia, 58).texto();
+        assertThat(texto.split(Pattern.quote(TicketFactura.LEYENDA_REIMPRESION), -1)).hasSize(3);   // inicio y final
+        assertThat(texto.indexOf("COPIA")).isLessThan(texto.indexOf("FACTURA"));
     }
 
     @Test
@@ -120,7 +135,7 @@ class TicketFacturaTest {
                 new Establecimiento(1, "1", "Súper del Valle, zona 1", "6a. avenida 5-10, zona 1", "01001",
                         "Guatemala", "Guatemala", null),
                 "CF", "Consumidor Final", AUTORIZACION, "A1B2C3D4", "123456789", CERTIFICADA, CERTIFICADA, venta,
-                pagos, certificador, nitCertificador);
+                pagos, certificador, nitCertificador, false);
     }
 
     private static Pago pagoDebito(String ultimos4) {

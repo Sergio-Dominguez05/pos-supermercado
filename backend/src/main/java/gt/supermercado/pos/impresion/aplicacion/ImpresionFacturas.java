@@ -60,11 +60,7 @@ public class ImpresionFacturas implements ImpresionDeFactura {
             if (impresora.isEmpty()) {
                 return ResultadoImpresion.sinImprimir("La caja no tiene impresora configurada." + REIMPRIMIR);
             }
-            FacturaImprimible imprimible = facturas.paraImprimir(venta.id()).orElseThrow();
-            Ticket ticket = TicketFactura.armar(datos(imprimible, venta, pagos, facturas.certificador()),
-                    impresora.get().anchoMm());
-            canal.enviar(impresora.get().host(), impresora.get().puerto(),
-                    EscPos.codificar(ticket, impresora.get().copiasFactura()));
+            enviar(venta, pagos, impresora.get(), impresora.get().copiasFactura(), false);
             return ResultadoImpresion.enviada();
         } catch (ImpresoraNoDisponibleException e) {
             return ResultadoImpresion.sinImprimir("No se pudo imprimir: " + e.getMessage() + REIMPRIMIR);
@@ -74,12 +70,23 @@ public class ImpresionFacturas implements ImpresionDeFactura {
         }
     }
 
+    /**
+     * Arma el ticket de la factura de la venta y lo envía a la impresora. Lo usa también la reimpresión (HU-08.12), con
+     * la leyenda de copia. Lanza {@link ImpresoraNoDisponibleException} si la impresora no responde.
+     */
+    public void enviar(Venta venta, List<Pago> pagos, Impresora impresora, int copias, boolean reimpresion) {
+        FacturaImprimible imprimible = facturas.paraImprimir(venta.id()).orElseThrow();
+        Ticket ticket = TicketFactura.armar(datos(imprimible, venta, pagos, facturas.certificador(), reimpresion),
+                impresora.anchoMm());
+        canal.enviar(impresora.host(), impresora.puerto(), EscPos.codificar(ticket, copias));
+    }
+
     private static DatosTicketFactura datos(FacturaImprimible imprimible, Venta venta, List<Pago> pagos,
-                                            Certificador certificador) {
+                                            Certificador certificador, boolean reimpresion) {
         return new DatosTicketFactura(imprimible.emisor(), imprimible.establecimiento(),
                 imprimible.receptor().identificacion(), imprimible.receptor().nombre(),
                 imprimible.factura().autorizacion(), imprimible.factura().serie(), imprimible.factura().numero(),
                 imprimible.factura().fechaCertificacion(), imprimible.factura().emitidaEn(), venta, pagos,
-                certificador.nombre(), certificador.nit());
+                certificador.nombre(), certificador.nit(), reimpresion);
     }
 }

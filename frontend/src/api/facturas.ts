@@ -1,5 +1,5 @@
 import { pedir } from './cliente'
-import type { FacturaDeVenta } from './pagos'
+import type { FacturaDeVenta, ResultadoImpresion } from './pagos'
 
 /** HU-08.06 crit. 3 y 4: una venta cobrada cuya factura rechazó el certificador, pendiente de facturar. */
 export interface FacturaRechazada {
@@ -74,3 +74,18 @@ export const buscarFacturas = (buscar: string, fecha: string) => {
 /** Crit. 2 y 3: anula la factura con su motivo; el certificador debe aceptarla. */
 export const anularFactura = (facturaId: number, motivo: string) =>
   pedir<FacturaEmitida>(`/api/facturas/${facturaId}/anular`, { method: 'POST', body: JSON.stringify({ motivo }) })
+
+/** HU-08.12 crit. 2: las facturas que esta sesión puede reimprimir (el cajero, las de su turno). */
+export const listarReimprimibles = (buscar: string, fecha: string) => {
+  const parametros = new URLSearchParams()
+  if (buscar.trim()) parametros.set('buscar', buscar.trim())
+  if (fecha) parametros.set('fecha', fecha)
+  const consulta = parametros.toString()
+  return pedir<FacturaEmitida[]>(`/api/facturas/reimprimibles${consulta ? `?${consulta}` : ''}`)
+}
+
+/** HU-08.12 crit. 1: la última factura de la caja de este equipo (F9). */
+export const reimprimirUltima = () => pedir<ResultadoImpresion>('/api/facturas/ultima/reimprimir', { method: 'POST' })
+
+export const reimprimirFactura = (facturaId: number) =>
+  pedir<ResultadoImpresion>(`/api/facturas/${facturaId}/reimprimir`, { method: 'POST' })

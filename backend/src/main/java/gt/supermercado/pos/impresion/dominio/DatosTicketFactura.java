@@ -15,9 +15,10 @@ import java.util.UUID;
  *
  * @param certificador    el nombre del certificador FEL
  * @param nitCertificador su NIT, o {@code null} si todavía no se configuró
+ * @param reimpresion     HU-08.12 crit. 3: es una copia, y el ticket lo dice
  */
 public record DatosTicketFactura(Emisor emisor, Establecimiento establecimiento, String receptorId,
                                  String receptorNombre, UUID autorizacion, String serie, String numero,
                                  OffsetDateTime certificadaEn, OffsetDateTime emitidaEn, Venta venta, List<Pago> pagos,
-                                 String certificador, String nitCertificador) {
+                                 String certificador, String nitCertificador, boolean reimpresion) {
 }
