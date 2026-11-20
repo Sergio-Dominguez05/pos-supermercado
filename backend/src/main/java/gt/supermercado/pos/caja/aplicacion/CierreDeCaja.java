@@ -13,6 +13,8 @@ import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.caja.dominio.VentasDelTurno;
 import gt.supermercado.pos.compartido.dominio.NegocioException;
 import gt.supermercado.pos.compartido.dominio.RecursoNoEncontradoException;
+import gt.supermercado.pos.configuracion.aplicacion.Parametros;
+import gt.supermercado.pos.seguridad.dominio.Rol;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,10 +55,11 @@ public class CierreDeCaja {
     private final ImpresionDeCierre impresion;
     private final Bitacora bitacora;
     private final TransactionOperations transacciones;
+    private final Parametros parametros;
 
     public CierreDeCaja(GestionTurnos turnos, RepositorioTurnos repositorio, ResumenesDeTurno resumenes,
                         VentasDelTurno ventas, ImpresionDeCierre impresion, Bitacora bitacora,
-                        TransactionOperations transacciones) {
+                        TransactionOperations transacciones, Parametros parametros) {
         this.turnos = turnos;
         this.repositorio = repositorio;
         this.resumenes = resumenes;
@@ -64,15 +67,32 @@ public class CierreDeCaja {
         this.impresion = impresion;
         this.bitacora = bitacora;
         this.transacciones = transacciones;
+        this.parametros = parametros;
     }
 
     /** El cierre ya guardado, su comprobante y si se imprimió. */
     public record CierreHecho(ComprobanteDeCierre comprobante, ImpresionDeCierre.Resultado impresion) {}
 
-    /** Crit. 3: lo cobrado en el turno abierto del cajero, antes de cerrarlo. */
+    /** Datos iniciales del cierre; en modo ciego el resumen no se envía al cajero. */
+    public record PreparacionCierre(boolean cierreCiego, ResumenDeTurno resumen) {}
+
+    /** Resultado que se revela después de que el cajero confirma el monto contado. */
+    public record ComparacionCierre(ResumenDeTurno resumen, BigDecimal diferencia) {}
+
+    /** HU-09.11: oculta lo cobrado al cajero cuando está activo el cierre ciego; un supervisor siempre lo ve. */
     @Transactional(readOnly = true)
-    public ResumenDeTurno resumen(SesionActiva sesion) {
-        return resumenes.de(turnos.exigirTurnoAbierto(sesion).id());
+    public PreparacionCierre resumen(SesionActiva sesion) {
+        ResumenDeTurno resumen = resumenes.de(turnos.exigirTurnoAbierto(sesion).id());
+        boolean cierreCiego = parametros.cierreCiego() && sesion.rol() == Rol.CAJERO;
+        return new PreparacionCierre(cierreCiego, cierreCiego ? null : resumen);
+    }
+
+    /** HU-09.11 crit. 2: revela el total registrado y la diferencia tras confirmar el monto ingresado. */
+    @Transactional(readOnly = true)
+    public ComparacionCierre comparar(BigDecimal totalLote, SesionActiva sesion) {
+        validarTotalLote(totalLote);
+        ResumenDeTurno resumen = resumenes.de(turnos.exigirTurnoAbierto(sesion).id());
+        return new ComparacionCierre(resumen, totalLote.subtract(resumen.totalRegistrado()).setScale(2));
     }
 
     public CierreHecho cerrar(BigDecimal totalLote, String justificacion, SesionActiva sesion) {
@@ -93,10 +113,7 @@ public class CierreDeCaja {
                 throw new NegocioException("VENTA_EN_CURSO",
                         "Hay una venta en curso con productos: cóbrela o cancélela antes de cerrar la caja.");
             }
-            if (totalLote == null || totalLote.signum() < 0 || totalLote.stripTrailingZeros().scale() > 2) {
-                throw new NegocioException("TOTAL_LOTE_INVALIDO",
-                        "Ingrese el total del cierre de lote de la terminal, en quetzales con hasta 2 decimales.");
-            }
+            validarTotalLote(totalLote);
             totalRegistrado = resumenes.de(turno.id()).totalRegistrado();
             diferencia = totalLote.subtract(totalRegistrado).setScale(2);
             if (diferencia.signum() != 0 && (motivo == null || motivo.length() < 5)) {
@@ -166,5 +183,12 @@ public class CierreDeCaja {
                 AccionSensible.TURNO_CERRADO, false, "Cierre de caja rechazado: " + error.getMessage(), "turno", null,
                 null).enCaja(sesion.cajaId()));
         return error;
+    }
+
+    private static void validarTotalLote(BigDecimal totalLote) {
+        if (totalLote == null || totalLote.signum() < 0 || totalLote.stripTrailingZeros().scale() > 2) {
+            throw new NegocioException("TOTAL_LOTE_INVALIDO",
+                    "Ingrese el total del cierre de lote de la terminal, en quetzales con hasta 2 decimales.");
+        }
     }
 }

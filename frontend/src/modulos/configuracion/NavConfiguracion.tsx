@@ -6,6 +6,7 @@ const SECCIONES = [
   { ruta: '/configuracion/emisor', etiqueta: 'Emisor' },
   { ruta: '/configuracion/establecimiento', etiqueta: 'Establecimiento' },
   { ruta: '/configuracion/fel', etiqueta: 'Conexión FEL' },
+  { ruta: '/configuracion/parametros', etiqueta: 'Caja y venta' },
 ] as const
 
 /** Ruta de navegación de la configuración (EP-12): la sección actual sin enlace y las demás con él. */

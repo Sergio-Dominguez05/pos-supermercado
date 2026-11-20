@@ -22,4 +22,30 @@ class RepositorioParametrosJdbc implements RepositorioParametros {
                 WHERE clave = ? AND jsonb_typeof(valor) = 'number' AND (valor #>> '{}') ~ '^[0-9]+$'""",
                 (rs, fila) -> rs.getInt(1), clave).stream().findFirst();
     }
+
+    @Override
+    public Optional<Boolean> booleano(String clave) {
+        return jdbc.query("""
+                SELECT (valor #>> '{}')::boolean FROM parametro
+                WHERE clave = ? AND jsonb_typeof(valor) = 'boolean'""",
+                (rs, fila) -> rs.getBoolean(1), clave).stream().findFirst();
+    }
+
+    @Override
+    public void guardarEntero(String clave, int valor) {
+        jdbc.update("""
+                INSERT INTO parametro (clave, valor, modificado_en)
+                VALUES (?, to_jsonb(CAST(? AS integer)), now())
+                ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, modificado_en = EXCLUDED.modificado_en""",
+                clave, valor);
+    }
+
+    @Override
+    public void guardarBooleano(String clave, boolean valor) {
+        jdbc.update("""
+                INSERT INTO parametro (clave, valor, modificado_en)
+                VALUES (?, to_jsonb(CAST(? AS boolean)), now())
+                ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, modificado_en = EXCLUDED.modificado_en""",
+                clave, valor);
+    }
 }

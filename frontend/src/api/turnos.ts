@@ -34,6 +34,16 @@ export interface ResumenDeTurno {
   contingencias: number
 }
 
+export interface PreparacionCierre {
+  cierreCiego: boolean
+  resumen: ResumenDeTurno | null
+}
+
+export interface ComparacionCierre {
+  resumen: ResumenDeTurno
+  diferencia: number
+}
+
 /** HU-09.08 crit. 5 y HU-09.09: el cierre guardado. */
 export interface CierreDeTurno {
   turnoId: number
@@ -63,7 +73,14 @@ export interface CierreHecho {
 export const CLAVE_RESUMEN_CIERRE = ['turnos', 'actual', 'cierre'] as const
 export const CLAVE_CIERRES = ['turnos', 'cierres'] as const
 
-export const obtenerResumenCierre = () => pedir<ResumenDeTurno>('/api/turnos/actual/cierre')
+export const obtenerResumenCierre = () => pedir<PreparacionCierre>('/api/turnos/actual/cierre')
+
+/** HU-09.11: revela el total y la diferencia solo después de confirmar el monto del cierre ciego. */
+export const compararCierre = (totalLote: number) =>
+  pedir<ComparacionCierre>('/api/turnos/actual/cierre/comparar', {
+    method: 'POST',
+    body: JSON.stringify({ totalLote, justificacion: null }),
+  })
 
 /** HU-09.08 y 09.09: cierra la caja con el total del cierre de lote y, si hay diferencia, su justificación. */
 export const cerrarCaja = (totalLote: number, justificacion: string) =>
