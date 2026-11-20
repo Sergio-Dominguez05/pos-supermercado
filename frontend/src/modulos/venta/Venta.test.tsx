@@ -291,7 +291,8 @@ describe('operar con atajos de teclado (HU-06.17)', () => {
     for (const atajo of ATAJOS) expect(html).toContain(atajo.descripcion)
     expect(html).toContain('<kbd>Supr</kbd> Eliminar línea')
     expect(html).toContain('<kbd>6*</kbd> antes del código')
-    expect(html).toContain('Consultar precio<small> (llega con HU-03.10 (#28))</small>')
+    expect(html).toContain('<kbd>F3</kbd> Consultar precio')
+    expect(html).not.toContain('llega con')
     expect(html).not.toContain('Cancelar venta<small>')
   })
 

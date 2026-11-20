@@ -84,12 +84,10 @@ describe('atajos de acciones que llegan con otras historias (HU-06.17 crit. 1)',
     expect(ACCIONES_DE_LA_VENTA.filter((accion) => pendientes.includes(accion))).toEqual([])
   })
 
-  it('cada acción pendiente es del mapa y dice con qué historia llega', () => {
+  it('ya no queda ninguna acción pendiente: F3 llegó con HU-03.10 (#28)', () => {
+    expect(ACCIONES_PENDIENTES).toEqual({})
+    expect(ACCIONES_DE_LA_VENTA).toContain('consultarPrecio')
     const consultar = ATAJOS.find((atajo) => atajo.accion === 'consultarPrecio')!
-
-    expect(avisoPendiente(consultar)).toBe('Consultar precio (F3) estará disponible con HU-03.10 (#28).')
-    for (const accion of Object.keys(ACCIONES_PENDIENTES)) {
-      expect(ATAJOS.map((atajo) => atajo.accion)).toContain(accion)
-    }
+    expect(avisoPendiente({ ...consultar })).toContain('Consultar precio (F3)')
   })
 })

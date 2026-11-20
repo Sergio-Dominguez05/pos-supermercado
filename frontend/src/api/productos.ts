@@ -82,6 +82,19 @@ export const activarProducto = (id: number) => pedir<Producto>(`/api/productos/$
 
 export const obtenerProducto = (id: number) => pedir<Producto>(`/api/productos/${id}`)
 
+/** HU-03.11: un cambio de precio tal como quedó en la bitácora. `usuario` es "Nombre (usuario)". */
+export interface CambioDePrecio {
+  cambiadoEn: string
+  anterior: number
+  nuevo: number
+  usuario: string | null
+}
+
+export const claveHistorialPrecios = (id: number) => ['productos', id, 'precios'] as const
+
+/** HU-03.11: los cambios de precio del producto, del más reciente; solo para quien consulta la bitácora. */
+export const obtenerHistorialPrecios = (id: number) => pedir<CambioDePrecio[]>(`/api/productos/${id}/precios`)
+
 /** Si el error es el de un código que no existe en el catálogo (HU-03.08). */
 export const esCodigoNoEncontrado = (error: unknown) =>
   error instanceof ErrorDeApi && error.codigo === 'PRODUCTO_NO_ENCONTRADO'

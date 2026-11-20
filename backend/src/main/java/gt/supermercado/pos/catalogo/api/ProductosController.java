@@ -1,6 +1,8 @@
 package gt.supermercado.pos.catalogo.api;
 
 import gt.supermercado.pos.catalogo.aplicacion.GestionProductos;
+import gt.supermercado.pos.catalogo.aplicacion.HistorialPrecios;
+import gt.supermercado.pos.catalogo.aplicacion.HistorialPrecios.CambioDePrecio;
 import gt.supermercado.pos.catalogo.dominio.CodigoNoEncontrado;
 import gt.supermercado.pos.catalogo.dominio.FiltroProductos;
 import gt.supermercado.pos.catalogo.dominio.FiltroProductos.OrdenProductos;
@@ -34,9 +36,11 @@ import java.util.List;
 public class ProductosController {
 
     private final GestionProductos gestionProductos;
+    private final HistorialPrecios historialPrecios;
 
-    public ProductosController(GestionProductos gestionProductos) {
+    public ProductosController(GestionProductos gestionProductos, HistorialPrecios historialPrecios) {
         this.gestionProductos = gestionProductos;
+        this.historialPrecios = historialPrecios;
     }
 
     /**
@@ -65,6 +69,16 @@ public class ProductosController {
     @PreAuthorize("hasAuthority('PRODUCTO_CONSULTAR')")
     public Producto obtener(@PathVariable long id) {
         return gestionProductos.obtener(id);
+    }
+
+    /**
+     * HU-03.11: los cambios de precio del producto, del más reciente, tomados de la bitácora. Lo ve quien consulta la
+     * bitácora (Supervisor y Administrador, decisión de Sergio); 404 si el producto no existe.
+     */
+    @GetMapping("/{id}/precios")
+    @PreAuthorize("hasAuthority('BITACORA_CONSULTAR')")
+    public List<CambioDePrecio> historialDePrecios(@PathVariable long id) {
+        return historialPrecios.de(id);
     }
 
     /** HU-03.06: búsqueda exacta por código, escaneado o escrito a mano; 404 si no existe. */

@@ -134,7 +134,9 @@ export function TablaProductos({ puedeEditar }: { puedeEditar: boolean }) {
               {pagina.productos.map((producto) => (
                 <tr key={producto.id}>
                   <td>{producto.codigoBarras}</td>
-                  <td>{producto.descripcion}</td>
+                  <td>
+                    <Link to={`/catalogo/${producto.id}`}>{producto.descripcion}</Link>
+                  </td>
                   <td>{formatoQuetzales(producto.precio)}</td>
                   <td>
                     <span className={producto.activo ? 'estado estado-activo' : 'estado estado-inactivo'}>
