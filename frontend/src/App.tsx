@@ -15,6 +15,8 @@ import { PaginaAnularFacturas } from './modulos/facturas/AnularFacturas'
 import { PaginaContingencia } from './modulos/facturas/Contingencia'
 import { PaginaFacturas } from './modulos/facturas/Facturas'
 import { PaginaFacturasRechazadas } from './modulos/facturas/FacturasRechazadas'
+import { PaginaDetalleFactura } from './modulos/facturas/DetalleFactura'
+import { PaginaHistorialFacturas } from './modulos/facturas/HistorialFacturas'
 import { ListaCajas } from './modulos/configuracion/ListaCajas'
 import { Inicio } from './modulos/inicio/Inicio'
 import { CambioCredencial } from './modulos/login/CambioCredencial'
@@ -141,6 +143,22 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaAnularFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/historial"
+            element={
+              <RutaProtegida>
+                <PaginaHistorialFacturas />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/facturas/:facturaId"
+            element={
+              <RutaProtegida>
+                <PaginaDetalleFactura />
               </RutaProtegida>
             }
           />

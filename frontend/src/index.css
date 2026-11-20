@@ -656,3 +656,24 @@ kbd {
   opacity: 0.6;
   cursor: wait;
 }
+
+/* HU-08.14: el detalle de una factura, con emisor, cliente y certificación lado a lado. */
+.columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0 16px;
+}
+
+.acciones-factura {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.historial-factura {
+  display: grid;
+  gap: 6px;
+  padding-left: 32px;
+}
