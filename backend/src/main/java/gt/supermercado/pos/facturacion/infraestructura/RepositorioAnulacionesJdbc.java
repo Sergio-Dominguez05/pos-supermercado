@@ -57,8 +57,29 @@ class RepositorioAnulacionesJdbc implements RepositorioAnulaciones {
 
     @Override
     public List<FacturaEmitida> buscar(String texto, LocalDate fecha, int limite) {
-        StringBuilder sql = new StringBuilder(SELECT_EMITIDA).append("WHERE f.estado IN ('CERTIFICADA', 'ANULADA')\n");
+        return buscar("('CERTIFICADA', 'ANULADA')", texto, fecha, null, limite);
+    }
+
+    @Override
+    public List<FacturaEmitida> buscarCertificadas(String texto, LocalDate fecha, Long turnoId, int limite) {
+        return buscar("('CERTIFICADA')", texto, fecha, turnoId, limite);
+    }
+
+    @Override
+    public Optional<FacturaEmitida> ultimaCertificadaDeLaCaja(long cajaId) {
+        return jdbc.query(SELECT_EMITIDA + """
+                WHERE f.estado = 'CERTIFICADA' AND v.caja_id = ?
+                ORDER BY f.emitida_en DESC, f.id DESC LIMIT 1""", EMITIDA, cajaId).stream().findFirst();
+    }
+
+    private List<FacturaEmitida> buscar(String estados, String texto, LocalDate fecha, Long turnoId, int limite) {
+        StringBuilder sql = new StringBuilder(SELECT_EMITIDA).append("WHERE f.estado IN ").append(estados)
+                .append('\n');
         List<Object> parametros = new ArrayList<>();
+        if (turnoId != null) {
+            sql.append("  AND v.turno_id = ?\n");
+            parametros.add(turnoId);
+        }
         if (texto != null && !texto.isBlank()) {
             sql.append("""
                       AND (f.numero ILIKE ? OR f.serie ILIKE ? OR f.uuid_autorizacion::text ILIKE ?

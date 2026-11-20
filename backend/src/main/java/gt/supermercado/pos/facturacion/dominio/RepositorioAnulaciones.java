@@ -16,6 +16,15 @@ public interface RepositorioAnulaciones {
     Optional<FacturaEmitida> porId(long facturaId);
 
     /**
+     * HU-08.12 crit. 2: las facturas certificadas que coinciden, solo las del turno indicado si {@code turnoId} no es
+     * nulo (el cajero reimprime las de su turno).
+     */
+    List<FacturaEmitida> buscarCertificadas(String texto, LocalDate fecha, Long turnoId, int limite);
+
+    /** HU-08.12 crit. 1: la última factura certificada de la caja. */
+    Optional<FacturaEmitida> ultimaCertificadaDeLaCaja(long cajaId);
+
+    /**
      * Crit. 3 y 4: la factura queda {@code ANULADA} con su anulación (motivo, usuario, turno de la venta y respuesta del
      * certificador). Falso si ya no estaba certificada.
      */

@@ -13,7 +13,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Venta', permiso: 'VENTA_REGISTRAR', ruta: '/venta' },
   { etiqueta: 'Caja', permiso: 'CAJA_OPERAR_PROPIA' },
   { etiqueta: 'Clientes', permiso: 'CLIENTE_GESTIONAR' },
-  { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR' },
+  // HU-08.12 crit. 2: buscar y reimprimir facturas (el cajero, las de su turno).
+  { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR', ruta: '/facturas' },
   // HU-08.06 crit. 3: las ventas pendientes de facturar, para quien gestiona facturas (Supervisor y Administrador).
   { etiqueta: 'Facturas rechazadas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/rechazadas' },
   // HU-08.10: buscar y anular facturas (Supervisor y Administrador).

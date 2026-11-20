@@ -30,6 +30,8 @@ public final class TicketFactura {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     /** La frase del régimen General (frase 1, escenario 1), la misma del DTE (HU-08.02). */
     static final String FRASE_ISR = "Sujeto a pagos trimestrales ISR";
+    /** HU-08.12 crit. 3: la leyenda de una reimpresión, al principio y al final del ticket. */
+    public static final String LEYENDA_REIMPRESION = "*** COPIA - REIMPRESIÓN ***";
 
     private TicketFactura() {
     }
@@ -37,6 +39,9 @@ public final class TicketFactura {
     public static Ticket armar(DatosTicketFactura datos, int anchoMm) {
         Ticket ticket = Ticket.paraPapel(anchoMm);
         Establecimiento establecimiento = datos.establecimiento();
+        if (datos.reimpresion()) {
+            ticket.centradoNegrita(LEYENDA_REIMPRESION);
+        }
         ticket.titulo(establecimiento.nombre())
                 .centrado(datos.emisor().razonSocial())
                 .centrado("NIT " + datos.emisor().nit())
@@ -77,8 +82,12 @@ public final class TicketFactura {
         if (datos.nitCertificador() != null) {
             ticket.centrado("NIT certificador: " + datos.nitCertificador());
         }
-        return ticket.centrado("Venta N.º %d · %s".formatted(datos.venta().numero(), datos.venta().cajaNombre()))
+        ticket.centrado("Venta N.º %d · %s".formatted(datos.venta().numero(), datos.venta().cajaNombre()))
                 .centrado("¡Gracias por su compra!");
+        if (datos.reimpresion()) {
+            ticket.centradoNegrita(LEYENDA_REIMPRESION);
+        }
+        return ticket;
     }
 
     /** "Tarjeta de débito ****4321": el número de la tarjeta nunca se guarda completo (HU-07.03 crit. 4). */
