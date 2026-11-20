@@ -8,6 +8,7 @@ export const PERMISO_REPORTES = 'REPORTE_CONSULTAR'
 export const REPORTES = [
   { codigo: 'VENTAS_PERIODO', titulo: 'Ventas por período' },
   { codigo: 'VENTAS_CAJERO', titulo: 'Ventas por cajero' },
+  { codigo: 'VENTAS_CAJA', titulo: 'Ventas por caja' },
   { codigo: 'PRODUCTOS', titulo: 'Productos más vendidos' },
   { codigo: 'TARJETAS', titulo: 'Ingresos por tarjeta' },
   { codigo: 'IVA', titulo: 'IVA cobrado' },
@@ -58,6 +59,9 @@ export const ESTADOS_FACTURA: Record<string, string> = {
   RECHAZADA: 'Rechazada',
   ANULADA: 'Anulada',
 }
+
+/** HU-10.04: la participación con un decimal, como la calcula el servidor. */
+export const textoParticipacion = (participacion: number) => `${participacion.toFixed(1)} %`
 
 /** La diferencia con su signo y si es faltante o sobrante (lote − registrado). */
 export const textoDiferencia = (diferencia: number) =>

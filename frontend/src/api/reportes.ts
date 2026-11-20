@@ -127,6 +127,24 @@ export interface ReporteVentasPorCajero {
   totales: FilaVentasCajero
 }
 
+/** HU-10.04: una fila por caja, o la de totales (`cajaId` nulo). */
+export interface FilaVentasCaja {
+  cajaId: number | null
+  caja: string
+  cantidadVentas: number
+  totalVendido: number
+  turnos: number
+  ticketPromedio: number
+  /** El porcentaje del total vendido, con un decimal (45.5 = 45.5 %). */
+  participacion: number
+}
+
+export interface ReporteVentasPorCaja {
+  encabezado: EncabezadoReporte
+  filas: FilaVentasCaja[]
+  totales: FilaVentasCaja
+}
+
 /** HU-10.03 crit. 2: una venta finalizada o cancelada del cajero. */
 export interface VentaDeCajero {
   ventaId: number
@@ -151,6 +169,9 @@ const sinAgrupacion = ({ desde, hasta, cajaId, cajeroId }: FiltrosVentas) => ({ 
 
 export const generarReporteCajeros = (filtros: FiltrosVentas) =>
   pedir<ReporteVentasPorCajero>(`/api/reportes/cajeros?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteCajas = (filtros: FiltrosVentas) =>
+  pedir<ReporteVentasPorCaja>(`/api/reportes/cajas?${consultaDe(sinAgrupacion(filtros))}`)
 
 export const generarReporteProductos = (filtros: FiltrosVentas) =>
   pedir<ReporteProductosMasVendidos>(
@@ -314,6 +335,7 @@ export type CodigoExportable =
   | 'VENTAS_PERIODO'
   | 'VENTAS_CAJERO'
   | 'DETALLE_CAJERO'
+  | 'VENTAS_CAJA'
   | 'PRODUCTOS'
   | 'TARJETAS'
   | 'DETALLE_TARJETA'

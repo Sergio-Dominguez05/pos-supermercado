@@ -19,6 +19,7 @@ import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.OrdenProductos;
 import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
@@ -76,6 +77,18 @@ public class ReportesController {
             @RequestParam(required = false) Long cajeroId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.ventasPorCajero(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.04: por caja, ventas, total vendido, turnos y participación, para compararlas en el mismo período. */
+    @GetMapping("/api/reportes/cajas")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteVentasPorCaja ventasPorCaja(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.ventasPorCaja(desde, hasta, cajaId, cajeroId, sesion);
     }
 
     /**

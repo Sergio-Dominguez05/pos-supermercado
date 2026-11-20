@@ -184,6 +184,66 @@ class ReportesIntegracionTest {
     }
 
     @Test
+    void resumePorCajaLasVentasElTotalYLosTurnos() throws Exception {   // HU-10.04 crit. 1
+        Caja caja = caja();
+        caja.venta("FINALIZADA", "2025-08-04T15:00:00Z", "100.00", "CERTIFICADA");
+        caja.venta("FINALIZADA", "2025-08-05T15:00:00Z", "50.00", null);
+        caja.venta("FINALIZADA", "2025-08-05T16:00:00Z", "999.00", "ANULADA");   // no se cuenta
+        caja.venta("CANCELADA", "2025-08-05T17:00:00Z", "20.00", null);          // no es venta
+        caja.venta("FINALIZADA", "2025-09-01T15:00:00Z", "70.00", null);         // fuera del período
+        caja.cierre("2025-08-04T23:00:00Z", "100.00", "100.00", null);           // turno abierto el 4
+        Caja otro = caja.conOtroCajero();
+        otro.cierre("2025-08-05T23:00:00Z", "50.00", "50.00", null);
+        otro.cierre("2025-09-01T23:00:00Z", "70.00", "70.00", null);              // fuera del período
+
+        JsonNode reporte = ok(get("/api/reportes/cajas?desde=2025-08-01&hasta=2025-08-31&cajaId=" + caja.id));
+
+        assertThat(reporte.get("encabezado").get("titulo").asString()).isEqualTo("Ventas por caja");
+        List<JsonNode> filas = filas(reporte);
+        assertThat(filas).hasSize(1);
+        JsonNode fila = filas.getFirst();
+        assertThat(fila.get("cajaId").asLong()).isEqualTo(caja.id);
+        assertThat(fila.get("caja").asString()).isEqualTo(caja.nombre);
+        assertThat(fila.get("cantidadVentas").asLong()).isEqualTo(2);
+        assertThat(fila.get("totalVendido").decimalValue()).isEqualByComparingTo("150.00");
+        assertThat(fila.get("turnos").asLong()).isEqualTo(2);
+        assertThat(fila.get("ticketPromedio").decimalValue()).isEqualByComparingTo("75.00");
+        assertThat(fila.get("participacion").decimalValue()).isEqualByComparingTo("100.0");
+
+        JsonNode soloOtro = ok(get("/api/reportes/cajas?desde=2025-08-01&hasta=2025-08-31&cajaId=%d&cajeroId=%d"
+                .formatted(caja.id, otro.cajeroId)));
+        JsonNode filaOtro = filas(soloOtro).getFirst();
+        assertThat(filaOtro.get("cantidadVentas").asLong()).isZero();
+        assertThat(filaOtro.get("turnos").asLong()).isEqualTo(1);
+        assertThat(filaOtro.get("participacion").decimalValue()).isEqualByComparingTo("0.0");
+    }
+
+    @Test
+    void comparaLasCajasEnElMismoPeriodoDeLaQueMasVendioALaQueMenos() throws Exception {   // HU-10.04 crit. 2
+        Caja poca = caja();
+        poca.venta("FINALIZADA", "2024-02-10T15:00:00Z", "25.00", null);
+        Caja mucha = caja();
+        mucha.venta("FINALIZADA", "2024-02-10T16:00:00Z", "50.00", null);
+        mucha.venta("FINALIZADA", "2024-02-11T16:00:00Z", "25.00", null);
+        Caja sinVentas = caja();
+        jdbc.update("UPDATE caja SET activo = false WHERE id = ?", sinVentas.id);   // inactiva y sin actividad: no sale
+
+        JsonNode reporte = ok(get("/api/reportes/cajas?desde=2024-02-10&hasta=2024-02-11"));
+
+        List<JsonNode> filas = filas(reporte);
+        List<Long> ids = filas.stream().map(f -> f.get("cajaId").asLong()).toList();
+        assertThat(ids).contains(mucha.id, poca.id).doesNotContain(sinVentas.id);
+        assertThat(ids.indexOf(mucha.id)).isLessThan(ids.indexOf(poca.id));
+        JsonNode totales = reporte.get("totales");
+        assertThat(totales.get("caja").asString()).isEqualTo("Total");
+        assertThat(totales.get("cantidadVentas").asLong()).isEqualTo(3);
+        assertThat(totales.get("totalVendido").decimalValue()).isEqualByComparingTo("100.00");
+        assertThat(totales.get("participacion").decimalValue()).isEqualByComparingTo("100.0");
+        assertThat(filas.get(ids.indexOf(mucha.id)).get("participacion").decimalValue()).isEqualByComparingTo("75.0");
+        assertThat(filas.get(ids.indexOf(poca.id)).get("participacion").decimalValue()).isEqualByComparingTo("25.0");
+    }
+
+    @Test
     void ordenaLosProductosMasVendidosPorCantidadOMontoSinLasAnuladas() throws Exception {   // HU-10.05 crit. 1, 2 y 4
         Caja caja = caja();
         long arroz = producto("Arroz del reporte", "11.20");
@@ -550,7 +610,7 @@ class ReportesIntegracionTest {
         caja.anular(venta, "2025-10-05T16:00:00Z", "Error de digitación", supervisorId);
         caja.cierre("2025-10-05T23:00:00Z", "45.00", "40.00", "Faltó un voucher");
         String filtros = "&desde=2025-10-01&hasta=2025-10-31&cajaId=" + caja.id;
-        List<String> rutas = List.of("VENTAS_PERIODO?agrupacion=SEMANA", "VENTAS_CAJERO?x=1",
+        List<String> rutas = List.of("VENTAS_PERIODO?agrupacion=SEMANA", "VENTAS_CAJERO?x=1", "VENTAS_CAJA?x=1",
                 "PRODUCTOS?ordenarPor=MONTO&limite=50",
                 "DETALLE_CAJERO?cajeroId=" + caja.cajeroId, "TARJETAS?tipoTarjeta=DEBITO",
                 "DETALLE_TARJETA?tipoTarjeta=DEBITO", "IVA?x=1", "DETALLE_IVA?x=1", "CIERRES?soloConDiferencias=true",

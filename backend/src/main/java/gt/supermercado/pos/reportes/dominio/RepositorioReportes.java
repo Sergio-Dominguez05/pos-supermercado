@@ -16,6 +16,13 @@ public interface RepositorioReportes {
     List<ReporteVentasPorCajero.Fila> ventasPorCajero(FiltrosReporte filtros);
 
     /**
+     * HU-10.04: por caja, las ventas finalizadas en el período sin las de facturas anuladas y los turnos abiertos en
+     * el período (los dos por caja y cajero de los filtros). Trae las cajas activas aunque no tengan actividad y las
+     * inactivas que sí la tuvieron.
+     */
+    List<ReporteVentasPorCaja.VentasDeCaja> ventasPorCaja(FiltrosReporte filtros);
+
+    /**
      * HU-10.05: los productos de las líneas vigentes de las ventas finalizadas en el período (por caja y cajero), sin
      * las ventas de facturas anuladas (crit. 4), ordenados por cantidad o monto y recortados a {@code limite}.
      */
