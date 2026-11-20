@@ -206,8 +206,14 @@ public class GestionClientes {
         long ventaId = ventas.asignarCorreoFactura(sesion, nuevo).id();
         Optional<Cliente> cliente = clientes.deLaVenta(ventaId);
         if (nuevo != null && cliente.isPresent() && !nuevo.equalsIgnoreCase(String.valueOf(cliente.get().correo()))) {
-            clientes.cambiarCorreo(cliente.get().id(), nuevo);
-            cliente = clientes.porId(cliente.get().id());
+            Cliente antes = cliente.get();
+            clientes.cambiarCorreo(antes.id(), nuevo);
+            // HU-11.03 crit. 1: el correo del cliente cambió, aunque haya sido desde la venta.
+            bitacora.registrar(new EventoBitacora(sesion.usuarioId(), sesion.rol().name(),
+                    AccionSensible.CLIENTE_EDITADO, true, "Cliente %s %s editado desde la venta: correo".formatted(
+                            antes.tipoIdentificacion(), antes.nit()), "cliente", antes.id(),
+                    Map.of("correo", EventoBitacora.cambio(antes.correo() == null ? "" : antes.correo(), nuevo))));
+            cliente = clientes.porId(antes.id());
         }
         return new ClienteYCorreo(cliente, nuevo);
     }

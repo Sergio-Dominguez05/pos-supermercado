@@ -101,6 +101,11 @@ class CorreoFacturasIntegracionTest {
         // El correo nuevo queda en el cliente para sus próximas compras.
         assertThat(jdbc.queryForObject("SELECT correo FROM cliente WHERE id = ?", String.class, cliente))
                 .isEqualTo("ana.nuevo@cliente.test");
+        // HU-11.03 crit. 1: el cambio del cliente queda con el valor anterior y el nuevo.
+        assertThat(jdbc.queryForMap("""
+                SELECT cambios -> 'correo' ->> 'antes' AS antes, cambios -> 'correo' ->> 'despues' AS despues
+                FROM bitacora WHERE accion = 'CLIENTE_EDITADO' AND entidad_id = ?""", cliente))
+                .containsEntry("antes", "ana@cliente.test").containsEntry("despues", "ana.nuevo@cliente.test");
         assertThat(enviar("/api/ventas/actual/cliente", "GET", null, cajero.sesion()).body())
                 .contains("\"correoFactura\":\"ana.nuevo@cliente.test\"");
 
