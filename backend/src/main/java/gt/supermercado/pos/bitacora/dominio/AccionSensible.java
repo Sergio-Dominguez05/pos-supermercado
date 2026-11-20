@@ -26,7 +26,7 @@ public enum AccionSensible {
     CREDENCIAL_RESTABLECIDA(Categoria.USUARIOS_Y_PERMISOS, "seguridad"),
     /** El usuario cambia su propia contraseña o PIN (HU-01.13). */
     CREDENCIAL_CAMBIADA(Categoria.USUARIOS_Y_PERMISOS, "seguridad"),
-    /** Pendiente: HU-01.10. */
+    /** El Administrador cambia los permisos de un rol, con cada permiso agregado o quitado (HU-01.10). */
     PERMISOS_MODIFICADOS(Categoria.USUARIOS_Y_PERMISOS, "seguridad"),
 
     // Ventas
@@ -55,7 +55,7 @@ public enum AccionSensible {
     TURNO_ABIERTO(Categoria.CAJA, "caja"),
     /** El cajero cierra su caja con el cierre de lote y la diferencia; también el intento rechazado (HU-09.08). */
     TURNO_CERRADO(Categoria.CAJA, "caja"),
-    /** Un supervisor cierra la caja de otro usuario. Pendiente: HU-09.12. */
+    /** Un supervisor cierra la caja de otro usuario; también el intento rechazado (HU-09.12). */
     TURNO_CERRADO_POR_SUPERVISOR(Categoria.CAJA, "caja"),
 
     // Configuración

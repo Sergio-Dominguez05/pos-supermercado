@@ -122,13 +122,13 @@ class GestionTurnosTest {
         }
 
         @Override
-        public Optional<Turno> abiertoDeUsuario(long usuarioId) {
-            return abiertos.stream().filter(t -> t.usuarioId() == usuarioId).findFirst();
+        public List<Turno> abiertos() {
+            return List.copyOf(abiertos);
         }
 
         @Override
-        public List<Turno> abiertos() {
-            return List.copyOf(abiertos);
+        public Optional<Turno> abiertoDeUsuario(long usuarioId) {
+            return abiertos.stream().filter(t -> t.usuarioId() == usuarioId).findFirst();
         }
 
         @Override

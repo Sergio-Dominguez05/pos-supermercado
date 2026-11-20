@@ -236,7 +236,105 @@ class CierreIntegracionTest {
                 .body()).contains("CIERRE_DE_OTRO_USUARIO");
     }
 
+    // HU-09.12 Cerrar la caja de otro usuario
+
+    @Test
+    void elSupervisorCierraElTurnoDeOtroCajeroYQuedanLosDos() throws Exception {   // 09.12 crit. 1 a 3
+        Cajero cajero = cajeroConTurno();
+        vender(cajero, "10.00", "DEBITO");
+        long supervisorId = supervisor();
+        String supervisor = sesionDeSupervisor();
+
+        HttpResponse<String> abiertos = enviar("/api/turnos/por-cerrar", "GET", null, supervisor);
+        assertThat(abiertos.statusCode()).isEqualTo(200);
+        assertThat(abiertos.body()).contains("\"id\":" + cajero.turnoId(), "Cajero que cierra");
+        assertThat(enviar("/api/turnos/" + cajero.turnoId() + "/cierre", "GET", null, supervisor).body())
+                .contains("\"ventas\":1", "\"totalRegistrado\":10.00");
+
+        HttpResponse<String> sinMotivo = enviar("/api/turnos/" + cajero.turnoId() + "/cerrar", "POST",
+                "{\"totalLote\":9.00,\"justificacion\":null}", supervisor);
+        assertThat(sinMotivo.statusCode()).isEqualTo(422);
+        assertThat(sinMotivo.body()).contains("JUSTIFICACION_REQUERIDA");
+
+        HttpResponse<String> cerrado = enviar("/api/turnos/" + cajero.turnoId() + "/cerrar", "POST",
+                "{\"totalLote\":9.00,\"justificacion\":\"El cajero se retiró sin cerrar\"}", supervisor);
+
+        assertThat(cerrado.statusCode()).as(cerrado.body()).isEqualTo(200);
+        var turno = jdbc.queryForMap("""
+                SELECT estado, usuario_id, cerrado_por, total_registrado::text AS registrado, diferencia::text AS diferencia
+                FROM turno WHERE id = ?""", cajero.turnoId());
+        assertThat(turno.get("estado")).isEqualTo("CERRADO");
+        assertThat(turno.get("usuario_id")).isEqualTo(cajero.usuarioId());   // crit. 2: el cajero del turno
+        assertThat(turno.get("cerrado_por")).isEqualTo(supervisorId);        // y el supervisor que lo cerró
+        assertThat(turno.get("diferencia")).isEqualTo("-1.00");
+        var registro = jdbc.queryForMap("""
+                SELECT descripcion, cambios->>'cajero' AS cajero, caja_id FROM bitacora
+                WHERE accion = 'TURNO_CERRADO_POR_SUPERVISOR' AND exitoso AND usuario_id = ?
+                ORDER BY secuencia DESC LIMIT 1""", supervisorId);
+        assertThat((String) registro.get("descripcion")).startsWith("Turno de Cajero que cierra cerrado por supervisor");
+        assertThat(registro.get("cajero")).isEqualTo("Cajero que cierra");
+        // El comprobante sale en la impresora de la caja del turno.
+        assertThat(impresoraSimulada.ultimoA(cajero.host())).isNotNull();
+        // El cajero ya no tiene turno abierto.
+        assertThat(enviar("/api/turnos/actual/cierre", "GET", null, cajero.sesion()).statusCode()).isEqualTo(422);
+        assertThat(enviar("/api/turnos/por-cerrar", "GET", null, supervisor).body())
+                .doesNotContain("\"id\":" + cajero.turnoId() + ",");
+    }
+
+    @Test
+    void noSeCierraUnTurnoYaCerradoNiElPropioPorEstaVia() throws Exception {   // 09.12
+        Cajero cajero = cajeroConTurno();
+        String supervisor = sesionDeSupervisor();
+        assertThat(cerrar(cajero, "0", null).statusCode()).isEqualTo(200);
+
+        HttpResponse<String> yaCerrado = enviar("/api/turnos/" + cajero.turnoId() + "/cerrar", "POST",
+                "{\"totalLote\":0}", supervisor);
+        assertThat(yaCerrado.statusCode()).isEqualTo(422);
+        assertThat(yaCerrado.body()).contains("TURNO_YA_CERRADO");
+
+        Cajero otro = cajeroConTurno();
+        HttpResponse<String> propio = enviar("/api/turnos/" + otro.turnoId() + "/cerrar", "POST", "{\"totalLote\":0}",
+                otro.sesion());
+        assertThat(propio.statusCode()).isEqualTo(403);   // el cajero no tiene el permiso
+        assertThat(enviar("/api/turnos/por-cerrar", "GET", null, otro.sesion()).statusCode()).isEqualTo(403);
+    }
+
+    @Test
+    void conVentasPorResolverElSupervisorTampocoCierra() throws Exception {   // 09.12 con las reglas de 09.08 crit. 1
+        Cajero cajero = cajeroConTurno();
+        agregarProducto(cajero, "4.00");
+        String supervisor = sesionDeSupervisor();
+
+        HttpResponse<String> respuesta = enviar("/api/turnos/" + cajero.turnoId() + "/cerrar", "POST",
+                "{\"totalLote\":0}", supervisor);
+
+        assertThat(respuesta.statusCode()).isEqualTo(422);
+        assertThat(respuesta.body()).contains("VENTA_EN_CURSO");
+        assertThat(jdbc.queryForObject("SELECT estado FROM turno WHERE id = ?", String.class, cajero.turnoId()))
+                .isEqualTo("ABIERTO");
+    }
+
     // Apoyo
+
+    private String supervisorUsername;
+
+    /** Un supervisor con contraseña definitiva; devuelve su id. */
+    private long supervisor() {
+        if (supervisorUsername == null) {
+            supervisorUsername = "ci.s" + SIGUIENTE.incrementAndGet() + "." + System.nanoTime() % 1_000_000;
+            jdbc.update("""
+                    INSERT INTO usuario (username, nombre_completo, rol_id, credencial_hash, credencial_temporal)
+                    VALUES (?, 'Supervisora del cierre', 2, ?, false)""", supervisorUsername,
+                    codificador.encode("Clave2026segura"));
+        }
+        return jdbc.queryForObject("SELECT id FROM usuario WHERE username = ?", Long.class, supervisorUsername);
+    }
+
+    private String sesionDeSupervisor() throws Exception {
+        supervisor();
+        return cookie(enviar("/api/auth/login", "POST", login(supervisorUsername, "contrasena", "Clave2026segura"),
+                null), "POS_SESION");
+    }
 
     record Cajero(long usuarioId, String sesion, long turnoId, String host) {}
 

@@ -6,6 +6,8 @@ import gt.supermercado.pos.caja.aplicacion.CierreDeCaja.ComparacionCierre;
 import gt.supermercado.pos.caja.aplicacion.CierreDeCaja.PreparacionCierre;
 import gt.supermercado.pos.caja.dominio.CierreDeTurno;
 import gt.supermercado.pos.caja.dominio.ImpresionDeCierre;
+import gt.supermercado.pos.caja.dominio.ResumenDeTurno;
+import gt.supermercado.pos.caja.dominio.Turno;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.util.List;
 
-/** HU-09.08 a HU-09.10: el cierre de la caja propia, sus comprobantes y los cierres anteriores. */
+/** HU-09.08 a HU-09.10: el cierre de la caja propia, sus comprobantes y los cierres anteriores; HU-09.12: el de otro. */
 @RestController
 public class CierreController {
 
@@ -57,6 +59,31 @@ public class CierreController {
     @PreAuthorize("hasAuthority('CAJA_OPERAR_PROPIA') or hasAuthority('CAJA_VER_CIERRES')")
     public List<CierreDeTurno> cierres(@AuthenticationPrincipal SesionActiva sesion) {
         return cierre.cierresAnteriores(sesion);
+    }
+
+    /**
+     * HU-09.12 crit. 1: los turnos abiertos de los demás usuarios, para cerrarlos. Es distinto de
+     * {@code /api/turnos/abiertos} (HU-09.06), que solo consulta e incluye el turno propio.
+     */
+    @GetMapping("/api/turnos/por-cerrar")
+    @PreAuthorize("hasAuthority('CAJA_CERRAR_OTRA')")
+    public List<Turno> turnosAbiertos(@AuthenticationPrincipal SesionActiva sesion) {
+        return cierre.turnosAbiertosDeOtros(sesion);
+    }
+
+    /** HU-09.12: lo cobrado en el turno de otro usuario, antes de cerrarlo; 422 si ya se cerró o es propio. */
+    @GetMapping("/api/turnos/{turnoId}/cierre")
+    @PreAuthorize("hasAuthority('CAJA_CERRAR_OTRA')")
+    public ResumenDeTurno resumenDeOtro(@PathVariable long turnoId, @AuthenticationPrincipal SesionActiva sesion) {
+        return cierre.resumenDeOtro(turnoId, sesion);
+    }
+
+    /** HU-09.12 crit. 1 a 3: el supervisor cierra el turno de otro usuario con las mismas reglas del cierre propio. */
+    @PostMapping("/api/turnos/{turnoId}/cerrar")
+    @PreAuthorize("hasAuthority('CAJA_CERRAR_OTRA')")
+    public CierreHecho cerrarDeOtro(@PathVariable long turnoId, @RequestBody SolicitudCierre solicitud,
+                                    @AuthenticationPrincipal SesionActiva sesion) {
+        return cierre.cerrarDeOtro(turnoId, solicitud.totalLote(), solicitud.justificacion(), sesion);
     }
 
     @PostMapping("/api/turnos/{turnoId}/cierre/reimprimir")

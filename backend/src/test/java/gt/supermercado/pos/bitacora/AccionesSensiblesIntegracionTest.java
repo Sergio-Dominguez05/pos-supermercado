@@ -462,6 +462,38 @@ class AccionesSensiblesIntegracionTest {
     }
 
     @Test
+    void cambioDePermisosExitosoYRechazado() throws Exception {   // HU-01.10 crit. 6
+        List<String> iniciales = jdbc.queryForList("SELECT permiso FROM rol_permiso WHERE rol_id = 3", String.class);
+        List<String> nuevos = new java.util.ArrayList<>(iniciales);
+        nuevos.add("REPORTE_CONSULTAR");
+        String cuerpo = "{\"permisos\":[" + String.join(",", nuevos.stream().map(p -> "\"" + p + "\"").toList()) + "]}";
+        try {
+            assertThat(registrosDe(() -> enviar("/api/roles/CAJERO/permisos", "PUT", cuerpo, cookieAdmin)))
+                    .containsExactly(new Registro(PERMISOS_MODIFICADOS, true, adminId));
+            assertThat(registrosDe(() -> enviar("/api/roles/ADMIN/permisos", "PUT", "{\"permisos\":[]}",
+                    cookieAdmin))).containsExactly(new Registro(PERMISOS_MODIFICADOS, false, adminId));
+        } finally {
+            jdbc.update("DELETE FROM rol_permiso WHERE rol_id = 3");
+            iniciales.forEach(p -> jdbc.update("INSERT INTO rol_permiso (rol_id, permiso) VALUES (3, ?)", p));
+        }
+    }
+
+    @Test
+    void cierreDeLaCajaDeOtroUsuarioExitosoYRechazado() throws Exception {   // HU-09.12 crit. 3
+        String nombre = "Caja otro " + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 100_000;
+        long cajaId = idDe(enviar("/api/cajas", "POST", "{\"nombre\":\"%s\"}".formatted(nombre), cookieAdmin));
+        String equipo = cookie(enviar("/api/cajas/" + cajaId + "/equipo", "POST", null, cookieAdmin), "POS_EQUIPO");
+        String cajero = usuario(3, PIN);
+        String sesion = cookie(enviar("/api/auth/login-pin", "POST", login(cajero, "pin", PIN), equipo), "POS_SESION");
+        long turno = idDe(enviar("/api/turnos", "POST", null, sesion));
+
+        assertThat(registrosDe(() -> enviar("/api/turnos/999999999/cerrar", "POST", "{\"totalLote\":0}",
+                cookieAdmin))).containsExactly(new Registro(TURNO_CERRADO_POR_SUPERVISOR, false, adminId));
+        assertThat(registrosDe(() -> enviar("/api/turnos/" + turno + "/cerrar", "POST", "{\"totalLote\":0}",
+                cookieAdmin))).containsExactly(new Registro(TURNO_CERRADO_POR_SUPERVISOR, true, adminId));
+    }
+
+    @Test
     void generacionDeReporteExitosaYRechazada() throws Exception {   // HU-10.15 crit. 3
         assertThat(registrosDe(() -> enviar("/api/reportes/ventas?desde=2026-11-01&hasta=2026-11-20", "GET", null,
                 cookieAdmin))).containsExactly(new Registro(REPORTE_GENERADO, true, adminId));
