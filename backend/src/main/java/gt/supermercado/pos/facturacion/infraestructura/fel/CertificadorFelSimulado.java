@@ -94,6 +94,9 @@ public class CertificadorFelSimulado implements CertificadorFel {
     @Override
     public ResultadoAnulacion anular(UUID autorizacion, String motivo) {
         verificarConexion();
+        if (escenario == Escenario.RECHAZAR) {   // HU-08.10 crit. 3
+            return new ResultadoAnulacion(false, "SIM-003", "La SAT no permite anular este documento (simulado).");
+        }
         boolean existe = certificadas.values().stream().anyMatch(r -> autorizacion.equals(r.autorizacion()));
         return existe
                 ? new ResultadoAnulacion(true, null, null)

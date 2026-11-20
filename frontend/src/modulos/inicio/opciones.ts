@@ -16,6 +16,8 @@ export const OPCIONES: OpcionMenu[] = [
   { etiqueta: 'Facturas', permiso: 'FACTURA_REIMPRIMIR' },
   // HU-08.06 crit. 3: las ventas pendientes de facturar, para quien gestiona facturas (Supervisor y Administrador).
   { etiqueta: 'Facturas rechazadas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/rechazadas' },
+  // HU-08.10: buscar y anular facturas (Supervisor y Administrador).
+  { etiqueta: 'Anular facturas', permiso: 'FACTURA_ANULAR', ruta: '/facturas/anular' },
   // HU-03.04: la lista del catálogo; desde ahí, quien tiene permiso crea y edita productos.
   { etiqueta: 'Catálogo', permiso: 'PRODUCTO_CONSULTAR', ruta: '/catalogo' },
   { etiqueta: 'Reportes', permiso: 'REPORTE_CONSULTAR' },
