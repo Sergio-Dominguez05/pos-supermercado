@@ -10,6 +10,7 @@ import {
 import { useSesion } from '../login/sesion'
 import { PERMISO_ARCHIVO_CATALOGO } from '../../api/archivoCatalogo'
 import { ExportarCatalogo } from './ArchivoCatalogo'
+import { CargaCatalogo } from './CargaCatalogo'
 import { CodigosNoEncontrados } from './CodigosNoEncontrados'
 import { formatoFecha, formatoQuetzales, resumenPagina } from './textos'
 
@@ -35,6 +36,8 @@ export function ListaProductos() {
           <TablaProductos puedeEditar={usuario.permisos.includes('PRODUCTO_EDITAR')} />
           {/* HU-03.12: exportar el catálogo, con el permiso de las operaciones masivas sobre él. */}
           {usuario.permisos.includes(PERMISO_ARCHIVO_CATALOGO) && <ExportarCatalogo />}
+          {/* HU-03.05: cargar muchos productos desde un archivo, con revisión y confirmación. */}
+          {usuario.permisos.includes(PERMISO_ARCHIVO_CATALOGO) && <CargaCatalogo />}
         </>
       ) : (
         <p className="tarjeta error">No tiene permiso para consultar el catálogo.</p>

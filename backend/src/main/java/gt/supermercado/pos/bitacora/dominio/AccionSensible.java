@@ -82,7 +82,7 @@ public enum AccionSensible {
     PRECIO_CAMBIADO(Categoria.CATALOGO, "catalogo"),
     PRODUCTO_ACTIVADO(Categoria.CATALOGO, "catalogo"),
     PRODUCTO_DESACTIVADO(Categoria.CATALOGO, "catalogo"),
-    /** Carga del catálogo desde un archivo. Pendiente: HU-03.05. */
+    /** HU-03.05 crit. 6: carga del catálogo desde un archivo, con los creados y actualizados; también la rechazada. */
     CATALOGO_CARGADO(Categoria.CATALOGO, "catalogo"),
     /** HU-03.12 crit. 3: el catálogo exportado a Excel o CSV, con el formato y la cantidad de productos. */
     CATALOGO_EXPORTADO(Categoria.CATALOGO, "catalogo"),

@@ -36,6 +36,38 @@ class ArchivoCatalogoPoi implements ArchivoCatalogo.Escritor {
         return formato == Formato.CSV ? csv(productos) : excel(productos);
     }
 
+    /** HU-03.05 crit. 1: los títulos de las tres columnas; en Excel, la del código con formato de texto. */
+    @Override
+    public byte[] plantilla(Formato formato) {
+        if (formato == Formato.CSV) {
+            StringBuilder texto = new StringBuilder("﻿");
+            linea(texto, ArchivoCatalogo.COLUMNAS_PLANTILLA);
+            return texto.toString().getBytes(StandardCharsets.UTF_8);
+        }
+        try (SXSSFWorkbook libro = new SXSSFWorkbook(); ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
+            Sheet hoja = libro.createSheet("Catálogo");
+            CellStyle negrita = libro.createCellStyle();
+            Font fuente = libro.createFont();
+            fuente.setBold(true);
+            negrita.setFont(fuente);
+            CellStyle texto = libro.createCellStyle();
+            texto.setDataFormat(libro.createDataFormat().getFormat("@"));
+            hoja.setDefaultColumnStyle(0, texto);
+            Row titulos = hoja.createRow(0);
+            for (int i = 0; i < ArchivoCatalogo.COLUMNAS_PLANTILLA.size(); i++) {
+                Cell celda = titulos.createCell(i);
+                celda.setCellValue(ArchivoCatalogo.COLUMNAS_PLANTILLA.get(i));
+                celda.setCellStyle(negrita);
+            }
+            hoja.createFreezePane(0, 1);
+            libro.write(salida);
+            libro.dispose();
+            return salida.toByteArray();
+        } catch (IOException error) {
+            throw new UncheckedIOException("No se pudo generar la plantilla del catálogo", error);
+        }
+    }
+
     static String estado(Producto producto) {
         return producto.activo() ? "Activo" : "Inactivo";
     }

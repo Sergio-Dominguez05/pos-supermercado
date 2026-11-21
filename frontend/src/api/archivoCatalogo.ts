@@ -33,3 +33,76 @@ export const rutaExportarCatalogo = (formato: FormatoCatalogo) => `/api/producto
 /** HU-03.12: todo el catálogo; la exportación queda en la bitácora (crit. 3). */
 export const exportarCatalogo = (formato: FormatoCatalogo) =>
   descargarArchivo(rutaExportarCatalogo(formato), `catalogo.${formato === 'CSV' ? 'csv' : 'xlsx'}`)
+
+/** HU-03.05 crit. 1: la plantilla de carga, con las columnas código, descripción y precio. */
+export const descargarPlantilla = (formato: FormatoCatalogo) =>
+  descargarArchivo(
+    `/api/productos/plantilla?formato=${formato}`,
+    `plantilla_catalogo.${formato === 'CSV' ? 'csv' : 'xlsx'}`,
+  )
+
+/** HU-03.05 crit. 2: un producto que se creará. */
+export interface ProductoNuevo {
+  fila: number
+  codigo: string
+  descripcion: string
+  precio: number
+}
+
+/** HU-03.05 crit. 3: un producto que ya existe y cambiará; `null` en lo que no cambia. */
+export interface ProductoActualizado {
+  fila: number
+  productoId: number
+  codigo: string
+  descripcionAntes: string | null
+  descripcionDespues: string | null
+  precioAntes: number | null
+  precioDespues: number | null
+}
+
+/** HU-03.05 crit. 4: una fila que no se cargará y por qué. */
+export interface FilaConError {
+  fila: number
+  codigo: string
+  motivo: string
+}
+
+/** HU-03.05 crit. 2: lo que haría la carga; `huella` identifica el archivo revisado (crit. 5). */
+export interface RevisionCarga {
+  huella: string
+  filas: number
+  nuevos: ProductoNuevo[]
+  actualizados: ProductoActualizado[]
+  sinCambios: number
+  errores: FilaConError[]
+}
+
+export interface ResultadoCarga {
+  creados: number
+  actualizados: number
+  sinCambios: number
+  errores: number
+}
+
+/** Envía el archivo como `multipart/form-data` (sin el `Content-Type` de JSON que pone `pedir`). */
+async function enviarArchivo<T>(ruta: string, archivo: File): Promise<T> {
+  const datos = new FormData()
+  datos.append('archivo', archivo)
+  const respuesta = await fetch(ruta, { method: 'POST', body: datos, credentials: 'include' })
+  if (!respuesta.ok) {
+    const error: ErrorApi = await respuesta.json().catch(() => ({
+      codigo: 'SIN_RESPUESTA',
+      mensaje: 'No se pudo enviar el archivo.',
+      detalles: [],
+    }))
+    throw new ErrorDeApi(respuesta.status, error)
+  }
+  return respuesta.json()
+}
+
+/** HU-03.05 crit. 2: revisa el archivo sin guardar nada. */
+export const revisarCarga = (archivo: File) => enviarArchivo<RevisionCarga>('/api/productos/carga/revision', archivo)
+
+/** HU-03.05 crit. 5: carga el mismo archivo que se revisó (el servidor lo comprueba con la huella). */
+export const confirmarCarga = (archivo: File, huella: string) =>
+  enviarArchivo<ResultadoCarga>(`/api/productos/carga?huella=${encodeURIComponent(huella)}`, archivo)
