@@ -13,6 +13,7 @@ import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimie
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { PaginaParametrosOperacion } from './modulos/configuracion/ParametrosOperacion'
+import { PaginaFormatoComprobante } from './modulos/configuracion/FormatoComprobante'
 import { PaginaServidorCorreo } from './modulos/configuracion/ServidorCorreo'
 import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
 import { PaginaConsultaCierres, PaginaDetalleCierre } from './modulos/caja/ConsultaCierres'
@@ -134,6 +135,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaParametrosOperacion />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/comprobante"
+            element={
+              <RutaProtegida>
+                <PaginaFormatoComprobante />
               </RutaProtegida>
             }
           />
