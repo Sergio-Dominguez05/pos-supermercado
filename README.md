@@ -2,7 +2,7 @@
 
 **Sistema de punto de venta para supermercado, con control de caja y emisión de documentos FEL en Guatemala.**
 
-> **Estado:** producto mínimo con reportes y operación (`v0.8.0`) — vende, cobra con tarjeta, factura con FEL (con contingencia, rechazos, anulación, reimpresión, historial y envío por correo), cierra la caja (también a ciegas o por un supervisor) y ofrece los reportes de ventas, cajeros, tarjetas, IVA, cierres y anuladas, exportables a PDF y Excel. La certificación se prueba con un certificador simulado (el certificador real aún no se elige). Faltan las historias del Sprint 8 (prioridad media y baja).
+> **Estado:** V1 completa (`v1.0.0`) — las **115 historias** planificadas para la V1 están implementadas. Vende, cobra con tarjeta, factura con FEL (con contingencia, rechazos, anulación, reimpresión, historial y envío por correo), administra clientes por NIT o CUI, cierra la caja (también a ciegas o por un supervisor), ofrece reportes y un panel del día, carga y exporta el catálogo, y conserva una bitácora inmutable que se consulta, exporta y archiva. La certificación se prueba con un certificador simulado (el certificador real aún no se elige).
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
@@ -30,9 +30,13 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | Permisos por rol | El Administrador activa o desactiva los permisos del Supervisor y del Cajero, agrupados por módulo; cuatro permisos son solo del Administrador (también en la base de datos); los cambios aplican desde el siguiente inicio de sesión y quedan en la bitácora | HU-01.10 | `v0.8.0` |
 | Credencial temporal | Con una contraseña o PIN temporal (usuario nuevo o restablecido) solo se puede cambiarla; el servidor bloquea todo lo demás hasta hacerlo | HU-01.15 | `v0.8.0` |
 | Configuración | Registrar cajas con su serie de facturación y vincular el equipo (navegador) de cada caja | HU-12.05 | `v0.2.0` |
+| Formato del comprobante | Logo en blanco y negro y mensajes en el encabezado y el pie del ticket, con vista previa antes de guardar; los datos de la SAT y los totales no se pueden quitar | HU-12.09 | `v1.0.0` |
 | Bitácora | Registro automático de las acciones sensibles, con usuario, rol, caja y valores anteriores y nuevos; inmutable, encadenada con hashes y con verificación de integridad | HU-11.01, 11.02, 11.05 | `v0.2.0` |
 | Bitácora | Los intentos sin permiso registran el permiso que faltaba y la caja; las acciones automáticas quedan a nombre del usuario técnico "sistema" | HU-11.04 | `v0.6.0` |
+| Consulta de la bitácora | Consultar con filtros combinables (fechas, usuario, caja, módulo, acción, resultado y número de documento), ver el detalle con los valores anteriores y nuevos, y exportar a Excel o CSV (solo el Administrador); valor anterior y nuevo de cada cambio, con los datos sensibles como "modificado" | HU-11.03, 11.06 a 11.09 | `v1.0.0` |
+| Conservación de la bitácora | Plazo de conservación configurable (mínimo 4 años); los registros antiguos se archivan sin perder la consulta ni la verificación, y nunca se eliminan | HU-11.10 | `v1.0.0` |
 | Catálogo | Registrar, editar (el código no cambia), activar y desactivar productos; lista con búsqueda, filtros y paginación; buscar por código o por descripción (sin tildes ni mayúsculas); códigos no encontrados para registrar después | HU-03.01 a 03.04, 03.06 a 03.09 | `v0.3.0` |
+| Catálogo masivo | Consultar el precio con F3 sin agregar a la venta e historial de precios; cargar productos desde Excel o CSV con plantilla, revisión previa (nuevos, actualizados y errores con su motivo) y confirmación; exportar el catálogo en el mismo formato | HU-03.05, 03.10, 03.11, 03.12 | `v1.0.0` |
 | IVA | IVA del 12 % incluido en el precio; base e IVA con 6 decimales por línea y redondeo HALF_UP solo en los totales ([reglas](docs/arquitectura/calculo-iva.md)) | HU-04.01 a 04.05 | `v0.3.0` |
 | Caja | Abrir el turno en la caja del equipo (uno por caja y por cajero); sin turno abierto no se vende | HU-09.01 a 09.03 | `v0.3.0` |
 | Cierre de caja | Resumen por tarjeta (sin las anuladas), total del cierre de lote, diferencia con justificación obligatoria, turno cerrado inmodificable, comprobante con firmas y reimpresión de cierres anteriores | HU-09.08 a 09.10 | `v0.6.0` |
@@ -42,6 +46,7 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | Cobro | Cobrar con tarjeta (tipo, autorización y últimos 4, nunca el número completo); quitar un pago antes de finalizar; finalizar solo con el pago completo, en una transacción, y la caja queda lista para la siguiente venta | HU-07.03, 07.06, 07.07, 07.08 | `v0.5.0` |
 | Clientes | Cliente de la venta por NIT (con o sin guion, F6): se cargan sus datos o se consulta el nombre al certificador; registro sin duplicados; NIT validado con el módulo 11 de la SAT; volver a Consumidor Final con un clic | HU-05.01 a 05.05 | `v0.5.0` |
 | Clientes y correo | Lista de clientes con búsqueda por NIT, CUI o nombre, paginada y con la última compra; correo opcional para la factura de la venta, que se agrega o cambia durante la venta | HU-05.10, 05.11 | `v0.8.0` |
+| Clientes y CUI | Facturar con CUI; desde el límite configurable (Q2,500.00) no se factura a Consumidor Final; cambiar el cliente hasta finalizar el cobro, con aviso si impide cobrar; editar nombre, dirección y correo sin cambiar el NIT ni las facturas emitidas | HU-05.06 a 05.09, 12.07 | `v1.0.0` |
 | Facturación FEL | Documento de la factura (DTE tipo FACT, esquema FEL de la SAT) con los montos que guardó el POS; certificación al finalizar con tiempo límite (sin respuesta, queda en contingencia); identificador único por venta y consulta antes de reenviar, para no duplicar facturas | HU-08.01 a 08.04, 04.09 (parcial) | `v0.5.0` |
 | Rechazos FEL | Motivo del rechazo en lenguaje comprensible; el cajero corrige el cliente y reenvía sin volver a cobrar; los demás quedan en "Facturas rechazadas" para el supervisor | HU-08.06, 04.09 | `v0.6.0` |
 | Contingencia | Sin conexión con el certificador se emite el comprobante con número de acceso y se avisa en la venta; un proceso automático lo certifica después, en orden y con espera creciente; aviso al supervisor desde el día 12 de los 15 que da la SAT | HU-08.07 a 08.09 | `v0.6.0` |
@@ -53,6 +58,8 @@ Proyecto académico desarrollado de forma incremental mediante **Scrum adaptado*
 | Reportes | Filtros comunes (fechas obligatorias, caja, cajero, tipo de tarjeta) con rangos rápidos según la fecha del servidor; ventas por período (por día, semana o mes), por cajero con el detalle de sus ventas, ingresos por tipo de tarjeta con sus transacciones, IVA de las facturas certificadas por día y por factura, cierres de caja con faltantes y sobrantes, y facturas anuladas; las anuladas no se suman a las ventas | HU-10.01 a 10.03, 10.06 a 10.09 | `v0.7.0` |
 | Exportación | Cada reporte y detalle se exporta a PDF (con los datos de la empresa, los filtros, la fecha y el usuario) y a Excel (montos como números y fechas como fechas), con los mismos totales que la pantalla | HU-10.13, 10.14 | `v0.7.0` |
 | Acceso a reportes | Solo el Administrador y el Supervisor (permiso de consultar reportes); cada generación y exportación queda en la bitácora | HU-10.15 | `v0.7.0` |
+| Más reportes | Ventas por caja con su participación; productos más vendidos por cantidad o monto, limitados a los N primeros; ventas por hora con gráfica de barras (un día o promedio de un período) | HU-10.04, 10.05, 10.11 | `v1.0.0` |
+| Panel del día | Al entrar, el Administrador y el Supervisor ven el total vendido, las ventas, el ticket promedio, las cajas abiertas y las tarjetas de hoy, con alertas de contingencia, códigos no encontrados y cierres con diferencia; se actualiza solo cada minuto | HU-10.12 | `v1.0.0` |
 
 Las reglas que dependen de módulos futuros (clientes, cobro, facturación, cierre de caja) quedan anotadas en sus Issues y se completan en su sprint.
 
@@ -186,12 +193,12 @@ flowchart TB
 
     subgraph NUCLEO["Etapa 2 · Flujo de venta y facturación"]
         direction LR
-        S3["🔄 Sprint 3 · v0.4.0<br/>Pantalla de venta ✅ y clientes<br/>18 HU · Alta"] --> S4["✅ Sprint 4 · v0.5.0<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["✅ Sprint 5 · v0.6.0<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
+        S3["✅ Sprint 3 · v0.4.0<br/>Pantalla de venta y clientes<br/>18 HU · Alta"] --> S4["✅ Sprint 4 · v0.5.0<br/>Cobro y emisión FEL<br/>17 HU · Alta"] --> S5["✅ Sprint 5 · v0.6.0<br/>Contingencia, anulación y cierre<br/>10 HU · Alta"]
     end
 
     subgraph MEJORAS["Etapa 3 · Reportes y operación"]
         direction LR
-        S6["✅ Sprint 6 · v0.7.0<br/>Reportes y exportación<br/>10 HU · Alta"] --> S7["✅ Sprint 7 · v0.8.0<br/>Operación: suspendidas, cierres y correos<br/>14 HU · Media"] --> S8["Sprint 8<br/>Consultas, precios, bitácora y panel<br/>14 HU · Media/Baja"]
+        S6["✅ Sprint 6 · v0.7.0<br/>Reportes y exportación<br/>10 HU · Alta"] --> S7["✅ Sprint 7 · v0.8.0<br/>Operación: suspendidas, cierres y correos<br/>14 HU · Media"] --> S8["✅ Sprint 8 · v1.0.0<br/>Consultas, precios, bitácora y panel<br/>14 HU · Media/Baja"]
     end
 
     classDef base fill:#eaf5ff,stroke:#3275b3,color:#17324d;
@@ -202,7 +209,7 @@ flowchart TB
     class S7,S8 media;
 ```
 
-**Hitos previstos:** al cerrar el **Sprint 5**, contar con un flujo mínimo de venta, cobro, FEL, contingencia y cierre de caja; al completar el **Sprint 8**, cubrir las **115 HU** planificadas para la V1. Estos hitos describen objetivos, no funcionalidades ya implementadas.
+**Hitos:** al cerrar el **Sprint 5** se contó con el flujo mínimo de venta, cobro, FEL, contingencia y cierre de caja; con el **Sprint 8** (`v1.0.0`) quedan cubiertas las **115 HU** planificadas para la V1. Las historias marcadas como futuras en el documento arquitectónico quedan para etapas posteriores.
 
 Las historias se administrarán como **GitHub Issues** y se agruparán en **GitHub Projects**, reajustando el compromiso de cada sprint según avance, prioridades y dependencias.
 
