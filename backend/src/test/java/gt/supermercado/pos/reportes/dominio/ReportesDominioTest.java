@@ -224,6 +224,23 @@ class ReportesDominioTest {
     }
 
     @Test
+    void elPanelSumaLasTarjetasSinLasAnuladasYCalculaElTicketPromedio() {   // HU-10.12 crit. 1 y 2
+        PanelDelDia panel = PanelDelDia.de(LocalDate.of(2026, 11, 20), OffsetDateTime.parse("2026-11-20T10:00:00-06:00"),
+                new PanelDelDia.VentasDeHoy(3, new BigDecimal("100.00")), List.of(),
+                List.of(new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, false, 2, new BigDecimal("60.00")),
+                        new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, true, 1, new BigDecimal("9.00"))),
+                new PanelDelDia.Alertas(1, 0, 2));
+
+        assertThat(panel.ticketPromedio()).isEqualByComparingTo("33.33");
+        assertThat(panel.ventasPorTarjeta()).extracting(PanelDelDia.VentasConTarjeta::etiqueta)
+                .containsExactly("Débito", "Crédito");
+        assertThat(panel.ventasPorTarjeta().getFirst().transacciones()).isEqualTo(2);
+        assertThat(panel.ventasPorTarjeta().getFirst().monto().toPlainString()).isEqualTo("60.00");
+        assertThat(panel.ventasPorTarjeta().getLast().monto().toPlainString()).isEqualTo("0.00");
+        assertThat(panel.alertas().total()).isEqualTo(3);
+    }
+
+    @Test
     void unDiaMuestraLasVeinticuatroHorasConSusVentasYLaHoraPico() {   // HU-10.11 crit. 1 y 3
         ReporteVentasPorHora reporte = ReporteVentasPorHora.de(ENCABEZADO,
                 FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 20)), List.of(

@@ -630,6 +630,31 @@ kbd {
   vertical-align: middle;
 }
 
+/* HU-10.12: el panel resumen del día en la pantalla de inicio. */
+.panel-del-dia .cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.panel-del-dia .cifras dt {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.panel-del-dia .cifras dd {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.panel-del-dia .alertas {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
 /* HU-10.11 crit. 3: la gráfica de barras de las ventas por hora. */
 .grafica-horas figcaption {
   margin-bottom: 8px;

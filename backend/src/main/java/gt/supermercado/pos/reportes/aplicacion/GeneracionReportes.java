@@ -24,6 +24,8 @@ import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
 import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.PanelDelDia;
+import gt.supermercado.pos.reportes.dominio.VentasDelDia;
 import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorHora;
@@ -178,6 +180,22 @@ public class GeneracionReportes {
                                             Long anuladaPorId, SesionActiva sesion) {
         return (ReporteAnuladas) generar(CodigoReporte.ANULADAS,
                 ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId).conAnuladaPor(anuladaPorId), sesion);
+    }
+
+    /**
+     * HU-10.12: el resumen de hoy (hora de Guatemala). No queda en la bitácora: la pantalla lo pide cada minuto (crit.
+     * 3) y no es un reporte que se genere a pedido; el permiso es el mismo de los reportes.
+     */
+    public PanelDelDia panel() {
+        OffsetDateTime ahora = OffsetDateTime.now(reloj.withZone(GUATEMALA));
+        LocalDate hoy = ahora.toLocalDate();
+        FiltrosReporte delDia = FiltrosReporte.delPeriodo(hoy, hoy);
+        List<VentasDelDia> ventas = repositorio.ventasPorDia(delDia);
+        PanelDelDia.VentasDeHoy deHoy = new PanelDelDia.VentasDeHoy(
+                ventas.stream().mapToLong(VentasDelDia::cantidad).sum(),
+                ventas.stream().map(VentasDelDia::total).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+        return PanelDelDia.de(hoy, ahora, deHoy, repositorio.cajasAbiertas(), repositorio.pagosPorTipo(delDia),
+                repositorio.alertas(hoy));
     }
 
     /** Un archivo exportado, listo para descargar. */

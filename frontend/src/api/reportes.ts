@@ -100,6 +100,33 @@ const deProductos = (filtros: FiltrosVentas) => ({ ordenarPor: filtros.ordenarPo
 
 export const CLAVE_FILTROS_REPORTE = ['reportes', 'filtros'] as const
 
+/** HU-10.12: una caja con su turno abierto. */
+export interface CajaAbierta {
+  turnoId: number
+  caja: string
+  cajero: string
+  abiertaDesde: string
+}
+
+/** HU-10.12 crit. 1 y 2: el resumen de hoy y lo que requiere atención. */
+export interface PanelDelDia {
+  fecha: string
+  actualizadoEn: string
+  cantidadVentas: number
+  totalVendido: number
+  ticketPromedio: number
+  cajasAbiertas: CajaAbierta[]
+  ventasPorTarjeta: { tipo: 'DEBITO' | 'CREDITO'; etiqueta: string; transacciones: number; monto: number }[]
+  alertas: { contingenciaPendientes: number; codigosNoEncontrados: number; cierresConDiferencia: number }
+}
+
+export const CLAVE_PANEL_DEL_DIA = ['reportes', 'panel'] as const
+
+/** HU-10.12 crit. 3: cada cuánto se vuelve a pedir el panel, sin recargar la pantalla. */
+export const INTERVALO_PANEL_MS = 60_000
+
+export const obtenerPanelDelDia = () => pedir<PanelDelDia>('/api/reportes/panel')
+
 export const obtenerOpcionesDeFiltro = () => pedir<OpcionesDeFiltro>('/api/reportes/filtros')
 
 /** Solo los filtros con valor van en la consulta. */
