@@ -123,13 +123,14 @@ class BitacoraInmutableIntegracionTest {
 
     @Test
     void cadaRegistroSeEncadenaConElAnteriorConSecuenciaConsecutiva() {
+        // HU-11.10: la cadena incluye los registros archivados (bitacora_completa).
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM (
                     SELECT secuencia, hash_anterior, lag(secuencia) OVER w AS previa, lag(hash) OVER w AS hash_previo
-                    FROM bitacora WINDOW w AS (ORDER BY secuencia)) x
+                    FROM bitacora_completa WINDOW w AS (ORDER BY secuencia)) x
                 WHERE x.previa IS NOT NULL AND (x.secuencia <> x.previa + 1 OR x.hash_anterior <> x.hash_previo)""",
                 Integer.class)).isZero();
-        assertThat(jdbc.queryForObject("SELECT min(secuencia) FROM bitacora", Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT min(secuencia) FROM bitacora_completa", Long.class)).isEqualTo(1);
         assertThat(problemas()).isEmpty();
     }
 
