@@ -164,6 +164,57 @@ class CuiYLimiteIntegracionTest {
                 Integer.class, cajero.usuarioId())).isZero();
     }
 
+    // HU-05.08
+
+    @Test
+    void elClienteSeCambiaAntesDeCobrarYAvisaSiImpideElCobro() throws Exception {   // 05.08 crit. 1
+        Cajero cajero = cajeroConVenta("3000.00");
+        long primero = idDe(enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"Primer Cliente\"}".formatted(NitsDePrueba.nuevo()), cajero.sesion()));
+        long segundo = idDe(enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"Cliente Correcto\"}".formatted(NitsDePrueba.nuevo()), cajero.sesion()));
+
+        HttpResponse<String> asignado = enviar("/api/ventas/actual/cliente", "PUT",
+                "{\"clienteId\":%d}".formatted(primero), cajero.sesion());
+        assertThat(asignado.statusCode()).isEqualTo(200);
+        assertThat(asignado.body()).contains("Primer Cliente", "\"aviso\":null");
+        // En el cobro, con un pago registrado, todavía se corrige.
+        assertThat(enviar("/api/ventas/actual/pagos", "POST", "{\"tipoTarjeta\":\"DEBITO\",\"autorizacion\":\"123456\"}",
+                cajero.sesion()).statusCode()).isEqualTo(200);
+        HttpResponse<String> aCf = enviar("/api/ventas/actual/cliente", "PUT", "{\"clienteId\":null}", cajero.sesion());
+        assertThat(aCf.statusCode()).isEqualTo(200);
+        assertThat(aCf.body()).contains("\"consumidorFinal\":true", "no se pueden facturar a Consumidor Final");
+        HttpResponse<String> corregido = enviar("/api/ventas/actual/cliente", "PUT",
+                "{\"clienteId\":%d}".formatted(segundo), cajero.sesion());
+        assertThat(corregido.body()).contains("Cliente Correcto", "\"aviso\":null");
+
+        assertThat(enviar("/api/ventas/actual/finalizar", "POST", null, cajero.sesion()).statusCode()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("""
+                SELECT f.receptor_nombre FROM factura f JOIN venta v ON v.id = f.venta_id WHERE v.usuario_id = ?""",
+                String.class, cajero.usuarioId())).isEqualTo("Cliente Correcto");
+        assertThat(jdbc.queryForList("""
+                SELECT cambios -> 'cliente' ->> 'despues' FROM bitacora
+                WHERE accion = 'CLIENTE_VENTA_CAMBIADO' AND usuario_id = ? ORDER BY secuencia""", String.class,
+                cajero.usuarioId())).hasSize(3).last().asString().endsWith("Cliente Correcto");
+    }
+
+    @Test
+    void despuesDeEmitirLaFacturaElClienteYaNoSeCambia() throws Exception {   // 05.08 crit. 2
+        Cajero cajero = cajeroConVenta("10.00");
+        assertThat(finalizar(cajero).statusCode()).isEqualTo(200);
+        long cliente = idDe(enviar("/api/clientes", "POST",
+                "{\"nit\":\"%s\",\"nombre\":\"Tarde\"}".formatted(NitsDePrueba.nuevo()), cajero.sesion()));
+
+        HttpResponse<String> cambio = enviar("/api/ventas/actual/cliente", "PUT",
+                "{\"clienteId\":%d}".formatted(cliente), cajero.sesion());
+
+        assertThat(cambio.statusCode()).isEqualTo(422);
+        assertThat(cambio.body()).contains("SIN_VENTA_EN_CURSO", "anular la factura");
+        assertThat(jdbc.queryForObject("""
+                SELECT f.receptor_nombre FROM factura f JOIN venta v ON v.id = f.venta_id WHERE v.usuario_id = ?""",
+                String.class, cajero.usuarioId())).isEqualTo("Consumidor Final");
+    }
+
     // HU-12.07
 
     @Test
