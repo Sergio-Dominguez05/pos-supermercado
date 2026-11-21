@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { Bitacora } from './modulos/bitacora/Bitacora'
+import { Bitacora, PaginaEventoBitacora } from './modulos/bitacora/Bitacora'
 import { BuscarProducto } from './modulos/catalogo/BuscarProducto'
+import { DetalleProducto } from './modulos/catalogo/DetalleProducto'
 import { EditarProducto } from './modulos/catalogo/EditarProducto'
 import { ListaProductos } from './modulos/catalogo/ListaProductos'
 import { NuevoProducto } from './modulos/catalogo/NuevoProducto'
@@ -12,6 +13,7 @@ import { PaginaEstablecimiento } from './modulos/configuracion/DatosEstablecimie
 import { PaginaCaja } from './modulos/configuracion/FormularioCaja'
 import { PaginaImpresoras } from './modulos/configuracion/Impresoras'
 import { PaginaParametrosOperacion } from './modulos/configuracion/ParametrosOperacion'
+import { PaginaFormatoComprobante } from './modulos/configuracion/FormatoComprobante'
 import { PaginaServidorCorreo } from './modulos/configuracion/ServidorCorreo'
 import { PaginaCierreCaja } from './modulos/caja/CierreCaja'
 import { PaginaConsultaCierres, PaginaDetalleCierre } from './modulos/caja/ConsultaCierres'
@@ -133,6 +135,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <PaginaParametrosOperacion />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/configuracion/comprobante"
+            element={
+              <RutaProtegida>
+                <PaginaFormatoComprobante />
               </RutaProtegida>
             }
           />
@@ -265,6 +275,14 @@ export default function App() {
             }
           />
           <Route
+            path="/bitacora/:id"
+            element={
+              <RutaProtegida>
+                <PaginaEventoBitacora />
+              </RutaProtegida>
+            }
+          />
+          <Route
             path="/bitacora"
             element={
               <RutaProtegida>
@@ -301,6 +319,14 @@ export default function App() {
             element={
               <RutaProtegida>
                 <NuevoProducto />
+              </RutaProtegida>
+            }
+          />
+          <Route
+            path="/catalogo/:id"
+            element={
+              <RutaProtegida>
+                <DetalleProducto />
               </RutaProtegida>
             }
           />

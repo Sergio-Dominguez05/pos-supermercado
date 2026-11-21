@@ -423,6 +423,36 @@ class AccionesSensiblesIntegracionTest {
     }
 
     @Test
+    void cargaDelCatalogoExitosaYRechazada() throws Exception {   // HU-03.05 crit. 6
+        String codigo = "AUD" + SIGUIENTE.incrementAndGet() + "-" + System.nanoTime() % 1_000_000;
+        // El producto ya existe igual: la carga no cambia nada y solo queda el registro de la carga.
+        jdbc.update("INSERT INTO producto (codigo_barras, descripcion, precio) VALUES (?, 'Auditado', 10.00)", codigo);
+        byte[] archivo = "Código,Descripción,Precio\r\n%s,Auditado,10.00\r\n".formatted(codigo)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        String revision = archivoA("/api/productos/carga/revision", archivo).body();
+        String huella = revision.replaceAll("(?s).*\"huella\":\"([0-9a-f]+)\".*", "$1");
+
+        assertThat(registrosDe(() -> archivoA("/api/productos/carga?huella=" + huella, archivo)))
+                .containsExactly(new Registro(CATALOGO_CARGADO, true, adminId));
+        assertThat(registrosDe(() -> archivoA("/api/productos/carga?huella=otra", archivo)))
+                .containsExactly(new Registro(CATALOGO_CARGADO, false, adminId));   // no es el archivo revisado
+    }
+
+    /** Envía un archivo como multipart (campo "archivo"), con la sesión del administrador. */
+    private HttpResponse<String> archivoA(String ruta, byte[] contenido) throws Exception {
+        String limite = "----limite" + System.nanoTime();
+        java.io.ByteArrayOutputStream cuerpo = new java.io.ByteArrayOutputStream();
+        cuerpo.writeBytes(("--" + limite + "\r\nContent-Disposition: form-data; name=\"archivo\"; filename=\"catalogo.csv\"\r\n"
+                + "Content-Type: text/csv\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        cuerpo.writeBytes(contenido);
+        cuerpo.writeBytes(("\r\n--" + limite + "--\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + puerto + ruta))
+                .header("Content-Type", "multipart/form-data; boundary=" + limite).header("Cookie", cookieAdmin)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(cuerpo.toByteArray())).build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
     void cambioDeLaConexionFelExitosoYRechazado() throws Exception {   // HU-12.03 y HU-12.15 crit. 4
         String cuerpo = """
                 {"certificador":"Certificador auditado","urlServicio":"https://certificador.test/api",                "usuario":"usuario-fel","secreto":"llave","ambiente":"PRUEBAS","timeoutMs":%d}""";
@@ -509,6 +539,14 @@ class AccionesSensiblesIntegracionTest {
         assertThat(registrosDe(() -> enviar("/api/reportes/exportar/VENTAS_PERIODO?formato=XLSX&desde=2026-11-20"
                 + "&hasta=2026-11-01", "GET", null, cookieAdmin)))
                 .containsExactly(new Registro(REPORTE_EXPORTADO, false, adminId));   // fechas invertidas
+    }
+
+    @Test
+    void consultaDeLaBitacoraExitosaYRechazada() throws Exception {   // HU-11.06 crit. 4
+        assertThat(registrosDe(() -> enviar("/api/bitacora?desde=2026-11-01&hasta=2026-11-20", "GET", null,
+                cookieAdmin))).containsExactly(new Registro(BITACORA_CONSULTADA, true, adminId));
+        assertThat(registrosDe(() -> enviar("/api/bitacora?desde=2026-11-20&hasta=2026-11-01", "GET", null,
+                cookieAdmin))).containsExactly(new Registro(BITACORA_CONSULTADA, false, adminId));   // fechas invertidas
     }
 
     // Criterio 2: sin intervención del usuario, en el momento

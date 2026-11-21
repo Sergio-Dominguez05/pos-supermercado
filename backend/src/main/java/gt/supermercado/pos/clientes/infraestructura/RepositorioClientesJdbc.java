@@ -19,7 +19,7 @@ import java.util.Optional;
 class RepositorioClientesJdbc implements RepositorioClientes {
 
     private static final String SELECT_CLIENTE = """
-            SELECT c.id, c.identificacion, c.nombre, c.direccion, c.correo
+            SELECT c.id, c.identificacion, c.nombre, c.direccion, c.correo, c.tipo_id
             FROM cliente c
             """;
 
@@ -28,7 +28,8 @@ class RepositorioClientesJdbc implements RepositorioClientes {
             rs.getString("identificacion"),
             rs.getString("nombre"),
             rs.getString("direccion"),
-            rs.getString("correo"));
+            rs.getString("correo"),
+            rs.getString("tipo_id"));
 
     private final JdbcTemplate jdbc;
 
@@ -81,6 +82,12 @@ class RepositorioClientesJdbc implements RepositorioClientes {
     }
 
     @Override
+    public Optional<Cliente> porCui(String cui) {
+        return jdbc.query(SELECT_CLIENTE + "WHERE c.tipo_id = 'CUI' AND c.identificacion = ?", CLIENTE, cui).stream()
+                .findFirst();
+    }
+
+    @Override
     public Optional<Cliente> porId(long id) {
         return jdbc.query(SELECT_CLIENTE + "WHERE c.id = ?", CLIENTE, id).stream().findFirst();
     }
@@ -97,11 +104,18 @@ class RepositorioClientesJdbc implements RepositorioClientes {
     }
 
     @Override
-    public long registrar(String nit, String nombre, String direccion, String correo, long usuarioId) {
+    public void editar(long clienteId, String nombre, String direccion, String correo) {
+        jdbc.update("UPDATE cliente SET nombre = ?, direccion = ?, correo = ? WHERE id = ?", nombre, direccion, correo,
+                clienteId);
+    }
+
+    @Override
+    public long registrar(String tipo, String identificacion, String nombre, String direccion, String correo,
+                          long usuarioId) {
         return jdbc.queryForObject("""
                 INSERT INTO cliente (tipo_id, identificacion, nombre, direccion, correo, registrado_por)
-                VALUES ('NIT', ?, ?, ?, ?, ?)
-                RETURNING id""", Long.class, nit, nombre, direccion, correo, usuarioId);
+                VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING id""", Long.class, tipo, identificacion, nombre, direccion, correo, usuarioId);
     }
 
     /** Lo escrito se busca literalmente: '%' y '_' no actúan como comodines. */

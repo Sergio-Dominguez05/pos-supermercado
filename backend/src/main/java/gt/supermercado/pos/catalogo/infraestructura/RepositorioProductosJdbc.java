@@ -40,6 +40,11 @@ class RepositorioProductosJdbc implements RepositorioProductos {
     }
 
     @Override
+    public List<Producto> todos() {
+        return jdbc.query(SELECT_PRODUCTO + "ORDER BY codigo_barras", PRODUCTO);
+    }
+
+    @Override
     public Optional<Producto> buscarPorCodigo(String codigoBarras) {
         return jdbc.query(SELECT_PRODUCTO + "WHERE codigo_barras = ?", PRODUCTO, codigoBarras).stream().findFirst();
     }

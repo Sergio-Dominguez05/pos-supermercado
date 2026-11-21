@@ -4,6 +4,8 @@ import { pedir } from './cliente'
 export interface ParametrosOperacion {
   cantidadMaximaPorLinea: number
   cierreCiego: boolean
+  /** HU-12.07: desde este total, en quetzales, no se factura a Consumidor Final (Q2,500.00 al inicio). */
+  limiteConsumidorFinal: number
 }
 
 export const CLAVE_PARAMETROS_OPERACION = ['configuracion', 'parametros-operacion'] as const

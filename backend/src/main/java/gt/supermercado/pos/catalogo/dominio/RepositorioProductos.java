@@ -9,6 +9,9 @@ public interface RepositorioProductos {
 
     Optional<Producto> buscarPorId(long id);
 
+    /** HU-03.12: todo el catálogo, activos e inactivos, ordenado por código. */
+    List<Producto> todos();
+
     /** Recibe el código ya normalizado. */
     Optional<Producto> buscarPorCodigo(String codigoBarras);
 

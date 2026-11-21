@@ -8,6 +8,9 @@ export const PERMISO_REPORTES = 'REPORTE_CONSULTAR'
 export const REPORTES = [
   { codigo: 'VENTAS_PERIODO', titulo: 'Ventas por período' },
   { codigo: 'VENTAS_CAJERO', titulo: 'Ventas por cajero' },
+  { codigo: 'VENTAS_CAJA', titulo: 'Ventas por caja' },
+  { codigo: 'PRODUCTOS', titulo: 'Productos más vendidos' },
+  { codigo: 'VENTAS_HORA', titulo: 'Ventas por hora' },
   { codigo: 'TARJETAS', titulo: 'Ingresos por tarjeta' },
   { codigo: 'IVA', titulo: 'IVA cobrado' },
   { codigo: 'CIERRES', titulo: 'Cierres de caja' },
@@ -28,8 +31,19 @@ export const filtrosIniciales = (opciones: OpcionesDeFiltro): FiltrosVentas => {
     tipoTarjeta: '',
     soloConDiferencias: false,
     anuladaPorId: '',
+    ordenarPor: 'CANTIDAD',
+    limite: String(LIMITES_PRODUCTOS[1]),
   }
 }
+
+/** HU-10.05 crit. 3: cuántos productos se pueden mostrar; por omisión, los 20 primeros. */
+export const LIMITES_PRODUCTOS = [10, 20, 50, 100] as const
+
+/** HU-10.05 crit. 2: los criterios de orden, con el texto del servidor. */
+export const ORDENES_PRODUCTOS = [
+  { valor: 'CANTIDAD', etiqueta: 'Cantidad vendida' },
+  { valor: 'MONTO', etiqueta: 'Monto vendido' },
+] as const
 
 /** Fecha y hora en hora de Guatemala, como en el resto del POS. */
 export const fechaHora = (iso: string) =>
@@ -46,6 +60,16 @@ export const ESTADOS_FACTURA: Record<string, string> = {
   RECHAZADA: 'Rechazada',
   ANULADA: 'Anulada',
 }
+
+/** HU-10.04: la participación con un decimal, como la calcula el servidor. */
+export const textoParticipacion = (participacion: number) => `${participacion.toFixed(1)} %`
+
+/** HU-10.11 crit. 3: la altura de una barra en porcentaje de la más alta; una barra con ventas siempre se ve. */
+export const alturaDeBarra = (valor: number, maximo: number) =>
+  maximo <= 0 || valor <= 0 ? 0 : Math.max(2, Math.round((valor / maximo) * 100))
+
+/** La hora para el eje de la gráfica: "08". */
+export const horaCorta = (hora: number) => String(hora).padStart(2, '0')
 
 /** La diferencia con su signo y si es faltante o sobrante (lote − registrado). */
 export const textoDiferencia = (diferencia: number) =>

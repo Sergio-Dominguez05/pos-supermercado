@@ -11,6 +11,11 @@ import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
 import gt.supermercado.pos.reportes.dominio.FiltrosReporte;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro.Opcion;
+import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.PanelDelDia;
+import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorHora;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.VentasDelDia;
@@ -119,6 +124,103 @@ class RepositorioReportesJdbc implements RepositorioReportes {
                 fila.getString("nombre_completo") + " (" + fila.getString("username") + ")", fila.getLong("ventas"),
                 fila.getBigDecimal("total").setScale(2), fila.getLong("canceladas"), fila.getLong("eliminadas"),
                 fila.getLong("anuladas"), fila.getBigDecimal("monto_anulado").setScale(2)), valores.toArray());
+    }
+
+    @Override
+    public List<ReporteVentasPorCaja.VentasDeCaja> ventasPorCaja(FiltrosReporte filtros) {
+        String sql = """
+                WITH ventas AS (
+                    SELECT v.caja_id, count(*) AS ventas, sum(v.total) AS total
+                    FROM venta v LEFT JOIN factura f ON f.venta_id = v.id
+                    WHERE v.estado = 'FINALIZADA' AND f.estado IS DISTINCT FROM 'ANULADA' AND %s AND %s
+                    GROUP BY v.caja_id),
+                turnos AS (
+                    SELECT t.caja_id, count(*) AS turnos FROM turno t
+                    WHERE %s AND %s
+                    GROUP BY t.caja_id)
+                SELECT c.id, c.nombre, coalesce(ve.ventas, 0) AS ventas, coalesce(ve.total, 0) AS total,
+                       coalesce(tu.turnos, 0) AS turnos
+                FROM caja c
+                LEFT JOIN ventas ve ON ve.caja_id = c.id
+                LEFT JOIN turnos tu ON tu.caja_id = c.id
+                WHERE (?::bigint IS NULL OR c.id = ?::bigint)
+                  AND (c.activo OR ve.caja_id IS NOT NULL OR tu.caja_id IS NOT NULL)""".formatted(
+                enPeriodo("v.finalizada_en"), deCajaYCajero("v"), enPeriodo("t.abierto_en"), deCajaYCajero("t"));
+        List<Object> valores = new ArrayList<>(parametros(filtros));
+        valores.addAll(parametros(filtros));
+        valores.addAll(Arrays.asList(filtros.cajaId(), filtros.cajaId()));
+        return jdbc.query(sql, (fila, i) -> new ReporteVentasPorCaja.VentasDeCaja(fila.getLong("id"),
+                fila.getString("nombre"), fila.getLong("ventas"), fila.getBigDecimal("total").setScale(2),
+                fila.getLong("turnos")), valores.toArray());
+    }
+
+    @Override
+    public ReporteProductosMasVendidos.Resultado productosMasVendidos(FiltrosReporte filtros, OrdenProductos orden,
+                                                                     int limite) {
+        // El orden solo puede ser uno de estos dos textos fijos: nunca viene del usuario.
+        String criterio = orden == OrdenProductos.MONTO ? "monto DESC, cantidad DESC" : "cantidad DESC, monto DESC";
+        String sql = """
+                WITH vendidos AS (
+                    SELECT l.producto_id, sum(l.cantidad) AS cantidad, round(sum(l.subtotal_con_iva), 2) AS monto
+                    FROM venta_linea l
+                    JOIN venta v ON v.id = l.venta_id
+                    LEFT JOIN factura f ON f.venta_id = v.id
+                    WHERE l.eliminada_en IS NULL AND v.estado = 'FINALIZADA' AND f.estado IS DISTINCT FROM 'ANULADA'
+                      AND %s AND %s
+                    GROUP BY l.producto_id)
+                SELECT p.id, p.codigo_barras, p.descripcion, ve.cantidad, ve.monto, count(*) OVER () AS productos
+                FROM vendidos ve
+                JOIN producto p ON p.id = ve.producto_id
+                ORDER BY %s, lower(p.descripcion), p.id
+                LIMIT ?""".formatted(enPeriodo("v.finalizada_en"), deCajaYCajero("v"), criterio);
+        List<Object> valores = parametros(filtros);
+        valores.add(limite);
+        long[] productos = {0};
+        List<ReporteProductosMasVendidos.Fila> filas = jdbc.query(sql, (fila, i) -> {
+            productos[0] = fila.getLong("productos");
+            return new ReporteProductosMasVendidos.Fila(i + 1, fila.getLong("id"), fila.getString("codigo_barras"),
+                    fila.getString("descripcion"), fila.getLong("cantidad"), fila.getBigDecimal("monto"));
+        }, valores.toArray());
+        return new ReporteProductosMasVendidos.Resultado(productos[0], filas);
+    }
+
+    @Override
+    public List<PanelDelDia.CajaAbierta> cajasAbiertas() {
+        return jdbc.query("""
+                SELECT t.id, c.nombre AS caja, %s AS cajero, t.abierto_en
+                FROM turno t
+                JOIN caja c ON c.id = t.caja_id
+                JOIN usuario u ON u.id = t.usuario_id
+                WHERE t.estado = 'ABIERTO'
+                ORDER BY t.abierto_en, t.id""".formatted(NOMBRE.formatted("u")),
+                (fila, i) -> new PanelDelDia.CajaAbierta(fila.getLong("id"), fila.getString("caja"),
+                        fila.getString("cajero"), fila.getObject("abierto_en", OffsetDateTime.class)));
+    }
+
+    @Override
+    public PanelDelDia.Alertas alertas(LocalDate dia) {
+        return jdbc.queryForObject("""
+                SELECT (SELECT count(*) FROM factura WHERE estado = 'CONTINGENCIA') AS contingencia,
+                       (SELECT count(*) FROM codigo_no_encontrado n WHERE NOT n.resuelto AND %s) AS codigos,
+                       (SELECT count(*) FROM turno t WHERE t.estado = 'CERRADO' AND t.diferencia <> 0 AND %s) AS cierres
+                """.formatted(enPeriodo("n.ocurrido_en"), enPeriodo("t.cerrado_en")),
+                (fila, i) -> new PanelDelDia.Alertas(fila.getLong("contingencia"), fila.getLong("codigos"),
+                        fila.getLong("cierres")),
+                dia, dia, dia, dia);
+    }
+
+    @Override
+    public List<ReporteVentasPorHora.VentasDeLaHora> ventasPorHora(FiltrosReporte filtros) {
+        return jdbc.query("""
+                SELECT extract(hour FROM v.finalizada_en AT TIME ZONE 'America/Guatemala')::int AS hora,
+                       count(*) AS cantidad, sum(v.total) AS total
+                FROM venta v LEFT JOIN factura f ON f.venta_id = v.id
+                WHERE v.estado = 'FINALIZADA' AND f.estado IS DISTINCT FROM 'ANULADA' AND %s AND %s
+                GROUP BY 1
+                ORDER BY 1""".formatted(enPeriodo("v.finalizada_en"), deCajaYCajero("v")),
+                (fila, i) -> new ReporteVentasPorHora.VentasDeLaHora(fila.getInt("hora"), fila.getLong("cantidad"),
+                        fila.getBigDecimal("total")),
+                parametros(filtros).toArray());
     }
 
     @Override

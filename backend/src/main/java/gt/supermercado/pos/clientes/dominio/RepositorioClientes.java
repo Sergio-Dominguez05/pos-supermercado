@@ -12,12 +12,21 @@ public interface RepositorioClientes {
 
     Optional<Cliente> porId(long id);
 
+    /** HU-05.06: {@code cui} ya normalizado (13 dígitos). */
+    Optional<Cliente> porCui(String cui);
+
     /** El cliente asignado a la venta, o vacío si es a Consumidor Final. */
     Optional<Cliente> deLaVenta(long ventaId);
 
-    /** Lanza {@code DuplicateKeyException} si el NIT ya está registrado. */
-    long registrar(String nit, String nombre, String direccion, String correo, long usuarioId);
+    /**
+     * {@code tipo} es {@link Cliente#NIT} o {@link Cliente#CUI}. Lanza {@code DuplicateKeyException} si la
+     * identificación ya está registrada.
+     */
+    long registrar(String tipo, String identificacion, String nombre, String direccion, String correo, long usuarioId);
 
     /** HU-05.11 crit. 1: el correo del cliente, agregado o cambiado durante la venta. */
     void cambiarCorreo(long clienteId, String correo);
+
+    /** HU-05.09: el nombre, la dirección y el correo; la identificación (NIT o CUI) no cambia nunca (crit. 2). */
+    void editar(long clienteId, String nombre, String direccion, String correo);
 }

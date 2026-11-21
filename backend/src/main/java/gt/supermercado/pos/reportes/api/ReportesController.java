@@ -4,6 +4,7 @@ import gt.supermercado.pos.reportes.aplicacion.GeneracionReportes;
 import gt.supermercado.pos.reportes.dominio.Agrupacion;
 import gt.supermercado.pos.reportes.dominio.CodigoReporte;
 import gt.supermercado.pos.reportes.dominio.FormatoExportacion;
+import gt.supermercado.pos.reportes.dominio.PanelDelDia;
 import gt.supermercado.pos.reportes.dominio.ParametrosReporte;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +18,10 @@ import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.TipoTarjetaReporte;
+import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorHora;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.OpcionesDeFiltro;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
@@ -74,6 +79,54 @@ public class ReportesController {
             @RequestParam(required = false) Long cajeroId,
             @AuthenticationPrincipal SesionActiva sesion) {
         return reportes.ventasPorCajero(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.12: el panel resumen del día, con sus alertas; la pantalla lo vuelve a pedir cada minuto. */
+    @GetMapping("/api/reportes/panel")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public PanelDelDia panel() {
+        return reportes.panel();
+    }
+
+    /** HU-10.11: ventas por hora; con {@code desde == hasta} es un día, con un período incluye el promedio por día. */
+    @GetMapping("/api/reportes/horas")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteVentasPorHora ventasPorHora(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.ventasPorHora(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /** HU-10.04: por caja, ventas, total vendido, turnos y participación, para compararlas en el mismo período. */
+    @GetMapping("/api/reportes/cajas")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteVentasPorCaja ventasPorCaja(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.ventasPorCaja(desde, hasta, cajaId, cajeroId, sesion);
+    }
+
+    /**
+     * HU-10.05: los productos más vendidos; {@code ordenarPor} es {@code CANTIDAD} (por omisión) o {@code MONTO} y
+     * {@code limite} cuántos mostrar (20 por omisión, entre 1 y 500; 422 fuera de ese rango).
+     */
+    @GetMapping("/api/reportes/productos")
+    @PreAuthorize("hasAuthority('REPORTE_CONSULTAR')")
+    public ReporteProductosMasVendidos productosMasVendidos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) Long cajeroId,
+            @RequestParam(required = false) OrdenProductos ordenarPor,
+            @RequestParam(required = false) Integer limite,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        return reportes.productosMasVendidos(desde, hasta, cajaId, cajeroId, ordenarPor, limite, sesion);
     }
 
     /** HU-10.03 crit. 2: el detalle de las ventas de un cajero en el período. */
@@ -155,9 +208,11 @@ public class ReportesController {
             @RequestParam(required = false) Agrupacion agrupacion,
             @RequestParam(defaultValue = "false") boolean soloConDiferencias,
             @RequestParam(required = false) Long anuladaPorId,
+            @RequestParam(required = false) OrdenProductos ordenarPor,
+            @RequestParam(required = false) Integer limite,
             @AuthenticationPrincipal SesionActiva sesion) {
         ParametrosReporte parametros = new ParametrosReporte(desde, hasta, cajaId, cajeroId, tipoTarjeta, agrupacion,
-                soloConDiferencias, anuladaPorId);
+                soloConDiferencias, anuladaPorId, ordenarPor, limite);
         GeneracionReportes.ArchivoReporte archivo = reportes.exportar(codigo, parametros, formato, sesion);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(archivo.tipoContenido()))

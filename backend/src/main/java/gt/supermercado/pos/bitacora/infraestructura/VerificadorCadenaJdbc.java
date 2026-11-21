@@ -22,7 +22,7 @@ class VerificadorCadenaJdbc implements VerificadorCadena {
     public ResultadoVerificacion verificar() {
         List<Problema> problemas = jdbc.query("SELECT secuencia, problema FROM verificar_bitacora() ORDER BY secuencia",
                 (rs, fila) -> new Problema(rs.getLong("secuencia"), rs.getString("problema")));
-        long registros = jdbc.queryForObject("SELECT count(*) FROM bitacora", Long.class);
+        long registros = jdbc.queryForObject("SELECT count(*) FROM bitacora_completa", Long.class);
         return new ResultadoVerificacion(registros, problemas);
     }
 }

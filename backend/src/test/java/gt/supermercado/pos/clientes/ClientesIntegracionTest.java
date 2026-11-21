@@ -218,9 +218,82 @@ class ClientesIntegracionTest {
                 .containsEntry("receptor_nombre", "Consumidor Final");
     }
 
+    // HU-05.09
+
+    @Test
+    void seCorrigenNombreDireccionYCorreoDuranteLaVentaSinTocarLasFacturasEmitidas() throws Exception {   // crit. 1 y 3
+        Cajero cajero = cajeroConVenta();
+        String nit = NitsDePrueba.nuevo();
+        long cliente = idDe(registrar(cajero, "{\"nit\":\"%s\",\"nombre\":\"Ferreteria Clavo\"}".formatted(nit)));
+        asignar(cajero, cliente);
+        pagar(cajero);
+        enviar("/api/ventas/actual/finalizar", "POST", null, cajero.sesion());   // factura con el nombre mal escrito
+        assertThat(enviar("/api/ventas/actual/lineas", "POST", "{\"codigo\":\"%s\"}".formatted(ultimoProducto()),
+                cajero.sesion()).statusCode()).isEqualTo(200);
+        asignar(cajero, cliente);
+
+        HttpResponse<String> editado = editar(cajero, cliente, "{\"nit\":\"%s\",\"nombre\":\"  Ferretería El Clavo \","
+                + "\"direccion\":\"5a. calle 3-20, zona 1\",\"correo\":\"compras@elclavo.gt\"}".formatted("1234567"));
+
+        assertThat(editado.statusCode()).as(editado.body()).isEqualTo(200);
+        assertThat(editado.body()).contains("\"nit\":\"" + nit + "\"", "\"nombre\":\"Ferretería El Clavo\"",
+                "zona 1", "compras@elclavo.gt");   // crit. 2: el NIT enviado se ignora
+        // Crit. 1: durante la venta, la factura en curso sale con los datos nuevos.
+        assertThat(clienteDeLaVenta(cajero).body()).contains("Ferretería El Clavo");
+        pagar(cajero);
+        enviar("/api/ventas/actual/finalizar", "POST", null, cajero.sesion());
+        // Crit. 3: la factura ya emitida conserva los datos con que se emitió.
+        assertThat(jdbc.queryForList("""
+                SELECT f.receptor_nombre FROM factura f JOIN venta v ON v.id = f.venta_id
+                WHERE v.usuario_id = ? ORDER BY f.id""", String.class, cajero.usuarioId()))
+                .containsExactly("Ferreteria Clavo", "Ferretería El Clavo");
+    }
+
+    @Test
+    void laIdentificacionNoCambiaYLaEdicionQuedaEnLaBitacoraConAntesYDespues() throws Exception {   // crit. 2 y 4
+        Cajero cajero = cajeroConVenta();
+        String nit = NitsDePrueba.nuevo();
+        long cliente = idDe(registrar(cajero,
+                "{\"nit\":\"%s\",\"nombre\":\"Abarrotes Luz\",\"correo\":\"luz@correo.com\"}".formatted(nit)));
+
+        editar(cajero, cliente, "{\"nombre\":\"Abarrotes La Luz\",\"direccion\":\"\",\"correo\":\"\"}");
+
+        assertThat(jdbc.queryForObject("SELECT identificacion FROM cliente WHERE id = ?", String.class, cliente))
+                .isEqualTo(nit);
+        Map<String, Object> registro = jdbc.queryForMap("""
+                SELECT exitoso, descripcion, cambios -> 'nombre' ->> 'antes' AS antes,
+                       cambios -> 'nombre' ->> 'despues' AS despues, cambios -> 'correo' ->> 'antes' AS correo_antes,
+                       jsonb_exists(cambios, 'direccion') AS cambio_direccion
+                FROM bitacora WHERE accion = 'CLIENTE_EDITADO' AND entidad_id = ?""", cliente);
+        assertThat(registro).containsEntry("exitoso", true).containsEntry("antes", "Abarrotes Luz")
+                .containsEntry("despues", "Abarrotes La Luz").containsEntry("correo_antes", "luz@correo.com")
+                .containsEntry("cambio_direccion", false);   // la dirección seguía siendo "Ciudad"
+        assertThat((String) registro.get("descripcion")).contains(nit);
+
+        // Sin cambios no se registra nada; con datos inválidos se rechaza y queda el intento.
+        editar(cajero, cliente, "{\"nombre\":\"Abarrotes La Luz\",\"direccion\":\"Ciudad\",\"correo\":null}");
+        HttpResponse<String> invalido = editar(cajero, cliente, "{\"nombre\":\" \",\"correo\":\"no-es-correo\"}");
+        assertThat(invalido.statusCode()).isEqualTo(422);
+        assertThat(invalido.body()).contains("NOMBRE_CLIENTE_REQUERIDO");
+        assertThat(jdbc.queryForList("""
+                SELECT exitoso FROM bitacora WHERE accion = 'CLIENTE_EDITADO' AND entidad_id = ? ORDER BY secuencia""",
+                Boolean.class, cliente)).containsExactly(true, false);
+        assertThat(editar(cajero, 999_999_999L, "{\"nombre\":\"Nadie\"}").statusCode()).isEqualTo(404);
+    }
+
     // Apoyo
 
     record Cajero(long usuarioId, String sesion) {}
+
+    private HttpResponse<String> editar(Cajero cajero, long clienteId, String cuerpo) throws Exception {
+        return enviar("/api/clientes/" + clienteId, "PUT", cuerpo, cajero.sesion());
+    }
+
+    /** El código del último producto que creó {@link #cajeroConVenta()}, para vender otra unidad. */
+    private String ultimoProducto() {
+        return jdbc.queryForObject("SELECT codigo_barras FROM producto WHERE codigo_barras LIKE 'CL%' ORDER BY id DESC "
+                + "LIMIT 1", String.class);
+    }
 
     private HttpResponse<String> buscar(Cajero cajero, String nit) throws Exception {
         return enviar("/api/clientes/nit/" + nit.replace(" ", "%20"), "GET", null, cajero.sesion());

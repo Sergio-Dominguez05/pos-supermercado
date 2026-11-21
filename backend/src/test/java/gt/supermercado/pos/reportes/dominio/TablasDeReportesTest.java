@@ -38,6 +38,55 @@ class TablasDeReportesTest {
     }
 
     @Test
+    void lasVentasPorCajaExportanLaParticipacionComoNumero() {   // HU-10.04, HU-10.14 crit. 2
+        ReporteVentasPorCaja reporte = ReporteVentasPorCaja.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCaja.VentasDeCaja(1, "Caja 1", 3, new BigDecimal("30.00"), 2)));
+
+        TablaReporte tabla = TablasDeReportes.de(CodigoReporte.VENTAS_CAJA, reporte);
+
+        assertThat(tabla.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("Caja", "Ventas",
+                "Total vendido", "Turnos", "Ticket promedio", "Participación");
+        assertThat(tabla.columnas().getLast().tipo()).isEqualTo(TablaReporte.Tipo.PORCENTAJE);
+        assertThat(tabla.filas().getFirst()).containsExactly("Caja 1", 3L, new BigDecimal("30.00"), 2L,
+                new BigDecimal("10.00"), new BigDecimal("100.0"));
+        assertThat(tabla.pie().getFirst().getFirst()).isEqualTo("Total");
+    }
+
+    @Test
+    void losProductosMasVendidosSeExportanConSuPosicionYElTotalDeLosMostrados() {   // HU-10.05
+        ReporteProductosMasVendidos reporte = ReporteProductosMasVendidos.de(ENCABEZADO, OrdenProductos.CANTIDAD, 20,
+                new ReporteProductosMasVendidos.Resultado(1, List.of(new ReporteProductosMasVendidos.Fila(1, 10L,
+                        "750100", "Arroz 1 lb", 3, new BigDecimal("33.60")))));
+
+        TablaReporte tabla = TablasDeReportes.de(CodigoReporte.PRODUCTOS, reporte);
+
+        assertThat(tabla.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("N.º", "Código",
+                "Descripción", "Cantidad vendida", "Monto vendido");
+        assertThat(tabla.filas().getFirst()).containsExactly(1L, "750100", "Arroz 1 lb", 3L, new BigDecimal("33.60"));
+        assertThat(tabla.pie().getFirst()).containsExactly(null, null, "Total", 3L, new BigDecimal("33.60"));
+        assertThat(tabla.resumen()).extracting(TablaReporte.Dato::valor).containsExactly(1L);
+    }
+
+    @Test
+    void lasVentasPorHoraAgreganElPromedioSoloConUnPeriodo() {   // HU-10.11
+        List<ReporteVentasPorHora.VentasDeLaHora> horas = List.of(
+                new ReporteVentasPorHora.VentasDeLaHora(9, 4, new BigDecimal("40.00")));
+        TablaReporte dia = TablasDeReportes.de(CodigoReporte.VENTAS_HORA, ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 2)), horas));
+        TablaReporte periodo = TablasDeReportes.de(CodigoReporte.VENTAS_HORA, ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 2)), horas));
+
+        assertThat(dia.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("Hora", "Ventas",
+                "Total vendido");
+        assertThat(dia.filas()).hasSize(24);
+        assertThat(periodo.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("Hora", "Ventas",
+                "Total vendido", "Ventas por día", "Promedio por día");
+        assertThat(periodo.filas().get(9)).containsExactly("09:00 – 09:59", 4L, new BigDecimal("40.00"), "2.0",
+                new BigDecimal("20.00"));
+        assertThat(periodo.resumen()).extracting(TablaReporte.Dato::valor).containsExactly(2L, "09:00 – 09:59");
+    }
+
+    @Test
     void lasTarjetasSeparanCantidadYMontoAnuladosEnDosColumnasNumericas() {
         ReporteTarjetas reporte = ReporteTarjetas.de(ENCABEZADO, null, List.of(
                 new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, true, 1, new BigDecimal("25.00"))));

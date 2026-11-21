@@ -23,6 +23,12 @@ import gt.supermercado.pos.reportes.dominio.ReporteCierres;
 import gt.supermercado.pos.reportes.dominio.ReporteIva;
 import gt.supermercado.pos.reportes.dominio.ReporteTarjetas;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPeriodo;
+import gt.supermercado.pos.reportes.dominio.OrdenProductos;
+import gt.supermercado.pos.reportes.dominio.PanelDelDia;
+import gt.supermercado.pos.reportes.dominio.VentasDelDia;
+import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorHora;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.TablasDeReportes;
@@ -105,6 +111,28 @@ public class GeneracionReportes {
                 ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
     }
 
+    /** HU-10.04: ventas y turnos por caja, para comparar las cajas en el mismo período. */
+    public ReporteVentasPorCaja ventasPorCaja(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                              SesionActiva sesion) {
+        return (ReporteVentasPorCaja) generar(CodigoReporte.VENTAS_CAJA,
+                ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
+    }
+
+    /** HU-10.11: ventas por hora del día; con un período, también el promedio por día de cada hora. */
+    public ReporteVentasPorHora ventasPorHora(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                              SesionActiva sesion) {
+        return (ReporteVentasPorHora) generar(CodigoReporte.VENTAS_HORA,
+                ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
+    }
+
+    /** HU-10.05: los productos más vendidos, por cantidad (por omisión) o por monto, limitados a {@code limite}. */
+    public ReporteProductosMasVendidos productosMasVendidos(LocalDate desde, LocalDate hasta, Long cajaId,
+                                                            Long cajeroId, OrdenProductos orden, Integer limite,
+                                                            SesionActiva sesion) {
+        return (ReporteProductosMasVendidos) generar(CodigoReporte.PRODUCTOS,
+                ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId).conProductos(orden, limite), sesion);
+    }
+
     /** HU-10.03 crit. 2: las ventas de un cajero; su generación también queda en la bitácora. */
     public DetalleVentasCajero detalleDeCajero(long cajeroId, LocalDate desde, LocalDate hasta, Long cajaId,
                                                SesionActiva sesion) {
@@ -152,6 +180,22 @@ public class GeneracionReportes {
                                             Long anuladaPorId, SesionActiva sesion) {
         return (ReporteAnuladas) generar(CodigoReporte.ANULADAS,
                 ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId).conAnuladaPor(anuladaPorId), sesion);
+    }
+
+    /**
+     * HU-10.12: el resumen de hoy (hora de Guatemala). No queda en la bitácora: la pantalla lo pide cada minuto (crit.
+     * 3) y no es un reporte que se genere a pedido; el permiso es el mismo de los reportes.
+     */
+    public PanelDelDia panel() {
+        OffsetDateTime ahora = OffsetDateTime.now(reloj.withZone(GUATEMALA));
+        LocalDate hoy = ahora.toLocalDate();
+        FiltrosReporte delDia = FiltrosReporte.delPeriodo(hoy, hoy);
+        List<VentasDelDia> ventas = repositorio.ventasPorDia(delDia);
+        PanelDelDia.VentasDeHoy deHoy = new PanelDelDia.VentasDeHoy(
+                ventas.stream().mapToLong(VentasDelDia::cantidad).sum(),
+                ventas.stream().map(VentasDelDia::total).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+        return PanelDelDia.de(hoy, ahora, deHoy, repositorio.cajasAbiertas(), repositorio.pagosPorTipo(delDia),
+                repositorio.alertas(hoy));
     }
 
     /** Un archivo exportado, listo para descargar. */
@@ -229,6 +273,11 @@ public class GeneracionReportes {
         switch (codigo) {
             case VENTAS_PERIODO -> aplicados.add(new FiltroAplicado("Agrupación", agrupacion(p).etiqueta()));
             case DETALLE_CAJERO -> exigir(p.cajeroId() != null, "Indique el cajero del detalle.");
+            case PRODUCTOS -> {
+                aplicados.add(new FiltroAplicado("Ordenado por", ordenProductos(p).etiqueta()));
+                aplicados.add(new FiltroAplicado("Mostrar",
+                        "Los " + ReporteProductosMasVendidos.limiteValido(p.limite()) + " primeros"));
+            }
             case DETALLE_TARJETA -> exigir(p.tipoTarjeta() != null, "Indique el tipo de tarjeta del detalle.");
             case CIERRES -> {
                 if (p.soloConDiferencias()) {
@@ -251,6 +300,13 @@ public class GeneracionReportes {
                     repositorio.ventasPorDia(filtros));
             case VENTAS_CAJERO -> ReporteVentasPorCajero.de(encabezado, repositorio.ventasPorCajero(filtros));
             case DETALLE_CAJERO -> new DetalleVentasCajero(encabezado, repositorio.ventasDeCajero(filtros));
+            case VENTAS_CAJA -> ReporteVentasPorCaja.de(encabezado, repositorio.ventasPorCaja(filtros));
+            case VENTAS_HORA -> ReporteVentasPorHora.de(encabezado, filtros, repositorio.ventasPorHora(filtros));
+            case PRODUCTOS -> {
+                int limite = ReporteProductosMasVendidos.limiteValido(p.limite());
+                yield ReporteProductosMasVendidos.de(encabezado, ordenProductos(p), limite,
+                        repositorio.productosMasVendidos(filtros, ordenProductos(p), limite));
+            }
             case TARJETAS -> ReporteTarjetas.de(encabezado, filtros.tipoTarjeta(), repositorio.pagosPorTipo(filtros));
             case DETALLE_TARJETA -> new DetallePagosTarjeta(encabezado, repositorio.pagosDeTarjeta(filtros));
             case IVA -> ReporteIva.de(encabezado, repositorio.ivaPorDia(filtros), repositorio.sinCertificar(filtros));
@@ -263,6 +319,10 @@ public class GeneracionReportes {
 
     private static Agrupacion agrupacion(ParametrosReporte p) {
         return p.agrupacion() == null ? Agrupacion.DIA : p.agrupacion();
+    }
+
+    private static OrdenProductos ordenProductos(ParametrosReporte p) {
+        return p.ordenProductos() == null ? OrdenProductos.CANTIDAD : p.ordenProductos();
     }
 
     private static void exigir(boolean condicion, String mensaje) {

@@ -13,6 +13,7 @@ import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.DINERO;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.ENTERO;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.FECHA;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.FECHA_HORA;
+import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.PORCENTAJE;
 import static gt.supermercado.pos.reportes.dominio.TablaReporte.Tipo.TEXTO;
 
 /**
@@ -33,6 +34,9 @@ public final class TablasDeReportes {
             case VENTAS_PERIODO -> ventasPeriodo((ReporteVentasPeriodo) reporte);
             case VENTAS_CAJERO -> ventasPorCajero((ReporteVentasPorCajero) reporte);
             case DETALLE_CAJERO -> detalleCajero((DetalleVentasCajero) reporte);
+            case VENTAS_CAJA -> ventasPorCaja((ReporteVentasPorCaja) reporte);
+            case PRODUCTOS -> productos((ReporteProductosMasVendidos) reporte);
+            case VENTAS_HORA -> ventasPorHora((ReporteVentasPorHora) reporte);
             case TARJETAS -> tarjetas((ReporteTarjetas) reporte);
             case DETALLE_TARJETA -> detalleTarjeta((DetallePagosTarjeta) reporte);
             case IVA -> iva((ReporteIva) reporte);
@@ -69,6 +73,61 @@ public final class TablasDeReportes {
     private static List<Object> filaCajero(ReporteVentasPorCajero.Fila fila) {
         return fila(fila.cajero(), fila.cantidadVentas(), fila.totalVendido(), fila.ventasCanceladas(),
                 fila.lineasEliminadas(), fila.facturasAnuladas(), fila.montoAnulado());
+    }
+
+    private static TablaReporte ventasPorCaja(ReporteVentasPorCaja reporte) {
+        return tabla(CodigoReporte.VENTAS_CAJA, reporte.encabezado(), List.of(),
+                columnas("Caja", TEXTO, "Ventas", ENTERO, "Total vendido", DINERO, "Turnos", ENTERO,
+                        "Ticket promedio", DINERO, "Participación", PORCENTAJE),
+                reporte.filas().stream().map(TablasDeReportes::filaCaja).toList(),
+                List.of(filaCaja(reporte.totales())),
+                List.of("Ventas y total sin las facturas anuladas. Los turnos cuentan por la fecha en que se abrieron; "
+                        + "la participación es la parte del total vendido."));
+    }
+
+    private static List<Object> filaCaja(ReporteVentasPorCaja.Fila fila) {
+        return fila(fila.caja(), fila.cantidadVentas(), fila.totalVendido(), fila.turnos(), fila.ticketPromedio(),
+                fila.participacion());
+    }
+
+    private static TablaReporte ventasPorHora(ReporteVentasPorHora reporte) {
+        List<Dato> resumen = new ArrayList<>();
+        resumen.add(new Dato("Días del período", reporte.dias(), ENTERO));
+        if (reporte.horaPico() != null) {
+            resumen.add(new Dato("Hora de más ventas", ReporteVentasPorHora.etiqueta(reporte.horaPico()), TEXTO));
+        }
+        List<Columna> columnas = reporte.promedio()
+                ? columnas("Hora", TEXTO, "Ventas", ENTERO, "Total vendido", DINERO, "Ventas por día", TEXTO,
+                        "Promedio por día", DINERO)
+                : columnas("Hora", TEXTO, "Ventas", ENTERO, "Total vendido", DINERO);
+        return tabla(CodigoReporte.VENTAS_HORA, reporte.encabezado(), List.copyOf(resumen), columnas,
+                reporte.filas().stream().map(fila -> filaHora(fila, reporte.promedio())).toList(),
+                List.of(filaHora(reporte.totales(), reporte.promedio())),
+                List.of("Ventas finalizadas sin las facturas anuladas, por la hora de finalización (hora de Guatemala)."
+                        + (reporte.promedio() ? " El promedio divide entre todos los días del período." : "")));
+    }
+
+    private static List<Object> filaHora(ReporteVentasPorHora.Fila fila, boolean promedio) {
+        return promedio
+                ? fila(fila.etiqueta(), fila.cantidadVentas(), fila.totalVendido(),
+                        fila.promedioVentas().toPlainString(), fila.promedioTotal())
+                : fila(fila.etiqueta(), fila.cantidadVentas(), fila.totalVendido());
+    }
+
+    private static TablaReporte productos(ReporteProductosMasVendidos reporte) {
+        return tabla(CodigoReporte.PRODUCTOS, reporte.encabezado(),
+                List.of(new Dato("Productos distintos vendidos en el período", reporte.productosVendidos(), ENTERO)),
+                columnas("N.º", ENTERO, "Código", TEXTO, "Descripción", TEXTO, "Cantidad vendida", ENTERO,
+                        "Monto vendido", DINERO),
+                reporte.filas().stream().map(TablasDeReportes::filaProducto).toList(),
+                List.of(filaProducto(reporte.totales())),
+                List.of("Líneas vigentes de las ventas finalizadas en el período, sin las de facturas anuladas. El "
+                        + "monto incluye IVA; el total suma los productos mostrados."));
+    }
+
+    private static List<Object> filaProducto(ReporteProductosMasVendidos.Fila fila) {
+        return fila(fila.posicion() == null ? null : fila.posicion().longValue(), fila.codigo(),
+                fila.descripcion(), fila.cantidad(), fila.monto());
     }
 
     private static TablaReporte detalleCajero(DetalleVentasCajero detalle) {

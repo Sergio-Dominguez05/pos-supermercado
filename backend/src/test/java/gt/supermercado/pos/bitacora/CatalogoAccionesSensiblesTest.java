@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static gt.supermercado.pos.bitacora.dominio.AccionSensible.*;
-import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -28,11 +27,11 @@ class CatalogoAccionesSensiblesTest {
      * registrar la acción, esta prueba falla hasta quitarla de aquí y agregar su caso a
      * {@link AccionesSensiblesIntegracionTest}.
      */
-    static final Map<AccionSensible, String> PENDIENTES = Map.ofEntries(
-            entry(CATALOGO_CARGADO, "HU-03.05"));
+    static final Map<AccionSensible, String> PENDIENTES = Map.of();
 
     private static final Set<String> MODULOS = Set.of(
-            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion", "reportes");
+            "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion", "reportes",
+            "bitacora");
 
     @Test
     void elCatalogoTieneTodosLosEventosDelCriterio1() {
@@ -49,6 +48,8 @@ class CatalogoAccionesSensiblesTest {
                 PRODUCTO_ACTIVADO, PRODUCTO_DESACTIVADO, CATALOGO_CARGADO);
         // HU-10.15 crit. 3: la generación y la exportación de reportes.
         assertThat(porCategoria(Categoria.REPORTES)).contains(REPORTE_GENERADO, REPORTE_EXPORTADO);
+        // HU-11.06 crit. 4: la consulta de la bitácora.
+        assertThat(porCategoria(Categoria.BITACORA)).contains(BITACORA_CONSULTADA);
     }
 
     @Test

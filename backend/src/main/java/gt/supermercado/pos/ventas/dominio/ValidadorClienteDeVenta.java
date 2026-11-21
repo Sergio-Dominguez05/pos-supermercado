@@ -5,8 +5,8 @@ package gt.supermercado.pos.ventas.dominio;
  * ejemplo que Consumidor Final no supere el límite de la SAT (HU-05.07). Si no las cumple, lanza una
  * {@link gt.supermercado.pos.compartido.dominio.NegocioException} con el motivo listo para mostrarse.
  *
- * <p>El módulo de clientes (EP-05) todavía no existe: mientras tanto rige {@code SinReglasDeCliente}, que acepta todas
- * las ventas. HU-05.07 (#43) debe implementar este puerto y quitar esa clase.
+ * <p>Lo implementa el módulo de clientes ({@code LimiteConsumidorFinal}, HU-05.07); se revisa al pasar al cobro y al
+ * finalizar la venta.
  */
 public interface ValidadorClienteDeVenta {
 

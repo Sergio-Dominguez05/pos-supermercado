@@ -67,9 +67,65 @@ export interface FiltrosVentas {
   soloConDiferencias: boolean
   /** HU-10.09 crit. 2: el usuario que anuló, o vacío (cualquiera). */
   anuladaPorId: string
+  /** HU-10.05 crit. 2: ordenar los productos por cantidad (por omisión) o por monto. */
+  ordenarPor?: OrdenProductos
+  /** HU-10.05 crit. 3: cuántos productos mostrar; vacío = 20. */
+  limite?: string
 }
 
+export type OrdenProductos = 'CANTIDAD' | 'MONTO'
+
+/** HU-10.05: un producto en su posición, o la fila de totales (`posicion` y `productoId` nulos). */
+export interface FilaProductoVendido {
+  posicion: number | null
+  productoId: number | null
+  codigo: string | null
+  descripcion: string
+  cantidad: number
+  monto: number
+}
+
+export interface ReporteProductosMasVendidos {
+  encabezado: EncabezadoReporte
+  ordenarPor: OrdenProductos
+  limite: number
+  /** Cuántos productos distintos se vendieron en el período, aunque no se muestren todos. */
+  productosVendidos: number
+  filas: FilaProductoVendido[]
+  totales: FilaProductoVendido
+}
+
+/** Los filtros propios del reporte de productos más vendidos. */
+const deProductos = (filtros: FiltrosVentas) => ({ ordenarPor: filtros.ordenarPor ?? '', limite: filtros.limite ?? '' })
+
 export const CLAVE_FILTROS_REPORTE = ['reportes', 'filtros'] as const
+
+/** HU-10.12: una caja con su turno abierto. */
+export interface CajaAbierta {
+  turnoId: number
+  caja: string
+  cajero: string
+  abiertaDesde: string
+}
+
+/** HU-10.12 crit. 1 y 2: el resumen de hoy y lo que requiere atención. */
+export interface PanelDelDia {
+  fecha: string
+  actualizadoEn: string
+  cantidadVentas: number
+  totalVendido: number
+  ticketPromedio: number
+  cajasAbiertas: CajaAbierta[]
+  ventasPorTarjeta: { tipo: 'DEBITO' | 'CREDITO'; etiqueta: string; transacciones: number; monto: number }[]
+  alertas: { contingenciaPendientes: number; codigosNoEncontrados: number; cierresConDiferencia: number }
+}
+
+export const CLAVE_PANEL_DEL_DIA = ['reportes', 'panel'] as const
+
+/** HU-10.12 crit. 3: cada cuánto se vuelve a pedir el panel, sin recargar la pantalla. */
+export const INTERVALO_PANEL_MS = 60_000
+
+export const obtenerPanelDelDia = () => pedir<PanelDelDia>('/api/reportes/panel')
 
 export const obtenerOpcionesDeFiltro = () => pedir<OpcionesDeFiltro>('/api/reportes/filtros')
 
@@ -98,6 +154,46 @@ export interface ReporteVentasPorCajero {
   totales: FilaVentasCajero
 }
 
+/** HU-10.04: una fila por caja, o la de totales (`cajaId` nulo). */
+export interface FilaVentasCaja {
+  cajaId: number | null
+  caja: string
+  cantidadVentas: number
+  totalVendido: number
+  turnos: number
+  ticketPromedio: number
+  /** El porcentaje del total vendido, con un decimal (45.5 = 45.5 %). */
+  participacion: number
+}
+
+export interface ReporteVentasPorCaja {
+  encabezado: EncabezadoReporte
+  filas: FilaVentasCaja[]
+  totales: FilaVentasCaja
+}
+
+/** HU-10.11: una hora del día (0 a 23), o la fila de totales (`hora` nula). */
+export interface FilaVentasHora {
+  hora: number | null
+  etiqueta: string
+  cantidadVentas: number
+  totalVendido: number
+  /** Ventas por día en esa hora, con un decimal; igual a `cantidadVentas` en un solo día. */
+  promedioVentas: number
+  promedioTotal: number
+}
+
+export interface ReporteVentasPorHora {
+  encabezado: EncabezadoReporte
+  dias: number
+  /** Crit. 2: verdadero si es un período (más de un día) y se muestra el promedio por día. */
+  promedio: boolean
+  filas: FilaVentasHora[]
+  totales: FilaVentasHora
+  /** La hora con más ventas, o `null` si no hubo ventas. */
+  horaPico: number | null
+}
+
 /** HU-10.03 crit. 2: una venta finalizada o cancelada del cajero. */
 export interface VentaDeCajero {
   ventaId: number
@@ -122,6 +218,17 @@ const sinAgrupacion = ({ desde, hasta, cajaId, cajeroId }: FiltrosVentas) => ({ 
 
 export const generarReporteCajeros = (filtros: FiltrosVentas) =>
   pedir<ReporteVentasPorCajero>(`/api/reportes/cajeros?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteCajas = (filtros: FiltrosVentas) =>
+  pedir<ReporteVentasPorCaja>(`/api/reportes/cajas?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteHoras = (filtros: FiltrosVentas) =>
+  pedir<ReporteVentasPorHora>(`/api/reportes/horas?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteProductos =(filtros: FiltrosVentas) =>
+  pedir<ReporteProductosMasVendidos>(
+    `/api/reportes/productos?${consultaDe({ ...sinAgrupacion(filtros), ...deProductos(filtros) })}`,
+  )
 
 /** El detalle usa las fechas y la caja del resumen; el cajero es el de la fila elegida. */
 export const generarDetalleCajero = (cajeroId: number, filtros: FiltrosVentas) =>
@@ -280,6 +387,9 @@ export type CodigoExportable =
   | 'VENTAS_PERIODO'
   | 'VENTAS_CAJERO'
   | 'DETALLE_CAJERO'
+  | 'VENTAS_CAJA'
+  | 'PRODUCTOS'
+  | 'VENTAS_HORA'
   | 'TARJETAS'
   | 'DETALLE_TARJETA'
   | 'IVA'
@@ -315,6 +425,8 @@ export const rutaExportacion = (
         return { soloConDiferencias: filtros.soloConDiferencias ? 'true' : '' }
       case 'ANULADAS':
         return { anuladaPorId: filtros.anuladaPorId }
+      case 'PRODUCTOS':
+        return deProductos(filtros)
       case 'DETALLE_CAJERO':
         return { cajeroId: String(cajeroId ?? '') }
       case 'DETALLE_TARJETA':

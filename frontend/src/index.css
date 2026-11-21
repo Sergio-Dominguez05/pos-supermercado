@@ -623,6 +623,117 @@ kbd {
   padding-bottom: 9px;
 }
 
+/* HU-10.04 crit. 2: la barra de participación de cada caja, delante del porcentaje. */
+.tabla td.participacion meter {
+  width: 80px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* HU-10.12: el panel resumen del día en la pantalla de inicio. */
+.panel-del-dia .cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.panel-del-dia .cifras dt {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.panel-del-dia .cifras dd {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.panel-del-dia .alertas {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+/* HU-10.11 crit. 3: la gráfica de barras de las ventas por hora. */
+.grafica-horas figcaption {
+  margin-bottom: 8px;
+  color: var(--texto-suave);
+}
+
+.grafica-horas .barras {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 180px;
+}
+
+.grafica-horas .barra {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.grafica-horas .relleno {
+  display: block;
+  background: var(--texto-suave);
+  border-radius: 3px 3px 0 0;
+}
+
+.grafica-horas .barra.pico .relleno {
+  background: var(--ok);
+}
+
+.grafica-horas .eje {
+  font-size: 0.7rem;
+  text-align: center;
+  color: var(--texto-suave);
+  padding-top: 4px;
+}
+
+/* HU-12.09: el formulario y la vista previa lado a lado; en pantallas angostas, uno debajo del otro. */
+.dos-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* HU-12.09 crit. 3: la vista previa del ticket, en letra de ancho fijo como la impresora. */
+.ticket-muestra .papel {
+  max-width: 100%;
+  margin: 8px auto;
+  padding: 12px 1ch;
+  background: #ffffff;
+  color: #000000;
+  border: 1px dashed var(--borde);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.ticket-muestra .papel img {
+  display: block;
+  margin: 0 auto 8px;
+  max-width: 100%;
+  image-rendering: pixelated;
+}
+
+.ticket-muestra .centro {
+  text-align: center;
+}
+
+.ticket-muestra .negrita {
+  font-weight: 700;
+}
+
+.ticket-muestra .destacado {
+  font-size: 1.15em;
+}
+
 /* Motivos y justificaciones: se ajustan en varias líneas en lugar de ensanchar la tabla. */
 .tabla td.texto-largo {
   min-width: 220px;

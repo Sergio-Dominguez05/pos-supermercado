@@ -33,16 +33,24 @@ public class ConsultaContribuyentes {
 
     /** {@code nit} ya normalizado y válido. Nunca lanza: cualquier falla del servicio es "no disponible". */
     public ConsultaNit porNit(String nit) {
+        return consultar(() -> certificador.consultarNit(nit), "NIT");
+    }
+
+    /** HU-05.06 crit. 3: el nombre por CUI ({@code cui} con sus 13 dígitos). Nunca lanza, como {@link #porNit}. */
+    public ConsultaNit porCui(String cui) {
+        return consultar(() -> certificador.consultarCui(cui), "CUI");
+    }
+
+    private ConsultaNit consultar(java.util.function.Supplier<Optional<Contribuyente>> consulta, String tipo) {
         try {
-            Optional<Contribuyente> contribuyente = LlamadaConLimite.conLimite(() -> certificador.consultarNit(nit),
-                    LIMITE);
+            Optional<Contribuyente> contribuyente = LlamadaConLimite.conLimite(consulta, LIMITE);
             return contribuyente.filter(c -> c.nombre() != null && !c.nombre().isBlank())
                     .map(c -> new ConsultaNit(Resultado.ENCONTRADO, c.nombre().strip()))
                     .orElse(new ConsultaNit(Resultado.NO_EXISTE, null));
         } catch (CertificadorNoDisponibleException e) {
             return new ConsultaNit(Resultado.NO_DISPONIBLE, null);
         } catch (RuntimeException e) {
-            LOG.warn("Falló la consulta del NIT al certificador", e);
+            LOG.warn("Falló la consulta del {} al certificador", tipo, e);
             return new ConsultaNit(Resultado.NO_DISPONIBLE, null);
         }
     }

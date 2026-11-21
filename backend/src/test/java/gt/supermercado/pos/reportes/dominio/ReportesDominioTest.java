@@ -166,6 +166,114 @@ class ReportesDominioTest {
     }
 
     @Test
+    void lasCajasSeOrdenanPorTotalConSuParticipacionYLaFilaDeTotales() {   // HU-10.04 crit. 1 y 2
+        ReporteVentasPorCaja reporte = ReporteVentasPorCaja.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCaja.VentasDeCaja(1, "Caja 1", 1, new BigDecimal("10.00"), 1),
+                new ReporteVentasPorCaja.VentasDeCaja(2, "Caja 2", 2, new BigDecimal("20.00"), 3),
+                new ReporteVentasPorCaja.VentasDeCaja(3, "caja 0", 0, new BigDecimal("0.00"), 0),
+                new ReporteVentasPorCaja.VentasDeCaja(4, "Caja 4", 0, new BigDecimal("0.00"), 1)));
+
+        assertThat(reporte.filas()).extracting(ReporteVentasPorCaja.Fila::caja)
+                .containsExactly("Caja 2", "Caja 1", "caja 0", "Caja 4");
+        assertThat(reporte.filas()).extracting(f -> f.participacion().toPlainString())
+                .containsExactly("66.7", "33.3", "0.0", "0.0");
+        assertThat(reporte.filas().getFirst().ticketPromedio()).isEqualByComparingTo("10.00");
+        ReporteVentasPorCaja.Fila totales = reporte.totales();
+        assertThat(totales.cajaId()).isNull();
+        assertThat(totales.cantidadVentas()).isEqualTo(3);
+        assertThat(totales.totalVendido().toPlainString()).isEqualTo("30.00");
+        assertThat(totales.turnos()).isEqualTo(5);
+        assertThat(totales.participacion().toPlainString()).isEqualTo("100.0");
+    }
+
+    @Test
+    void sinVentasLaParticipacionEsCero() {   // HU-10.04
+        ReporteVentasPorCaja reporte = ReporteVentasPorCaja.de(ENCABEZADO, List.of(
+                new ReporteVentasPorCaja.VentasDeCaja(1, "Caja 1", 0, BigDecimal.ZERO, 2)));
+
+        assertThat(reporte.filas().getFirst().participacion().toPlainString()).isEqualTo("0.0");
+        assertThat(reporte.totales().participacion().toPlainString()).isEqualTo("0.0");
+        assertThat(reporte.totales().ticketPromedio()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void losProductosMasVendidosSumanLosMostradosEnLaFilaDeTotales() {   // HU-10.05 crit. 1
+        ReporteProductosMasVendidos reporte = ReporteProductosMasVendidos.de(ENCABEZADO, OrdenProductos.MONTO, 2,
+                new ReporteProductosMasVendidos.Resultado(5, List.of(
+                        new ReporteProductosMasVendidos.Fila(1, 10L, "750100", "Arroz 1 lb", 3, new BigDecimal("33.60")),
+                        new ReporteProductosMasVendidos.Fila(2, 11L, "750200", "Frijol 1 lb", 4, new BigDecimal("20.00")))));
+
+        assertThat(reporte.productosVendidos()).isEqualTo(5);
+        assertThat(reporte.limite()).isEqualTo(2);
+        assertThat(reporte.ordenarPor()).isEqualTo(OrdenProductos.MONTO);
+        assertThat(reporte.totales().descripcion()).isEqualTo("Total");
+        assertThat(reporte.totales().posicion()).isNull();
+        assertThat(reporte.totales().cantidad()).isEqualTo(7);
+        assertThat(reporte.totales().monto().toPlainString()).isEqualTo("53.60");
+    }
+
+    @Test
+    void elLimiteDeProductosEsVeintePorOmisionYVaDeUnoAQuinientos() {   // HU-10.05 crit. 3
+        assertThat(ReporteProductosMasVendidos.limiteValido(null)).isEqualTo(20);
+        assertThat(ReporteProductosMasVendidos.limiteValido(50)).isEqualTo(50);
+        assertThat(ReporteProductosMasVendidos.limiteValido(1)).isEqualTo(1);
+        assertThat(ReporteProductosMasVendidos.limiteValido(500)).isEqualTo(500);
+        assertThatThrownBy(() -> ReporteProductosMasVendidos.limiteValido(0)).isInstanceOf(NegocioException.class)
+                .hasMessage("Indique cuántos productos mostrar, entre 1 y 500.");
+        assertThatThrownBy(() -> ReporteProductosMasVendidos.limiteValido(501)).isInstanceOf(NegocioException.class);
+    }
+
+    @Test
+    void elPanelSumaLasTarjetasSinLasAnuladasYCalculaElTicketPromedio() {   // HU-10.12 crit. 1 y 2
+        PanelDelDia panel = PanelDelDia.de(LocalDate.of(2026, 11, 20), OffsetDateTime.parse("2026-11-20T10:00:00-06:00"),
+                new PanelDelDia.VentasDeHoy(3, new BigDecimal("100.00")), List.of(),
+                List.of(new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, false, 2, new BigDecimal("60.00")),
+                        new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, true, 1, new BigDecimal("9.00"))),
+                new PanelDelDia.Alertas(1, 0, 2));
+
+        assertThat(panel.ticketPromedio()).isEqualByComparingTo("33.33");
+        assertThat(panel.ventasPorTarjeta()).extracting(PanelDelDia.VentasConTarjeta::etiqueta)
+                .containsExactly("Débito", "Crédito");
+        assertThat(panel.ventasPorTarjeta().getFirst().transacciones()).isEqualTo(2);
+        assertThat(panel.ventasPorTarjeta().getFirst().monto().toPlainString()).isEqualTo("60.00");
+        assertThat(panel.ventasPorTarjeta().getLast().monto().toPlainString()).isEqualTo("0.00");
+        assertThat(panel.alertas().total()).isEqualTo(3);
+    }
+
+    @Test
+    void unDiaMuestraLasVeinticuatroHorasConSusVentasYLaHoraPico() {   // HU-10.11 crit. 1 y 3
+        ReporteVentasPorHora reporte = ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 20)), List.of(
+                        new ReporteVentasPorHora.VentasDeLaHora(8, 2, new BigDecimal("30.00")),
+                        new ReporteVentasPorHora.VentasDeLaHora(17, 5, new BigDecimal("120.50"))));
+
+        assertThat(reporte.filas()).hasSize(24);
+        assertThat(reporte.promedio()).isFalse();
+        assertThat(reporte.dias()).isEqualTo(1);
+        assertThat(reporte.filas().get(8).etiqueta()).isEqualTo("08:00 – 08:59");
+        assertThat(reporte.filas().get(8).cantidadVentas()).isEqualTo(2);
+        assertThat(reporte.filas().get(9).cantidadVentas()).isZero();
+        assertThat(reporte.horaPico()).isEqualTo(17);
+        assertThat(reporte.totales().cantidadVentas()).isEqualTo(7);
+        assertThat(reporte.totales().totalVendido().toPlainString()).isEqualTo("150.50");
+    }
+
+    @Test
+    void unPeriodoPromediaCadaHoraEntreTodosSusDias() {   // HU-10.11 crit. 2
+        ReporteVentasPorHora reporte = ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 4)), List.of(
+                        new ReporteVentasPorHora.VentasDeLaHora(10, 6, new BigDecimal("100.00"))));
+
+        assertThat(reporte.promedio()).isTrue();
+        assertThat(reporte.dias()).isEqualTo(4);
+        ReporteVentasPorHora.Fila diez = reporte.filas().get(10);
+        assertThat(diez.promedioVentas().toPlainString()).isEqualTo("1.5");
+        assertThat(diez.promedioTotal().toPlainString()).isEqualTo("25.00");
+        assertThat(ReporteVentasPorHora.de(ENCABEZADO, FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 1),
+                LocalDate.of(2026, 11, 1)), List.of()).horaPico()).isNull();   // sin ventas no hay hora pico
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP

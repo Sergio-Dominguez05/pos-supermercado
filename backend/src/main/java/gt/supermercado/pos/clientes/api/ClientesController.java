@@ -4,6 +4,7 @@ import gt.supermercado.pos.clientes.aplicacion.GestionClientes;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.ClienteYCorreo;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.BusquedaNit;
 import gt.supermercado.pos.clientes.aplicacion.GestionClientes.SolicitudCliente;
+import gt.supermercado.pos.clientes.aplicacion.GestionClientes.SolicitudEdicion;
 import gt.supermercado.pos.clientes.dominio.Cliente;
 import gt.supermercado.pos.clientes.dominio.FiltroClientes;
 import gt.supermercado.pos.clientes.dominio.PaginaClientes;
@@ -32,13 +33,16 @@ public class ClientesController {
         this.gestion = gestion;
     }
 
-    /** El cliente de la venta: {@code consumidorFinal} si no tiene uno asignado (HU-05.01). */
-    /** {@code correoFactura}: HU-05.11, a dónde se enviará la factura; {@code null} si no se envía. */
-    public record ClienteDeVenta(boolean consumidorFinal, Cliente cliente, String correoFactura) {
+    /**
+     * El cliente de la venta: {@code consumidorFinal} si no tiene uno asignado (HU-05.01). {@code correoFactura}:
+     * HU-05.11, a dónde se enviará la factura; {@code null} si no se envía. {@code aviso}: HU-05.08, por qué la venta
+     * no se podrá cobrar con este cliente (solo al cambiarlo); {@code null} si se puede.
+     */
+    public record ClienteDeVenta(boolean consumidorFinal, Cliente cliente, String correoFactura, String aviso) {
 
         static ClienteDeVenta de(ClienteYCorreo actual) {
             return new ClienteDeVenta(actual.cliente().isEmpty(), actual.cliente().orElse(null),
-                    actual.correoFactura());
+                    actual.correoFactura(), actual.aviso());
         }
     }
 
@@ -66,11 +70,29 @@ public class ClientesController {
     }
 
     /** HU-05.05: registra al cliente, o devuelve el existente si el NIT ya está registrado. */
+    /** HU-05.06: búsqueda por CUI (13 dígitos); si no está registrado, consulta el nombre al certificador. */
+    @GetMapping("/api/clientes/cui/{cui}")
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
+    public BusquedaNit buscarCui(@PathVariable String cui, @AuthenticationPrincipal SesionActiva sesion) {
+        return gestion.buscarCui(cui, sesion);
+    }
+
     @PostMapping("/api/clientes")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     public Cliente registrar(@RequestBody SolicitudCliente solicitud, @AuthenticationPrincipal SesionActiva sesion) {
         return gestion.registrar(solicitud, sesion);
+    }
+
+    /**
+     * HU-05.09: corrige el nombre, la dirección y el correo del cliente, también durante la venta. El NIT o CUI no se
+     * modifica (si viene en la solicitud, se ignora). 404 si el cliente no existe; 422 con datos inválidos.
+     */
+    @PutMapping("/api/clientes/{clienteId}")
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
+    public Cliente editar(@PathVariable long clienteId, @RequestBody SolicitudEdicion solicitud,
+                          @AuthenticationPrincipal SesionActiva sesion) {
+        return gestion.editar(clienteId, solicitud, sesion);
     }
 
     @GetMapping("/api/ventas/actual/cliente")
@@ -90,7 +112,10 @@ public class ClientesController {
         return gestion.reenviarFactura(ventaId, solicitud.clienteId(), sesion);
     }
 
-    /** Asigna el cliente a la venta en curso; {@code clienteId} vacío vuelve a Consumidor Final. */
+    /**
+     * Asigna o cambia el cliente de la venta en curso; {@code clienteId} vacío vuelve a Consumidor Final. HU-05.08:
+     * se puede hasta finalizar el cobro; después, 422 {@code SIN_VENTA_EN_CURSO} (hay que anular la factura).
+     */
     @PutMapping("/api/ventas/actual/cliente")
     @PreAuthorize("hasAuthority('VENTA_REGISTRAR')")
     public ClienteDeVenta asignar(@RequestBody SolicitudAsignacion solicitud,

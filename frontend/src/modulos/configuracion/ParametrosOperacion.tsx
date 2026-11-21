@@ -42,18 +42,21 @@ export function FormularioParametros({ guardado }: { guardado: ParametrosOperaci
   const clienteConsultas = useQueryClient()
   const [cantidadMaxima, setCantidadMaxima] = useState(String(guardado.cantidadMaximaPorLinea))
   const [cierreCiego, setCierreCiego] = useState(guardado.cierreCiego)
+  const [limite, setLimite] = useState(guardado.limiteConsumidorFinal.toFixed(2))
   const [aviso, setAviso] = useState<string>()
 
   const guardadoMut = useMutation({
     mutationFn: () => guardarParametrosOperacion({
       cantidadMaximaPorLinea: Number(cantidadMaxima),
       cierreCiego,
+      limiteConsumidorFinal: Number(limite),
     }),
     onMutate: () => setAviso(undefined),
     onSuccess: (actualizado) => {
       clienteConsultas.setQueryData(CLAVE_PARAMETROS_OPERACION, actualizado)
       setCantidadMaxima(String(actualizado.cantidadMaximaPorLinea))
       setCierreCiego(actualizado.cierreCiego)
+      setLimite(actualizado.limiteConsumidorFinal.toFixed(2))
       setAviso('Los parámetros de caja y venta se guardaron correctamente.')
     },
   })
@@ -95,6 +98,23 @@ export function FormularioParametros({ guardado }: { guardado: ParametrosOperaci
         </label>
         <small>El cajero ingresará el cierre de lote sin ver primero el total registrado en el POS.</small>
       </div>
+      <label>
+        Límite para Consumidor Final (Q)
+        <input
+          name="limiteConsumidorFinal"
+          type="number"
+          inputMode="decimal"
+          min={0.01}
+          max={999999.99}
+          step={0.01}
+          required
+          value={limite}
+          onChange={(evento) => setLimite(evento.target.value)}
+        />
+        <small>
+          HU-12.07: desde este total la venta no se puede facturar a Consumidor Final; se exige el NIT o el CUI.
+        </small>
+      </label>
       {guardadoMut.error && <p className="error" role="alert">{guardadoMut.error.message}</p>}
       <button type="submit" disabled={guardadoMut.isPending}>
         {guardadoMut.isPending ? 'Guardando…' : 'Guardar'}
