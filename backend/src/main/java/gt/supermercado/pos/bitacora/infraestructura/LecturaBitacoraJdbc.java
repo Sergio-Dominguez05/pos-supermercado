@@ -28,7 +28,7 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
             SELECT b.id, coalesce(b.secuencia, 0) AS secuencia, b.ocurrido_en,
                    u.nombre_completo || ' (' || u.username || ')' AS usuario, b.rol, c.nombre AS caja, b.modulo,
                    b.accion, b.exitoso, b.descripcion, b.entidad, b.entidad_id, b.cambios::text AS cambios
-            FROM bitacora b
+            FROM bitacora_completa b
             LEFT JOIN usuario u ON u.id = b.usuario_id
             LEFT JOIN caja c ON c.id = b.caja_id
             WHERE true
@@ -52,7 +52,7 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
         return jdbc.query("""
                 SELECT b.ocurrido_en, b.cambios -> ? ->> 'antes' AS antes, b.cambios -> ? ->> 'despues' AS despues,
                        u.nombre_completo || ' (' || u.username || ')' AS usuario
-                FROM bitacora b LEFT JOIN usuario u ON u.id = b.usuario_id
+                FROM bitacora_completa b LEFT JOIN usuario u ON u.id = b.usuario_id
                 WHERE b.accion = ? AND b.exitoso AND b.entidad = ? AND b.entidad_id = ? AND b.cambios -> ? IS NOT NULL
                 ORDER BY b.ocurrido_en DESC, b.secuencia DESC""",
                 (rs, fila) -> new CambioRegistrado(rs.getObject("ocurrido_en", OffsetDateTime.class),
@@ -64,8 +64,8 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
     public PaginaBitacora buscar(FiltrosBitacora filtros) {
         List<Object> argumentos = new ArrayList<>();
         StringBuilder condiciones = condiciones(filtros, argumentos);
-        long total = jdbc.queryForObject("SELECT count(*) FROM bitacora b WHERE true\n" + condiciones, Long.class,
-                argumentos.toArray());
+        long total = jdbc.queryForObject("SELECT count(*) FROM bitacora_completa b WHERE true\n" + condiciones,
+                Long.class, argumentos.toArray());
         List<Object> pagina = new ArrayList<>(argumentos);
         pagina.add(FiltrosBitacora.TAMANO_PAGINA);
         pagina.add((long) filtros.pagina() * FiltrosBitacora.TAMANO_PAGINA);
@@ -78,8 +78,8 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
     @Override
     public long contar(FiltrosBitacora filtros) {
         List<Object> argumentos = new ArrayList<>();
-        return jdbc.queryForObject("SELECT count(*) FROM bitacora b WHERE true\n" + condiciones(filtros, argumentos),
-                Long.class, argumentos.toArray());
+        return jdbc.queryForObject("SELECT count(*) FROM bitacora_completa b WHERE true\n"
+                + condiciones(filtros, argumentos), Long.class, argumentos.toArray());
     }
 
     @Override
@@ -199,7 +199,7 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
     public List<OpcionBitacora> usuarios() {
         return jdbc.query("""
                 SELECT u.id, u.nombre_completo, u.username FROM usuario u
-                WHERE EXISTS (SELECT 1 FROM bitacora b WHERE b.usuario_id = u.id)
+                WHERE EXISTS (SELECT 1 FROM bitacora_completa b WHERE b.usuario_id = u.id)
                 ORDER BY u.nombre_completo, u.username""", (rs, fila) -> new OpcionBitacora(rs.getLong("id"),
                 rs.getString("nombre_completo") + " (" + rs.getString("username") + ")"));
     }
@@ -207,7 +207,8 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
     @Override
     public List<OpcionBitacora> cajas() {
         return jdbc.query("""
-                SELECT c.id, c.nombre FROM caja c WHERE EXISTS (SELECT 1 FROM bitacora b WHERE b.caja_id = c.id)
+                SELECT c.id, c.nombre FROM caja c
+                WHERE EXISTS (SELECT 1 FROM bitacora_completa b WHERE b.caja_id = c.id)
                 ORDER BY lower(c.nombre)""", (rs, fila) -> new OpcionBitacora(rs.getLong("id"), rs.getString("nombre")));
     }
 

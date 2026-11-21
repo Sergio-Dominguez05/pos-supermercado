@@ -17,6 +17,7 @@ import {
   type VerificacionBitacora,
 } from '../../api/bitacora'
 import { useSesion } from '../login/sesion'
+import { Conservacion } from './Conservacion'
 import { fechaYHoraConSegundos, filasDeCambios, filtrosDeHoy, rotuloBitacora, rutaDocumento } from './consulta'
 
 const SIN_PERMISO = 'No tiene permiso para consultar la bitácora.'
@@ -39,6 +40,8 @@ export function Bitacora() {
         <>
           <ConsultaRegistros esAdministrador={usuario.rol === 'ADMIN'} />
           <VerificarIntegridad />
+          {/* HU-11.10: el plazo de conservación y el archivo de lo antiguo. */}
+          <Conservacion esAdministrador={usuario.rol === 'ADMIN'} />
         </>
       ) : (
         <p className="tarjeta error">{SIN_PERMISO}</p>

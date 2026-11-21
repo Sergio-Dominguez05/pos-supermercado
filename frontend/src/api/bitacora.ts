@@ -120,3 +120,32 @@ export const obtenerOpcionesBitacora = () => pedir<OpcionesBitacora>('/api/bitac
 
 /** HU-11.08. Abrir el detalle también queda en la bitácora. */
 export const obtenerDetalleEvento = (id: number) => pedir<DetalleEvento>(`/api/bitacora/${id}`)
+
+/** HU-11.10: el plazo de conservación y el estado del archivo de la bitácora. */
+export interface ConservacionBitacora {
+  plazoAnios: number
+  plazoMinimoAnios: number
+  registrosActivos: number
+  registrosArchivados: number
+  registroMasAntiguo: string | null
+  archivadoHasta: string | null
+  /** El primer día que ya no se puede archivar: se archiva lo anterior a esta fecha o a una más antigua. */
+  archivableAntesDe: string
+  /** Los registros anteriores a este día ya cumplieron el plazo; aun así no se eliminan (crit. 3). */
+  plazoCumplidoAntesDe: string
+}
+
+export const CLAVE_CONSERVACION_BITACORA = ['bitacora', 'conservacion'] as const
+
+export const obtenerConservacion = () => pedir<ConservacionBitacora>('/api/configuracion/bitacora')
+
+/** HU-11.10 crit. 1: solo el Administrador; de 4 a 50 años. */
+export const cambiarPlazoConservacion = (plazoAnios: number) =>
+  pedir<ConservacionBitacora>('/api/configuracion/bitacora', { method: 'PUT', body: JSON.stringify({ plazoAnios }) })
+
+/** HU-11.10 crit. 2: mueve al archivo lo anterior a `antesDe` (de hace más de 90 días); no borra nada. */
+export const archivarBitacora = (antesDe: string) =>
+  pedir<{ archivados: number; estado: ConservacionBitacora }>('/api/configuracion/bitacora/archivo', {
+    method: 'POST',
+    body: JSON.stringify({ antesDe }),
+  })

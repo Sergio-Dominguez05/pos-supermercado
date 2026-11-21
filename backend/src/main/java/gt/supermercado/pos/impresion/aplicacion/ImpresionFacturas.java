@@ -1,5 +1,6 @@
 package gt.supermercado.pos.impresion.aplicacion;
 
+import gt.supermercado.pos.configuracion.aplicacion.GestionFormatoComprobante;
 import gt.supermercado.pos.configuracion.aplicacion.GestionImpresoras;
 import gt.supermercado.pos.configuracion.dominio.Impresora;
 import gt.supermercado.pos.facturacion.aplicacion.ConsultaFacturas;
@@ -43,11 +44,14 @@ public class ImpresionFacturas implements ImpresionDeFactura {
     private final ConsultaFacturas facturas;
     private final GestionImpresoras impresoras;
     private final CanalImpresion canal;
+    private final GestionFormatoComprobante formato;
 
-    public ImpresionFacturas(ConsultaFacturas facturas, GestionImpresoras impresoras, CanalImpresion canal) {
+    public ImpresionFacturas(ConsultaFacturas facturas, GestionImpresoras impresoras, CanalImpresion canal,
+                             GestionFormatoComprobante formato) {
         this.facturas = facturas;
         this.impresoras = impresoras;
         this.canal = canal;
+        this.formato = formato;
     }
 
     @Override
@@ -83,7 +87,9 @@ public class ImpresionFacturas implements ImpresionDeFactura {
     /** El ticket de la factura de la venta, sin imprimirlo. HU-08.15: la base de su representación gráfica en PDF. */
     public Ticket ticket(Venta venta, List<Pago> pagos, int anchoMm, boolean reimpresion) {
         FacturaImprimible imprimible = facturas.paraImprimir(venta.id()).orElseThrow();
-        return TicketFactura.armar(datos(imprimible, venta, pagos, facturas.certificador(), reimpresion), anchoMm);
+        // HU-12.09: con el logo y los mensajes vigentes; los datos de la SAT y los totales no dependen de ellos.
+        return TicketFactura.armar(datos(imprimible, venta, pagos, facturas.certificador(), reimpresion), anchoMm,
+                formato.actual());
     }
 
     private static DatosTicketFactura datos(FacturaImprimible imprimible, Venta venta, List<Pago> pagos,
