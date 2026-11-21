@@ -38,6 +38,8 @@ public enum AccionSensible {
     VENTA_FINALIZADA(Categoria.VENTAS, "pagos"),
     /** HU-05.05 crit. 4: un cliente nuevo, registrado a mano o con el nombre que dio el certificador (HU-05.04). */
     CLIENTE_REGISTRADO(Categoria.VENTAS, "clientes"),
+    /** HU-05.09 crit. 4: nombre, dirección o correo corregidos, con el valor anterior y el nuevo (HU-11.03). */
+    CLIENTE_EDITADO(Categoria.VENTAS, "clientes"),
 
     // Facturación
     /** El Supervisor o el Administrador anula una factura certificada; también el intento rechazado (HU-08.10). */
