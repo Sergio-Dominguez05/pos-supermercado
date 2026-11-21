@@ -3,6 +3,8 @@ package gt.supermercado.pos.impresion.dominio;
 import gt.supermercado.pos.configuracion.dominio.AfiliacionIva;
 import gt.supermercado.pos.configuracion.dominio.Emisor;
 import gt.supermercado.pos.configuracion.dominio.Establecimiento;
+import gt.supermercado.pos.configuracion.dominio.FormatoComprobante;
+import gt.supermercado.pos.configuracion.dominio.LogoTicket;
 import gt.supermercado.pos.configuracion.dominio.Impresora;
 import gt.supermercado.pos.impuestos.dominio.CalculadoraIva;
 import gt.supermercado.pos.impuestos.dominio.LineaCalculada;
@@ -125,6 +127,52 @@ class TicketFacturaTest {
 
         assertThat(pagina.texto()).contains("PÁGINA DE PRUEBA", "192.168.1.50:9100", "58 mm (32 columnas)",
                 "12345678901234567890123456789012", "áéíóú");
+    }
+
+    @Test
+    void elFormatoSoloAgregaLogoEncabezadoYPieSinQuitarLosDatosDeLaSat() {   // HU-12.09 crit. 2 y 4
+        LogoTicket logo = new LogoTicket(16, 2, new byte[] {(byte) 0xFF, 0, (byte) 0xFF, 0});
+        DatosTicketFactura datos = datos(List.of(pagoDebito("4321")), "Certificador S.A.", null);
+        Ticket conFormato = TicketFactura.armar(datos, 80,
+                new FormatoComprobante("Precios bajos siempre", "Vuelva pronto", logo, null));
+        Ticket sinMensajes = TicketFactura.armar(datos, 80, new FormatoComprobante(null, null, null, null));
+
+        String texto = conFormato.texto();
+        assertThat(conFormato.logo()).isEqualTo(logo);
+        assertThat(texto.indexOf("Establecimiento 1")).isLessThan(texto.indexOf("Precios bajos siempre"));
+        assertThat(texto.indexOf("Precios bajos siempre")).isLessThan(texto.indexOf("FACTURA"));
+        assertThat(texto).endsWith("Vuelva pronto\n").doesNotContain("Gracias por su compra");
+        // Sin importar el formato, los datos de la SAT y los totales están completos y en su orden.
+        for (Ticket ticket : List.of(conFormato, sinMensajes)) {
+            assertThat(ticket.texto()).contains("NIT 576937K", "FACTURA", AUTORIZACION.toString().toUpperCase(),
+                    "Sujeto a pagos trimestrales ISR", "Certificador: Certificador S.A.")
+                    .containsPattern("Subtotal +Q13\\.39\nIVA +Q1\\.61\nTOTAL +Q15\\.00");
+        }
+        assertThat(sinMensajes.texto()).doesNotContain("Gracias por su compra");
+        assertThat(TicketFactura.armar(datos, 80).texto()).contains("¡Gracias por su compra!");   // por omisión
+    }
+
+    @Test
+    void elLogoSeImprimeComoImagenEscPosAntesDelTexto() {   // HU-12.09 crit. 1
+        LogoTicket logo = new LogoTicket(16, 2, new byte[] {(byte) 0xF0, 0x0F, 1, 2});
+        byte[] bytes = EscPos.codificar(Ticket.paraPapel(80).conLogo(logo).texto("Hola"), 1);
+
+        byte[] encabezado = {0x1D, 'v', '0', 0, 2, 0, 2, 0};
+        int inicio = indice(bytes, encabezado);
+        assertThat(inicio).isPositive();
+        assertThat(java.util.Arrays.copyOfRange(bytes, inicio + 8, inicio + 12))
+                .containsExactly((byte) 0xF0, 0x0F, 1, 2);
+        assertThat(inicio).isLessThan(indice(bytes, "Hola".getBytes(Charset.forName("IBM850"))));
+        assertThat(indice(EscPos.codificar(Ticket.paraPapel(80).texto("Hola"), 1), encabezado)).isNegative();
+    }
+
+    private static int indice(byte[] datos, byte[] patron) {
+        for (int i = 0; i <= datos.length - patron.length; i++) {
+            if (java.util.Arrays.equals(java.util.Arrays.copyOfRange(datos, i, i + patron.length), patron)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @Test

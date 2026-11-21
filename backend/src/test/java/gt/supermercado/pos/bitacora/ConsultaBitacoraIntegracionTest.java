@@ -101,6 +101,77 @@ class ConsultaBitacoraIntegracionTest {
         assertThat(invalida.body()).contains("ACCION_INEXISTENTE");
     }
 
+    // HU-11.09
+
+    @Test
+    void exportaLosRegistrosFiltradosACsvYExcelYQuedaEnLaBitacora() throws Exception {   // 11.09 crit. 1 y 2
+        long producto = idDe(enviar("/api/productos", "POST",
+                "{\"codigoBarras\":\"%s\",\"descripcion\":\"=Cafe, \\\"molido\\\"\",\"precio\":8.00}".formatted(codigo()),
+                cookieAdmin));
+        cambiarPrecio(producto, "8.50");
+        String filtros = "desde=" + hoy + "&hasta=" + hoy + "&accion=PRECIO_CAMBIADO&documento=";
+
+        HttpResponse<byte[]> csv = bytes("/api/bitacora/exportar?formato=CSV&" + filtros, cookieAdmin);
+
+        assertThat(csv.statusCode()).isEqualTo(200);
+        assertThat(csv.headers().firstValue("Content-Type").orElseThrow()).startsWith("text/csv");
+        assertThat(csv.headers().firstValue("Content-Disposition").orElseThrow())
+                .contains("attachment", "bitacora_" + hoy + "_" + hoy + ".csv");
+        String texto = new String(csv.body(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(texto).startsWith("﻿Secuencia,Fecha y hora,Usuario,Rol,Caja,Módulo,Acción,Resultado,");
+        assertThat(texto).contains("PRECIO_CAMBIADO", "Exitoso", "(admin)", "\"antes\"")
+                .doesNotContain("PRODUCTO_CREADO");   // solo lo filtrado
+
+        HttpResponse<byte[]> excel = bytes("/api/bitacora/exportar?formato=XLSX&" + filtros, cookieAdmin);
+        assertThat(excel.statusCode()).isEqualTo(200);
+        try (var libro = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(excel.body()))) {
+            var hoja = libro.getSheetAt(0);
+            assertThat(hoja.getRow(0).getCell(6).getStringCellValue()).isEqualTo("Acción");
+            assertThat(hoja.getLastRowNum()).isGreaterThanOrEqualTo(1);
+            assertThat(hoja.getRow(1).getCell(0).getCellType()).isEqualTo(org.apache.poi.ss.usermodel.CellType.NUMERIC);
+            assertThat(hoja.getRow(hoja.getLastRowNum()).getCell(6).getStringCellValue()).isEqualTo("PRECIO_CAMBIADO");
+        }
+
+        // Crit. 2: cada exportación queda registrada con su formato, sus filtros y la cantidad.
+        assertThat(jdbc.queryForList("""
+                SELECT cambios ->> 'formato' FROM bitacora WHERE accion = 'BITACORA_EXPORTADA' AND exitoso
+                  AND usuario_id = ? AND cambios -> 'filtros' ->> 'accion' = 'PRECIO_CAMBIADO'
+                ORDER BY secuencia DESC LIMIT 2""", String.class, adminId)).containsExactly("XLSX", "CSV");
+        HttpResponse<String> invalida = enviar("/api/bitacora/exportar?formato=CSV&accion=NO_EXISTE", "GET", null,
+                cookieAdmin);
+        assertThat(invalida.statusCode()).isEqualTo(422);
+        assertThat(jdbc.queryForObject("""
+                SELECT descripcion FROM bitacora WHERE accion = 'BITACORA_EXPORTADA' AND NOT exitoso
+                  AND usuario_id = ? ORDER BY secuencia DESC LIMIT 1""", String.class, adminId))
+                .contains("rechazada", "NO_EXISTE");
+    }
+
+    @Test
+    void soloElAdministradorExportaLaBitacora() throws Exception {   // 11.09 crit. 3
+        String username = "bit.s" + SIGUIENTE.incrementAndGet() + "." + System.nanoTime() % 1_000_000;
+        jdbc.update("""
+                INSERT INTO usuario (username, nombre_completo, rol_id, credencial_hash, credencial_temporal)
+                VALUES (?, 'Supervisora de la bitácora', 2, ?, false)""", username, codificador.encode("Clave2026segura"));
+        String supervisor = cookie(enviar("/api/auth/login", "POST", login(username, "contrasena", "Clave2026segura"),
+                null), "POS_SESION");
+        long supervisorId = jdbc.queryForObject("SELECT id FROM usuario WHERE username = ?", Long.class, username);
+
+        // Puede consultarla, pero no exportarla.
+        assertThat(enviar("/api/bitacora?desde=" + hoy, "GET", null, supervisor).statusCode()).isEqualTo(200);
+        assertThat(bytes("/api/bitacora/exportar?formato=CSV", supervisor).statusCode()).isEqualTo(403);
+        assertThat(jdbc.queryForObject("""
+                SELECT cambios ->> 'permisoRequerido' FROM bitacora WHERE accion = 'ACCESO_DENEGADO' AND usuario_id = ?""",
+                String.class, supervisorId)).isEqualTo("ROL_ADMIN");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bitacora WHERE accion = 'BITACORA_EXPORTADA' AND usuario_id = ?""", Integer.class,
+                supervisorId)).isZero();
+    }
+
+    private HttpResponse<byte[]> bytes(String ruta, String cookie) throws Exception {
+        return http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + puerto + ruta)).header("Cookie", cookie)
+                .GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+    }
+
     @Test
     void buscaPorNumeroDeVentaDeFacturaYDeCierre() throws Exception {   // 11.07 crit. 2 y 3
         Cajero cajero = cajeroConTurno();

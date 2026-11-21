@@ -1,5 +1,7 @@
 package gt.supermercado.pos.impresion.dominio;
 
+import gt.supermercado.pos.configuracion.dominio.LogoTicket;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,9 +18,21 @@ public final class Ticket {
 
     private final int columnas;
     private final List<Renglon> renglones = new ArrayList<>();
+    /** HU-12.09 crit. 1: el logo en blanco y negro, al principio del ticket; {@code null} si no hay. */
+    private LogoTicket logo;
 
     private Ticket(int columnas) {
         this.columnas = columnas;
+    }
+
+    /** HU-12.09: el logo que se imprime antes del primer renglón. */
+    public Ticket conLogo(LogoTicket logo) {
+        this.logo = logo;
+        return this;
+    }
+
+    public LogoTicket logo() {
+        return logo;
     }
 
     /** Un ticket vacío para papel de 58 mm (32 columnas) u 80 mm (48 columnas), con la letra normal. */

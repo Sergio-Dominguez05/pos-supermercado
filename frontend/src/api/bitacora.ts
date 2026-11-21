@@ -1,4 +1,4 @@
-import { pedir } from './cliente'
+import { ErrorDeApi, pedir, type ErrorApi } from './cliente'
 
 /** HU-11.05 crit. 3: resultado de recalcular la cadena de hashes de la bitácora. */
 export interface VerificacionBitacora {
@@ -77,6 +77,41 @@ export const rutaBitacora = (filtros: FiltrosBitacora, pagina: number) => {
   return `/api/bitacora${consulta ? `?${consulta}` : ''}`
 }
 
+/** HU-11.09 crit. 1: los formatos de exportación. */
+export type FormatoBitacora = 'XLSX' | 'CSV'
+
+/** HU-11.09: los mismos filtros de la consulta, sin página, más el formato. */
+export const rutaExportarBitacora = (filtros: FiltrosBitacora, formato: FormatoBitacora) =>
+  rutaBitacora(filtros, 0).replace('/api/bitacora', '/api/bitacora/exportar').replace(/\?|$/, (separador) =>
+    `?formato=${formato}${separador === '?' ? '&' : ''}`)
+
+/**
+ * HU-11.09: descarga el archivo. La exportación queda en la bitácora (crit. 2) y solo el Administrador puede hacerla
+ * (crit. 3: el servidor responde 403 a otro rol). Con filtros inválidos responde el error en JSON.
+ */
+export async function exportarBitacora(filtros: FiltrosBitacora, formato: FormatoBitacora) {
+  const respuesta = await fetch(rutaExportarBitacora(filtros, formato), { credentials: 'include' })
+  if (!respuesta.ok) {
+    const error: ErrorApi = await respuesta.json().catch(() => ({
+      codigo: 'SIN_RESPUESTA',
+      mensaje: 'No se pudo exportar la bitácora.',
+      detalles: [],
+    }))
+    throw new ErrorDeApi(respuesta.status, error)
+  }
+  const nombre =
+    /filename="?([^";]+)"?/.exec(respuesta.headers.get('Content-Disposition') ?? '')?.[1] ??
+    `bitacora.${formato === 'CSV' ? 'csv' : 'xlsx'}`
+  const enlace = document.createElement('a')
+  enlace.href = URL.createObjectURL(await respuesta.blob())
+  enlace.download = nombre
+  document.body.append(enlace)
+  enlace.click()
+  enlace.remove()
+  setTimeout(() => URL.revokeObjectURL(enlace.href), 1000)
+  return nombre
+}
+
 /** HU-11.06 y 11.07. El servidor registra cada búsqueda (no los cambios de página) en la bitácora. */
 export const buscarEnBitacora = (filtros: FiltrosBitacora, pagina: number) =>
   pedir<PaginaBitacora>(rutaBitacora(filtros, pagina))
@@ -85,3 +120,32 @@ export const obtenerOpcionesBitacora = () => pedir<OpcionesBitacora>('/api/bitac
 
 /** HU-11.08. Abrir el detalle también queda en la bitácora. */
 export const obtenerDetalleEvento = (id: number) => pedir<DetalleEvento>(`/api/bitacora/${id}`)
+
+/** HU-11.10: el plazo de conservación y el estado del archivo de la bitácora. */
+export interface ConservacionBitacora {
+  plazoAnios: number
+  plazoMinimoAnios: number
+  registrosActivos: number
+  registrosArchivados: number
+  registroMasAntiguo: string | null
+  archivadoHasta: string | null
+  /** El primer día que ya no se puede archivar: se archiva lo anterior a esta fecha o a una más antigua. */
+  archivableAntesDe: string
+  /** Los registros anteriores a este día ya cumplieron el plazo; aun así no se eliminan (crit. 3). */
+  plazoCumplidoAntesDe: string
+}
+
+export const CLAVE_CONSERVACION_BITACORA = ['bitacora', 'conservacion'] as const
+
+export const obtenerConservacion = () => pedir<ConservacionBitacora>('/api/configuracion/bitacora')
+
+/** HU-11.10 crit. 1: solo el Administrador; de 4 a 50 años. */
+export const cambiarPlazoConservacion = (plazoAnios: number) =>
+  pedir<ConservacionBitacora>('/api/configuracion/bitacora', { method: 'PUT', body: JSON.stringify({ plazoAnios }) })
+
+/** HU-11.10 crit. 2: mueve al archivo lo anterior a `antesDe` (de hace más de 90 días); no borra nada. */
+export const archivarBitacora = (antesDe: string) =>
+  pedir<{ archivados: number; estado: ConservacionBitacora }>('/api/configuracion/bitacora/archivo', {
+    method: 'POST',
+    body: JSON.stringify({ antesDe }),
+  })

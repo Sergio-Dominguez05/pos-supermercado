@@ -197,6 +197,96 @@ class ImpresionIntegracionTest {
                 "se puede reimprimir");
     }
 
+    // HU-12.09
+
+    @Test
+    void laVistaPreviaMuestraElFormatoSinGuardarloYConLosDatosDeLaSat() throws Exception {   // crit. 2, 3 y 4
+        jdbc.update("DELETE FROM formato_comprobante");
+        HttpResponse<String> vista = enviar("/api/configuracion/comprobante/vista-previa?anchoMm=58", "POST",
+                "{\"encabezado\":\"Su súper de confianza\",\"pie\":\"Vuelva pronto\",\"logo\":\"%s\"}".formatted(logoPng()),
+                cookieAdmin);
+
+        assertThat(vista.statusCode()).as(vista.body()).isEqualTo(200);
+        assertThat(vista.body()).contains("\"columnas\":32", "Su súper de confianza", "Vuelva pronto",
+                "\"logo\":\"data:image/png;base64,", "Subtotal", "TOTAL", "NIT", "Sujeto a pagos trimestrales ISR")
+                .doesNotContain("Gracias por su compra");
+        // Crit. 3: la vista previa no guarda nada.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM formato_comprobante", Integer.class)).isZero();
+        assertThat(enviar("/api/configuracion/comprobante", "GET", null, cookieAdmin).body())
+                .contains("\"pie\":\"¡Gracias por su compra!\"", "\"logo\":null");
+    }
+
+    @Test
+    void elFormatoGuardadoSaleEnLaFacturaImpresaYQuedaEnLaBitacora() throws Exception {   // crit. 1, 2 y 4
+        jdbc.update("DELETE FROM formato_comprobante");
+        try {
+            HttpResponse<String> guardado = enviar("/api/configuracion/comprobante", "PUT",
+                    "{\"encabezado\":\"  Precios   bajos  siempre \",\"pie\":\"Gracias, vuelva pronto\",\"logo\":\"%s\"}"
+                            .formatted(logoPng()), cookieAdmin);
+            assertThat(guardado.statusCode()).as(guardado.body()).isEqualTo(200);
+            assertThat(guardado.body()).contains("\"encabezado\":\"Precios bajos siempre\"", "\"logoAncho\":16",
+                    "\"logoAlto\":8");
+            assertThat(jdbc.queryForObject("""
+                    SELECT cambios -> 'pie' ->> 'despues' FROM bitacora WHERE accion = 'PARAMETRO_MODIFICADO'
+                      AND entidad = 'formato_comprobante' AND exitoso ORDER BY secuencia DESC LIMIT 1""", String.class))
+                    .isEqualTo("Gracias, vuelva pronto");
+
+            String host = host();
+            Cajero cajero = cajeroConVentaCobrada(impresora(host, 80, 1));
+            assertThat(finalizar(cajero).statusCode()).isEqualTo(200);
+            Envio envio = impresoraSimulada.ultimoA(host);
+            String ticket = texto(envio);
+            assertThat(ticket).contains("Precios bajos siempre", "Gracias, vuelva pronto", "FACTURA", "Subtotal",
+                    "TOTAL", "Sujeto a pagos trimestrales ISR");
+            assertThat(ticket.indexOf("Precios bajos siempre")).isLessThan(ticket.indexOf("FACTURA"));
+            assertThat(ticket.indexOf("TOTAL")).isLessThan(ticket.indexOf("Gracias, vuelva pronto"));
+            // El logo va como imagen ESC/POS (GS v 0) de 2 bytes por 8 renglones.
+            assertThat(indice(envio.datos(), new byte[] {0x1D, 'v', '0', 0, 2, 0, 8, 0})).isNotNegative();
+        } finally {
+            jdbc.update("DELETE FROM formato_comprobante");
+        }
+    }
+
+    @Test
+    void rechazaMensajesQueNoSeImprimenYLogosQueNoSonImagenes() throws Exception {
+        HttpResponse<String> emoji = enviar("/api/configuracion/comprobante", "PUT", "{\"pie\":\"Gracias 😀\"}",
+                cookieAdmin);
+        assertThat(emoji.statusCode()).isEqualTo(422);
+        assertThat(emoji.body()).contains("MENSAJE_COMPROBANTE_INVALIDO");
+        HttpResponse<String> largo = enviar("/api/configuracion/comprobante/vista-previa", "POST",
+                "{\"encabezado\":\"%s\"}".formatted("x".repeat(121)), cookieAdmin);
+        assertThat(largo.statusCode()).isEqualTo(422);
+        HttpResponse<String> noImagen = enviar("/api/configuracion/comprobante", "PUT",
+                "{\"logo\":\"data:image/png;base64,bm8gZXMgdW5hIGltYWdlbg==\"}", cookieAdmin);
+        assertThat(noImagen.statusCode()).isEqualTo(422);
+        assertThat(noImagen.body()).contains("LOGO_INVALIDO");
+        Cajero cajero = cajeroConVentaCobrada(null);
+        assertThat(enviar("/api/configuracion/comprobante", "GET", null, cajero.sesion()).statusCode()).isEqualTo(403);
+    }
+
+    /** Un PNG de 16x8 con la mitad izquierda negra, en Base64. */
+    private static String logoPng() throws Exception {
+        java.awt.image.BufferedImage imagen = new java.awt.image.BufferedImage(16, 8,
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 16; x++) {
+                imagen.setRGB(x, y, x < 8 ? 0x000000 : 0xFFFFFF);
+            }
+        }
+        java.io.ByteArrayOutputStream salida = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(imagen, "png", salida);
+        return "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(salida.toByteArray());
+    }
+
+    private static int indice(byte[] datos, byte[] patron) {
+        for (int i = 0; i <= datos.length - patron.length; i++) {
+            if (java.util.Arrays.equals(java.util.Arrays.copyOfRange(datos, i, i + patron.length), patron)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     // Apoyo
 
     record Cajero(long usuarioId, String sesion) {}

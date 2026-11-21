@@ -32,6 +32,8 @@ export interface ClienteDeVenta {
   cliente: Cliente | null
   /** HU-05.11: a dónde se enviará la factura (HU-08.15); `null` si no se envía. */
   correoFactura: string | null
+  /** HU-05.08: al cambiar el cliente, por qué la venta no se podrá cobrar así (por ejemplo, el límite de CF). */
+  aviso?: string | null
 }
 
 export interface DatosCliente {
