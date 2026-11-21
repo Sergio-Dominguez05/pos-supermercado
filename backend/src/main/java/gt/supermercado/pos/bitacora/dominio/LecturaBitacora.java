@@ -15,6 +15,12 @@ public interface LecturaBitacora {
     /** HU-11.06 y 11.07: los registros que cumplen los filtros, del más reciente al más antiguo. */
     PaginaBitacora buscar(FiltrosBitacora filtros);
 
+    /** HU-11.09: cuántos registros cumplen los filtros, sin traerlos. */
+    long contar(FiltrosBitacora filtros);
+
+    /** HU-11.09: todos los registros que cumplen los filtros, en orden de secuencia (cronológico), con sus cambios. */
+    List<RegistroExportado> exportar(FiltrosBitacora filtros);
+
     /** HU-11.08: el registro completo, con el documento relacionado si lo hay. */
     Optional<DetalleEvento> detalle(long id);
 

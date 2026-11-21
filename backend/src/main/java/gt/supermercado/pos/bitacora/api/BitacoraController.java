@@ -5,6 +5,11 @@ import gt.supermercado.pos.bitacora.aplicacion.ConsultaBitacora.OpcionesBitacora
 import gt.supermercado.pos.bitacora.aplicacion.ConsultaBitacora.SolicitudBusqueda;
 import gt.supermercado.pos.bitacora.aplicacion.VerificacionBitacora;
 import gt.supermercado.pos.bitacora.dominio.DetalleEvento;
+import gt.supermercado.pos.bitacora.dominio.FormatoBitacora;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import gt.supermercado.pos.bitacora.dominio.PaginaBitacora;
 import gt.supermercado.pos.bitacora.dominio.ResultadoVerificacion.Problema;
 import gt.supermercado.pos.seguridad.dominio.SesionActiva;
@@ -56,6 +61,33 @@ public class BitacoraController {
             @AuthenticationPrincipal SesionActiva sesion) {
         return consulta.buscar(new SolicitudBusqueda(desde, hasta, usuarioId, cajaId, modulo, accion, exitoso,
                 documento, pagina), sesion);
+    }
+
+    /**
+     * HU-11.09: los registros filtrados (mismos filtros que la consulta) en Excel ({@code XLSX}) o {@code CSV}. Crit.
+     * 3: solo el Administrador; a otro rol, 403 (y queda como {@code ACCESO_DENEGADO}). 422 con filtros inválidos o si
+     * pasa de {@link ConsultaBitacora#MAXIMO_EXPORTACION} registros.
+     */
+    @GetMapping("/exportar")
+    @PreAuthorize("hasAuthority('ROL_ADMIN')")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam FormatoBitacora formato,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) Long cajaId,
+            @RequestParam(required = false) String modulo,
+            @RequestParam(required = false) String accion,
+            @RequestParam(required = false) Boolean exitoso,
+            @RequestParam(required = false) String documento,
+            @AuthenticationPrincipal SesionActiva sesion) {
+        ConsultaBitacora.ArchivoBitacora archivo = consulta.exportar(new SolicitudBusqueda(desde, hasta, usuarioId,
+                cajaId, modulo, accion, exitoso, documento, 0), formato, sesion);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(archivo.tipoContenido()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(archivo.nombre()).build().toString())
+                .body(archivo.contenido());
     }
 
     @GetMapping("/opciones")
