@@ -668,6 +668,47 @@ kbd {
   padding-top: 4px;
 }
 
+/* HU-12.09: el formulario y la vista previa lado a lado; en pantallas angostas, uno debajo del otro. */
+.dos-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* HU-12.09 crit. 3: la vista previa del ticket, en letra de ancho fijo como la impresora. */
+.ticket-muestra .papel {
+  max-width: 100%;
+  margin: 8px auto;
+  padding: 12px 1ch;
+  background: #ffffff;
+  color: #000000;
+  border: 1px dashed var(--borde);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.ticket-muestra .papel img {
+  display: block;
+  margin: 0 auto 8px;
+  max-width: 100%;
+  image-rendering: pixelated;
+}
+
+.ticket-muestra .centro {
+  text-align: center;
+}
+
+.ticket-muestra .negrita {
+  font-weight: 700;
+}
+
+.ticket-muestra .destacado {
+  font-size: 1.15em;
+}
+
 /* Motivos y justificaciones: se ajustan en varias líneas en lugar de ensanchar la tabla. */
 .tabla td.texto-largo {
   min-width: 220px;
