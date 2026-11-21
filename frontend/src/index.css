@@ -630,6 +630,44 @@ kbd {
   vertical-align: middle;
 }
 
+/* HU-10.11 crit. 3: la gráfica de barras de las ventas por hora. */
+.grafica-horas figcaption {
+  margin-bottom: 8px;
+  color: var(--texto-suave);
+}
+
+.grafica-horas .barras {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 180px;
+}
+
+.grafica-horas .barra {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.grafica-horas .relleno {
+  display: block;
+  background: var(--texto-suave);
+  border-radius: 3px 3px 0 0;
+}
+
+.grafica-horas .barra.pico .relleno {
+  background: var(--ok);
+}
+
+.grafica-horas .eje {
+  font-size: 0.7rem;
+  text-align: center;
+  color: var(--texto-suave);
+  padding-top: 4px;
+}
+
 /* HU-12.09: el formulario y la vista previa lado a lado; en pantallas angostas, uno debajo del otro. */
 .dos-columnas {
   display: grid;

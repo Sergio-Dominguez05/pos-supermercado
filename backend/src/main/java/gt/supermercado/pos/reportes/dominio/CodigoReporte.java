@@ -11,6 +11,7 @@ public enum CodigoReporte {
     DETALLE_CAJERO(DetalleVentasCajero.TITULO, "ventas-del-cajero"),
     VENTAS_CAJA(ReporteVentasPorCaja.TITULO, "ventas-por-caja"),
     PRODUCTOS(ReporteProductosMasVendidos.TITULO, "productos-mas-vendidos"),
+    VENTAS_HORA(ReporteVentasPorHora.TITULO, "ventas-por-hora"),
     TARJETAS(ReporteTarjetas.TITULO, "ingresos-por-tarjeta"),
     DETALLE_TARJETA(DetallePagosTarjeta.TITULO, "transacciones-con-tarjeta"),
     IVA(ReporteIva.TITULO, "iva-cobrado"),
