@@ -118,6 +118,9 @@ class ConservacionBitacoraIntegracionTest {
         assertThat(enviar("/api/bitacora/" + id, "GET", null, cookieAdmin).body()).contains(marca);
         assertThat(enviar("/api/bitacora/verificacion", "GET", null, cookieAdmin).body())
                 .contains("\"integra\":true", "\"problemas\":[]");
+        // HU-11.09: la exportación también incluye lo archivado.
+        assertThat(enviar("/api/bitacora/exportar?formato=CSV&desde=2020-03-10&hasta=2020-03-11&modulo=bitacora", "GET",
+                null, cookieAdmin).body()).contains(marca);
         assertThat(jdbc.queryForObject("""
                 SELECT cambios ->> 'antesDe' FROM bitacora WHERE accion = 'BITACORA_ARCHIVADA' AND exitoso
                 ORDER BY secuencia DESC LIMIT 1""", String.class)).isEqualTo("2021-01-01");

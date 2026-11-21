@@ -34,10 +34,14 @@ public enum AccionSensible {
     LINEA_VENTA_ELIMINADA(Categoria.VENTAS, "ventas"),
     /** Pendiente: HU-06.14. */
     VENTA_CANCELADA(Categoria.VENTAS, "ventas"),
+    /** HU-05.08: el cajero cambia el cliente de la venta en curso, con el anterior y el nuevo. */
+    CLIENTE_VENTA_CAMBIADO(Categoria.VENTAS, "clientes"),
     /** El cajero finaliza el cobro: la venta queda registrada con sus pagos (HU-07.08). */
     VENTA_FINALIZADA(Categoria.VENTAS, "pagos"),
     /** HU-05.05 crit. 4: un cliente nuevo, registrado a mano o con el nombre que dio el certificador (HU-05.04). */
     CLIENTE_REGISTRADO(Categoria.VENTAS, "clientes"),
+    /** HU-05.09 crit. 4: nombre, dirección o correo corregidos, con el valor anterior y el nuevo (HU-11.03). */
+    CLIENTE_EDITADO(Categoria.VENTAS, "clientes"),
 
     // Facturación
     /** El Supervisor o el Administrador anula una factura certificada; también el intento rechazado (HU-08.10). */
@@ -78,8 +82,10 @@ public enum AccionSensible {
     PRECIO_CAMBIADO(Categoria.CATALOGO, "catalogo"),
     PRODUCTO_ACTIVADO(Categoria.CATALOGO, "catalogo"),
     PRODUCTO_DESACTIVADO(Categoria.CATALOGO, "catalogo"),
-    /** Carga del catálogo desde un archivo. Pendiente: HU-03.05. */
+    /** HU-03.05 crit. 6: carga del catálogo desde un archivo, con los creados y actualizados; también la rechazada. */
     CATALOGO_CARGADO(Categoria.CATALOGO, "catalogo"),
+    /** HU-03.12 crit. 3: el catálogo exportado a Excel o CSV, con el formato y la cantidad de productos. */
+    CATALOGO_EXPORTADO(Categoria.CATALOGO, "catalogo"),
 
     // Reportes (HU-10.15 crit. 3)
     /** Cada reporte generado, con sus filtros; también el intento con filtros inválidos (HU-10.15). */
@@ -90,6 +96,8 @@ public enum AccionSensible {
     // Bitácora (HU-11.06 crit. 4)
     /** Cada búsqueda en la bitácora, con sus filtros, y cada detalle abierto; también la búsqueda rechazada. */
     BITACORA_CONSULTADA(Categoria.BITACORA, "bitacora"),
+    /** HU-11.09 crit. 2: cada exportación de la bitácora, con su formato y sus filtros; también la rechazada. */
+    BITACORA_EXPORTADA(Categoria.BITACORA, "bitacora"),
     /** HU-11.10 crit. 2: registros antiguos movidos al archivo (sin borrar nada); también el intento rechazado. */
     BITACORA_ARCHIVADA(Categoria.BITACORA, "bitacora");
 

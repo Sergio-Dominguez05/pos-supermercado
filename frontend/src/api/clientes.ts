@@ -32,6 +32,8 @@ export interface ClienteDeVenta {
   cliente: Cliente | null
   /** HU-05.11: a dónde se enviará la factura (HU-08.15); `null` si no se envía. */
   correoFactura: string | null
+  /** HU-05.08: al cambiar el cliente, por qué la venta no se podrá cobrar así (por ejemplo, el límite de CF). */
+  aviso?: string | null
 }
 
 export interface DatosCliente {
@@ -89,7 +91,18 @@ export const buscarClientePorCui = (cui: string) =>
 export const registrarCliente = (datos: DatosCliente) =>
   pedir<Cliente>('/api/clientes', { method: 'POST', body: JSON.stringify(datos) })
 
-export const obtenerClienteDeVenta = () => pedir<ClienteDeVenta>('/api/ventas/actual/cliente')
+/** HU-05.09: lo que se puede corregir de un cliente; el NIT o CUI no se modifica. */
+export interface EdicionCliente {
+  nombre: string
+  direccion: string
+  correo: string
+}
+
+/** HU-05.09: corrige el nombre, la dirección y el correo; queda en la bitácora con el valor anterior y el nuevo. */
+export const editarCliente = (clienteId: number, datos: EdicionCliente) =>
+  pedir<Cliente>(`/api/clientes/${clienteId}`, { method: 'PUT', body: JSON.stringify(datos) })
+
+export const obtenerClienteDeVenta =() => pedir<ClienteDeVenta>('/api/ventas/actual/cliente')
 
 /** Asigna el cliente a la venta en curso; `null` vuelve a Consumidor Final (HU-05.01 crit. 2). */
 export const asignarClienteAVenta = (clienteId: number | null) =>

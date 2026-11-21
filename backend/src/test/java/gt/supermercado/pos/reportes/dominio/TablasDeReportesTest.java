@@ -68,6 +68,25 @@ class TablasDeReportesTest {
     }
 
     @Test
+    void lasVentasPorHoraAgreganElPromedioSoloConUnPeriodo() {   // HU-10.11
+        List<ReporteVentasPorHora.VentasDeLaHora> horas = List.of(
+                new ReporteVentasPorHora.VentasDeLaHora(9, 4, new BigDecimal("40.00")));
+        TablaReporte dia = TablasDeReportes.de(CodigoReporte.VENTAS_HORA, ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 2)), horas));
+        TablaReporte periodo = TablasDeReportes.de(CodigoReporte.VENTAS_HORA, ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 2)), horas));
+
+        assertThat(dia.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("Hora", "Ventas",
+                "Total vendido");
+        assertThat(dia.filas()).hasSize(24);
+        assertThat(periodo.columnas()).extracting(TablaReporte.Columna::titulo).containsExactly("Hora", "Ventas",
+                "Total vendido", "Ventas por día", "Promedio por día");
+        assertThat(periodo.filas().get(9)).containsExactly("09:00 – 09:59", 4L, new BigDecimal("40.00"), "2.0",
+                new BigDecimal("20.00"));
+        assertThat(periodo.resumen()).extracting(TablaReporte.Dato::valor).containsExactly(2L, "09:00 – 09:59");
+    }
+
+    @Test
     void lasTarjetasSeparanCantidadYMontoAnuladosEnDosColumnasNumericas() {
         ReporteTarjetas reporte = ReporteTarjetas.de(ENCABEZADO, null, List.of(
                 new ReporteTarjetas.PagosDelTipo(TipoTarjetaReporte.DEBITO, true, 1, new BigDecimal("25.00"))));

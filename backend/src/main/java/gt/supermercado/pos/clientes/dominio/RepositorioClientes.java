@@ -26,4 +26,7 @@ public interface RepositorioClientes {
 
     /** HU-05.11 crit. 1: el correo del cliente, agregado o cambiado durante la venta. */
     void cambiarCorreo(long clienteId, String correo);
+
+    /** HU-05.09: el nombre, la dirección y el correo; la identificación (NIT o CUI) no cambia nunca (crit. 2). */
+    void editar(long clienteId, String nombre, String direccion, String correo);
 }

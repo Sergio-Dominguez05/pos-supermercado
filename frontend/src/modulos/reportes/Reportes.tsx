@@ -10,6 +10,7 @@ import { ReporteIva } from './Iva'
 import { ReporteDeProductos } from './ProductosMasVendidos'
 import { ReporteDeTarjetas } from './Tarjetas'
 import { ReporteDeCajas } from './VentasPorCaja'
+import { ReporteDeHoras } from './VentasPorHora'
 import { ReporteDeVentas } from './VentasPeriodo'
 import { ReporteDeCajeros } from './VentasPorCajero'
 
@@ -71,6 +72,7 @@ export function SelectorDeReportes({
       {elegido === 'VENTAS_CAJERO' && <ReporteDeCajeros key={elegido} opciones={opciones} />}
       {elegido === 'VENTAS_CAJA' && <ReporteDeCajas key={elegido} opciones={opciones} />}
       {elegido === 'PRODUCTOS' && <ReporteDeProductos key={elegido} opciones={opciones} />}
+      {elegido === 'VENTAS_HORA' && <ReporteDeHoras key={elegido} opciones={opciones} />}
       {elegido === 'TARJETAS' && <ReporteDeTarjetas key={elegido} opciones={opciones} />}
       {elegido === 'IVA' && <ReporteIva key={elegido} opciones={opciones} />}
       {elegido === 'CIERRES' && <ReporteDeCierres key={elegido} opciones={opciones} />}

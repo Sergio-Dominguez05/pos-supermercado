@@ -28,6 +28,42 @@ public record EventoBitacora(
     public static final String MODIFICADO = "modificado";
 
     /**
+     * HU-11.03 crit. 2: los campos de {@code cambios} cuyo valor nunca se guarda. Cuenta el nombre exacto, sin
+     * mayúsculas, o seguido de otra palabra en camelCase ({@code secretoFel}, {@code pinTemporal}); no los códigos con
+     * guion bajo, como el permiso {@code CREDENCIAL_RESTABLECER}, que no son datos sensibles.
+     */
+    public static final java.util.List<String> CAMPOS_SENSIBLES = java.util.List.of("secreto", "credencial",
+            "contrasena", "contraseña", "password", "pin", "token", "clave", "llave");
+
+    /**
+     * HU-11.03 crit. 2, como red de seguridad: aunque un caso de uso pase el valor de un dato sensible, se guarda
+     * {@link #MODIFICADO} en su lugar. Cada historia ya lo hace así; esto evita que un descuido lo filtre.
+     */
+    public EventoBitacora {
+        cambios = enmascarar(cambios);
+    }
+
+    /** Los mismos cambios, con {@link #MODIFICADO} en cada campo sensible; {@code null} sigue siendo {@code null}. */
+    static Map<String, Object> enmascarar(Map<String, Object> cambios) {
+        if (cambios == null || cambios.keySet().stream().noneMatch(EventoBitacora::esSensible)) {
+            return cambios;
+        }
+        Map<String, Object> seguros = new java.util.LinkedHashMap<>();
+        cambios.forEach((campo, valor) -> seguros.put(campo, esSensible(campo) ? MODIFICADO : valor));
+        return java.util.Collections.unmodifiableMap(seguros);
+    }
+
+    /** Si el campo es un dato sensible (HU-11.03 crit. 2). */
+    public static boolean esSensible(String campo) {
+        if (campo == null) {
+            return false;
+        }
+        String nombre = campo.toLowerCase(java.util.Locale.ROOT);
+        return CAMPOS_SENSIBLES.stream().anyMatch(sensible -> nombre.equals(sensible)
+                || nombre.startsWith(sensible) && Character.isUpperCase(campo.charAt(sensible.length())));
+    }
+
+    /**
      * Un evento de una de las {@link AccionSensible acciones del catálogo} (HU-11.01): el módulo y el código de la
      * acción salen del catálogo. Es la forma de registrar que deben usar los casos de uso.
      */

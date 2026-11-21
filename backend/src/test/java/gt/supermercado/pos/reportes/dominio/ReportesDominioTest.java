@@ -241,6 +241,39 @@ class ReportesDominioTest {
     }
 
     @Test
+    void unDiaMuestraLasVeinticuatroHorasConSusVentasYLaHoraPico() {   // HU-10.11 crit. 1 y 3
+        ReporteVentasPorHora reporte = ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 20)), List.of(
+                        new ReporteVentasPorHora.VentasDeLaHora(8, 2, new BigDecimal("30.00")),
+                        new ReporteVentasPorHora.VentasDeLaHora(17, 5, new BigDecimal("120.50"))));
+
+        assertThat(reporte.filas()).hasSize(24);
+        assertThat(reporte.promedio()).isFalse();
+        assertThat(reporte.dias()).isEqualTo(1);
+        assertThat(reporte.filas().get(8).etiqueta()).isEqualTo("08:00 – 08:59");
+        assertThat(reporte.filas().get(8).cantidadVentas()).isEqualTo(2);
+        assertThat(reporte.filas().get(9).cantidadVentas()).isZero();
+        assertThat(reporte.horaPico()).isEqualTo(17);
+        assertThat(reporte.totales().cantidadVentas()).isEqualTo(7);
+        assertThat(reporte.totales().totalVendido().toPlainString()).isEqualTo("150.50");
+    }
+
+    @Test
+    void unPeriodoPromediaCadaHoraEntreTodosSusDias() {   // HU-10.11 crit. 2
+        ReporteVentasPorHora reporte = ReporteVentasPorHora.de(ENCABEZADO,
+                FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 4)), List.of(
+                        new ReporteVentasPorHora.VentasDeLaHora(10, 6, new BigDecimal("100.00"))));
+
+        assertThat(reporte.promedio()).isTrue();
+        assertThat(reporte.dias()).isEqualTo(4);
+        ReporteVentasPorHora.Fila diez = reporte.filas().get(10);
+        assertThat(diez.promedioVentas().toPlainString()).isEqualTo("1.5");
+        assertThat(diez.promedioTotal().toPlainString()).isEqualTo("25.00");
+        assertThat(ReporteVentasPorHora.de(ENCABEZADO, FiltrosReporte.delPeriodo(LocalDate.of(2026, 11, 1),
+                LocalDate.of(2026, 11, 1)), List.of()).horaPico()).isNull();   // sin ventas no hay hora pico
+    }
+
+    @Test
     void elTicketPromedioSeRedondeaACentavos() {
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("10.00"), 3)).isEqualByComparingTo("3.33");
         assertThat(ReporteVentasPeriodo.promedio(new BigDecimal("0.05"), 2)).isEqualByComparingTo("0.03");   // HALF_UP

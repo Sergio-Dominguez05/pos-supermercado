@@ -28,6 +28,7 @@ import gt.supermercado.pos.reportes.dominio.PanelDelDia;
 import gt.supermercado.pos.reportes.dominio.VentasDelDia;
 import gt.supermercado.pos.reportes.dominio.ReporteProductosMasVendidos;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCaja;
+import gt.supermercado.pos.reportes.dominio.ReporteVentasPorHora;
 import gt.supermercado.pos.reportes.dominio.ReporteVentasPorCajero;
 import gt.supermercado.pos.reportes.dominio.RepositorioReportes;
 import gt.supermercado.pos.reportes.dominio.TablasDeReportes;
@@ -114,6 +115,13 @@ public class GeneracionReportes {
     public ReporteVentasPorCaja ventasPorCaja(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
                                               SesionActiva sesion) {
         return (ReporteVentasPorCaja) generar(CodigoReporte.VENTAS_CAJA,
+                ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
+    }
+
+    /** HU-10.11: ventas por hora del día; con un período, también el promedio por día de cada hora. */
+    public ReporteVentasPorHora ventasPorHora(LocalDate desde, LocalDate hasta, Long cajaId, Long cajeroId,
+                                              SesionActiva sesion) {
+        return (ReporteVentasPorHora) generar(CodigoReporte.VENTAS_HORA,
                 ParametrosReporte.comunes(desde, hasta, cajaId, cajeroId), sesion);
     }
 
@@ -293,6 +301,7 @@ public class GeneracionReportes {
             case VENTAS_CAJERO -> ReporteVentasPorCajero.de(encabezado, repositorio.ventasPorCajero(filtros));
             case DETALLE_CAJERO -> new DetalleVentasCajero(encabezado, repositorio.ventasDeCajero(filtros));
             case VENTAS_CAJA -> ReporteVentasPorCaja.de(encabezado, repositorio.ventasPorCaja(filtros));
+            case VENTAS_HORA -> ReporteVentasPorHora.de(encabezado, filtros, repositorio.ventasPorHora(filtros));
             case PRODUCTOS -> {
                 int limite = ReporteProductosMasVendidos.limiteValido(p.limite());
                 yield ReporteProductosMasVendidos.de(encabezado, ordenProductos(p), limite,

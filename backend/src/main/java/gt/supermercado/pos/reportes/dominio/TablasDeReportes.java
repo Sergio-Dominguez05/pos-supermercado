@@ -36,6 +36,7 @@ public final class TablasDeReportes {
             case DETALLE_CAJERO -> detalleCajero((DetalleVentasCajero) reporte);
             case VENTAS_CAJA -> ventasPorCaja((ReporteVentasPorCaja) reporte);
             case PRODUCTOS -> productos((ReporteProductosMasVendidos) reporte);
+            case VENTAS_HORA -> ventasPorHora((ReporteVentasPorHora) reporte);
             case TARJETAS -> tarjetas((ReporteTarjetas) reporte);
             case DETALLE_TARJETA -> detalleTarjeta((DetallePagosTarjeta) reporte);
             case IVA -> iva((ReporteIva) reporte);
@@ -87,6 +88,30 @@ public final class TablasDeReportes {
     private static List<Object> filaCaja(ReporteVentasPorCaja.Fila fila) {
         return fila(fila.caja(), fila.cantidadVentas(), fila.totalVendido(), fila.turnos(), fila.ticketPromedio(),
                 fila.participacion());
+    }
+
+    private static TablaReporte ventasPorHora(ReporteVentasPorHora reporte) {
+        List<Dato> resumen = new ArrayList<>();
+        resumen.add(new Dato("Días del período", reporte.dias(), ENTERO));
+        if (reporte.horaPico() != null) {
+            resumen.add(new Dato("Hora de más ventas", ReporteVentasPorHora.etiqueta(reporte.horaPico()), TEXTO));
+        }
+        List<Columna> columnas = reporte.promedio()
+                ? columnas("Hora", TEXTO, "Ventas", ENTERO, "Total vendido", DINERO, "Ventas por día", TEXTO,
+                        "Promedio por día", DINERO)
+                : columnas("Hora", TEXTO, "Ventas", ENTERO, "Total vendido", DINERO);
+        return tabla(CodigoReporte.VENTAS_HORA, reporte.encabezado(), List.copyOf(resumen), columnas,
+                reporte.filas().stream().map(fila -> filaHora(fila, reporte.promedio())).toList(),
+                List.of(filaHora(reporte.totales(), reporte.promedio())),
+                List.of("Ventas finalizadas sin las facturas anuladas, por la hora de finalización (hora de Guatemala)."
+                        + (reporte.promedio() ? " El promedio divide entre todos los días del período." : "")));
+    }
+
+    private static List<Object> filaHora(ReporteVentasPorHora.Fila fila, boolean promedio) {
+        return promedio
+                ? fila(fila.etiqueta(), fila.cantidadVentas(), fila.totalVendido(),
+                        fila.promedioVentas().toPlainString(), fila.promedioTotal())
+                : fila(fila.etiqueta(), fila.cantidadVentas(), fila.totalVendido());
     }
 
     private static TablaReporte productos(ReporteProductosMasVendidos reporte) {

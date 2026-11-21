@@ -9,6 +9,7 @@ import gt.supermercado.pos.bitacora.dominio.LecturaBitacora;
 import gt.supermercado.pos.bitacora.dominio.OpcionBitacora;
 import gt.supermercado.pos.bitacora.dominio.PaginaBitacora;
 import gt.supermercado.pos.bitacora.dominio.RegistroConsultado;
+import gt.supermercado.pos.bitacora.dominio.RegistroExportado;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -61,8 +62,38 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
 
     @Override
     public PaginaBitacora buscar(FiltrosBitacora filtros) {
-        StringBuilder condiciones = new StringBuilder();
         List<Object> argumentos = new ArrayList<>();
+        StringBuilder condiciones = condiciones(filtros, argumentos);
+        long total = jdbc.queryForObject("SELECT count(*) FROM bitacora_completa b WHERE true\n" + condiciones,
+                Long.class, argumentos.toArray());
+        List<Object> pagina = new ArrayList<>(argumentos);
+        pagina.add(FiltrosBitacora.TAMANO_PAGINA);
+        pagina.add((long) filtros.pagina() * FiltrosBitacora.TAMANO_PAGINA);
+        List<RegistroConsultado> registros = jdbc.query(SELECT_REGISTRO + condiciones
+                + "ORDER BY b.ocurrido_en DESC, b.secuencia DESC NULLS LAST, b.id DESC LIMIT ? OFFSET ?", REGISTRO,
+                pagina.toArray());
+        return new PaginaBitacora(registros, filtros.pagina(), FiltrosBitacora.TAMANO_PAGINA, total);
+    }
+
+    @Override
+    public long contar(FiltrosBitacora filtros) {
+        List<Object> argumentos = new ArrayList<>();
+        return jdbc.queryForObject("SELECT count(*) FROM bitacora_completa b WHERE true\n"
+                + condiciones(filtros, argumentos), Long.class, argumentos.toArray());
+    }
+
+    @Override
+    public List<RegistroExportado> exportar(FiltrosBitacora filtros) {
+        List<Object> argumentos = new ArrayList<>();
+        return jdbc.query(SELECT_REGISTRO + condiciones(filtros, argumentos)
+                + "ORDER BY b.secuencia NULLS LAST, b.ocurrido_en, b.id", (rs, fila) -> new RegistroExportado(
+                REGISTRO.mapRow(rs, fila), rs.getString("entidad"), (Long) rs.getObject("entidad_id"),
+                rs.getString("cambios")), argumentos.toArray());
+    }
+
+    /** HU-11.07: las condiciones de los filtros, las mismas para la pantalla y para la exportación (HU-11.09). */
+    private static StringBuilder condiciones(FiltrosBitacora filtros, List<Object> argumentos) {
+        StringBuilder condiciones = new StringBuilder();
         if (filtros.desde() != null) {
             condiciones.append("  AND b.ocurrido_en >= (?::date)::timestamp AT TIME ZONE 'America/Guatemala'\n");
             argumentos.add(filtros.desde());
@@ -94,15 +125,7 @@ class LecturaBitacoraJdbc implements LecturaBitacora {
         if (filtros.documento() != null) {
             documento(filtros.documento(), condiciones, argumentos);
         }
-        long total = jdbc.queryForObject("SELECT count(*) FROM bitacora_completa b WHERE true\n" + condiciones,
-                Long.class, argumentos.toArray());
-        List<Object> pagina = new ArrayList<>(argumentos);
-        pagina.add(FiltrosBitacora.TAMANO_PAGINA);
-        pagina.add((long) filtros.pagina() * FiltrosBitacora.TAMANO_PAGINA);
-        List<RegistroConsultado> registros = jdbc.query(SELECT_REGISTRO + condiciones
-                + "ORDER BY b.ocurrido_en DESC, b.secuencia DESC NULLS LAST, b.id DESC LIMIT ? OFFSET ?", REGISTRO,
-                pagina.toArray());
-        return new PaginaBitacora(registros, filtros.pagina(), FiltrosBitacora.TAMANO_PAGINA, total);
+        return condiciones;
     }
 
     /**

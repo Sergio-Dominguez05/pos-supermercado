@@ -17,6 +17,11 @@ spring:
           time_zone: UTC
   flyway:
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      # HU-03.05: un catálogo de miles de productos en Excel o CSV cabe con holgura en 5 MB.
+      max-file-size: 5MB
+      max-request-size: 6MB
   jackson:
     time-zone: America/Guatemala
     deserialization:

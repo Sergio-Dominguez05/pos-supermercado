@@ -172,6 +172,28 @@ export interface ReporteVentasPorCaja {
   totales: FilaVentasCaja
 }
 
+/** HU-10.11: una hora del día (0 a 23), o la fila de totales (`hora` nula). */
+export interface FilaVentasHora {
+  hora: number | null
+  etiqueta: string
+  cantidadVentas: number
+  totalVendido: number
+  /** Ventas por día en esa hora, con un decimal; igual a `cantidadVentas` en un solo día. */
+  promedioVentas: number
+  promedioTotal: number
+}
+
+export interface ReporteVentasPorHora {
+  encabezado: EncabezadoReporte
+  dias: number
+  /** Crit. 2: verdadero si es un período (más de un día) y se muestra el promedio por día. */
+  promedio: boolean
+  filas: FilaVentasHora[]
+  totales: FilaVentasHora
+  /** La hora con más ventas, o `null` si no hubo ventas. */
+  horaPico: number | null
+}
+
 /** HU-10.03 crit. 2: una venta finalizada o cancelada del cajero. */
 export interface VentaDeCajero {
   ventaId: number
@@ -200,7 +222,10 @@ export const generarReporteCajeros = (filtros: FiltrosVentas) =>
 export const generarReporteCajas = (filtros: FiltrosVentas) =>
   pedir<ReporteVentasPorCaja>(`/api/reportes/cajas?${consultaDe(sinAgrupacion(filtros))}`)
 
-export const generarReporteProductos = (filtros: FiltrosVentas) =>
+export const generarReporteHoras = (filtros: FiltrosVentas) =>
+  pedir<ReporteVentasPorHora>(`/api/reportes/horas?${consultaDe(sinAgrupacion(filtros))}`)
+
+export const generarReporteProductos =(filtros: FiltrosVentas) =>
   pedir<ReporteProductosMasVendidos>(
     `/api/reportes/productos?${consultaDe({ ...sinAgrupacion(filtros), ...deProductos(filtros) })}`,
   )
@@ -364,6 +389,7 @@ export type CodigoExportable =
   | 'DETALLE_CAJERO'
   | 'VENTAS_CAJA'
   | 'PRODUCTOS'
+  | 'VENTAS_HORA'
   | 'TARJETAS'
   | 'DETALLE_TARJETA'
   | 'IVA'

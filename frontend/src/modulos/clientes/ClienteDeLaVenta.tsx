@@ -13,6 +13,7 @@ import {
   type ClienteDeVenta,
   type TipoIdentificacion,
 } from '../../api/clientes'
+import { EdicionCliente } from './EdicionCliente'
 import { nitValido, normalizarNit } from './nit'
 import {
   avisoBusqueda,
@@ -34,6 +35,8 @@ import {
  * - HU-05.04: un NIT nuevo se consulta al certificador; si no aparece o no responde, se escribe el nombre o se usa CF.
  * - HU-05.05: el cliente nuevo se registra sin salir de la venta (dirección "Ciudad" si se deja vacía).
  * - HU-05.06: sin NIT, el cliente se busca y se registra con su CUI (13 dígitos), elegido en el selector.
+ * - HU-05.08: el cliente se cambia hasta finalizar el cobro; si el cambio impide cobrar (límite de CF), se avisa.
+ * - HU-05.09: los datos del cliente asignado (nombre, dirección y correo) se corrigen sin salir de la venta.
  * - HU-05.11: el correo al que se envía la factura (HU-08.15), opcional.
  * F6 lleva al campo del NIT (HU-06.17).
  */
@@ -45,6 +48,7 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
   const [nit, setNit] = useState('')
   const [problema, setProblema] = useState<string>()
   const [busqueda, setBusqueda] = useState<BusquedaNit>()
+  const [editando, setEditando] = useState(false)
 
   const asignacion = useMutation({
     mutationFn: (cliente: Cliente | null) => asignarClienteAVenta(cliente?.id ?? null),
@@ -83,7 +87,33 @@ export function ClienteDeLaVenta({ ventaId }: { ventaId: number }) {
       </h3>
       <p>
         <strong>{describirCliente(data?.cliente ?? null)}</strong>
+        {data?.cliente && !editando && (
+          <>
+            {' '}
+            <button type="button" data-control="editar-cliente" onClick={() => setEditando(true)}>
+              Editar datos
+            </button>
+          </>
+        )}
       </p>
+      {/* HU-05.08 crit. 1: el cambio se acepta, pero se avisa si con este cliente no se podrá cobrar. */}
+      {data?.aviso && (
+        <p className="pendiente" role="alert">
+          {data.aviso}
+        </p>
+      )}
+      {/* HU-05.09 crit. 1: los datos del cliente se corrigen sin salir de la venta. */}
+      {data?.cliente && editando && (
+        <EdicionCliente
+          cliente={data.cliente}
+          onCancelar={() => setEditando(false)}
+          onGuardado={(cliente) => {
+            setEditando(false)
+            clienteConsultas.setQueryData(clave, { ...data, cliente })
+            void clienteConsultas.invalidateQueries({ queryKey: ['clientes', 'lista'] })
+          }}
+        />
+      )}
       {data && (
         <CorreoDeFactura
           key={data.correoFactura ?? ''}
