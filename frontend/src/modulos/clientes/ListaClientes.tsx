@@ -1,16 +1,18 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import {
   claveListaClientes,
   FILTRO_CLIENTES_INICIAL,
   listarClientes,
+  type Cliente,
   type FiltroClientes,
 } from '../../api/clientes'
 import { useSesion } from '../login/sesion'
-import { fechaUltimaCompra, identificacionCliente, resumenClientes } from './textos'
+import { EdicionCliente } from './EdicionCliente'
+import { clienteDeLista, fechaUltimaCompra, identificacionCliente, resumenClientes } from './textos'
 
-/** HU-05.10: directorio paginado de clientes registrados. */
+/** HU-05.10: directorio paginado de clientes registrados; HU-05.09: desde aquí también se corrigen sus datos. */
 export function ListaClientes() {
   const { data: usuario } = useSesion()
   if (!usuario) return null
@@ -32,6 +34,8 @@ export function ListaClientes() {
 
 export function TablaClientes() {
   const [filtro, setFiltro] = useState<FiltroClientes>(FILTRO_CLIENTES_INICIAL)
+  const [editado, setEditado] = useState<Cliente>()
+  const consultas = useQueryClient()
   const { data: pagina, error, isPending } = useQuery({
     queryKey: claveListaClientes(filtro),
     queryFn: () => listarClientes(filtro),
@@ -68,21 +72,46 @@ export function TablaClientes() {
                 <th>Dirección</th>
                 <th>Correo</th>
                 <th>Última compra</th>
+                <th>
+                  <span className="solo-lector">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {pagina.clientes.map((cliente) => (
-                <tr key={cliente.id}>
+                <tr key={cliente.id} className={cliente.id === editado?.id ? 'seleccionada' : undefined}>
                   <td>{identificacionCliente(cliente)}</td>
                   <td>{cliente.nombre}</td>
                   <td>{cliente.direccion}</td>
                   <td>{cliente.correo ?? '—'}</td>
                   <td>{fechaUltimaCompra(cliente.ultimaCompra)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="boton-texto"
+                      aria-label={`Editar a ${cliente.nombre}`}
+                      onClick={() => setEditado(clienteDeLista(cliente))}
+                    >
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {/* HU-05.09: corregir nombre, dirección y correo; el NIT o CUI no se edita. */}
+      {editado && (
+        <EdicionCliente
+          key={editado.id}
+          cliente={editado}
+          onCancelar={() => setEditado(undefined)}
+          onGuardado={() => {
+            setEditado(undefined)
+            void consultas.invalidateQueries({ queryKey: ['clientes', 'lista'] })
+          }}
+        />
       )}
       {pagina && (
         <nav className="barra-filtros" aria-label="Páginas de clientes">

@@ -104,6 +104,12 @@ class RepositorioClientesJdbc implements RepositorioClientes {
     }
 
     @Override
+    public void editar(long clienteId, String nombre, String direccion, String correo) {
+        jdbc.update("UPDATE cliente SET nombre = ?, direccion = ?, correo = ? WHERE id = ?", nombre, direccion, correo,
+                clienteId);
+    }
+
+    @Override
     public long registrar(String tipo, String identificacion, String nombre, String direccion, String correo,
                           long usuarioId) {
         return jdbc.queryForObject("""
