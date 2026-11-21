@@ -78,6 +78,11 @@ class ProductosParaVenderTest {
         }
 
         @Override
+        public List<Producto> todos() {
+            return List.copyOf(catalogo);
+        }
+
+        @Override
         public PaginaProductos buscar(FiltroProductos filtro) {
             throw new UnsupportedOperationException();
         }
