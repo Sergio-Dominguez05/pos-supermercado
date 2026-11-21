@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static gt.supermercado.pos.bitacora.dominio.AccionSensible.*;
-import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -28,8 +27,7 @@ class CatalogoAccionesSensiblesTest {
      * registrar la acción, esta prueba falla hasta quitarla de aquí y agregar su caso a
      * {@link AccionesSensiblesIntegracionTest}.
      */
-    static final Map<AccionSensible, String> PENDIENTES = Map.ofEntries(
-            entry(CATALOGO_CARGADO, "HU-03.05"));
+    static final Map<AccionSensible, String> PENDIENTES = Map.of();
 
     private static final Set<String> MODULOS = Set.of(
             "seguridad", "catalogo", "ventas", "clientes", "pagos", "facturacion", "caja", "configuracion", "reportes",

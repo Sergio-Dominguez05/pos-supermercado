@@ -54,5 +54,24 @@ public final class ArchivoCatalogo {
     public interface Escritor {
 
         byte[] exportar(List<Producto> productos, Formato formato);
+
+        /** HU-03.05 crit. 1: la plantilla de carga, solo con los títulos de sus tres columnas. */
+        byte[] plantilla(Formato formato);
+    }
+
+    /**
+     * HU-03.05: una fila del archivo tal como viene, antes de validarla. {@code numero} es el renglón en la hoja
+     * (el de los títulos es el 1), para decirle al usuario dónde está cada error.
+     */
+    public record Fila(int numero, String codigo, String descripcion, String precio) {}
+
+    /** HU-03.05: lee las filas de un archivo de Excel (.xlsx) o CSV con las columnas de la plantilla. */
+    public interface Lector {
+
+        /**
+         * Las filas con datos, sin las vacías. Lanza {@code NegocioException} si el archivo no se puede leer o le falta
+         * alguna de las columnas de la plantilla; las columnas extra (estado, última modificación) se ignoran.
+         */
+        List<Fila> leer(byte[] contenido);
     }
 }
